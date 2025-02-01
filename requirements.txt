@@ -1,0 +1,24 @@
+httpx
+pathlib
+ujson
+
+uvicorn
+fastapi
+pydantic
+websockets
+
+soundfile
+# vosk
+pydub
+
+tqdm
+psutil
+
+sherpa-onnx
+
+numpy
+
+#pymystem3
+#pandas
+
+

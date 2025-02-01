@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="PYTHON_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/models/vosk-model-small-streaming-ru" />
+    </content>
+    <orderEntry type="jdk" jdkName="Python 3.11 (Vosk5_FastAPI_streaming)" jdkType="Python SDK" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+  <component name="PackageRequirementsSettings">
+    <option name="keepMatchingSpecifier" value="false" />
+  </component>
+</module>

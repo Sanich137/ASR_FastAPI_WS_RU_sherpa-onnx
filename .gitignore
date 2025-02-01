@@ -1,0 +1,7 @@
+/models/batch_vosk-model-ru-0.42/
+/.venv/
+/venv/
+*.log
+/models/vosk-model-small-streaming-ru/
+*.wav
+*.mp3
