@@ -42,7 +42,7 @@ async def post_not_websocket(ws:WebSocketModel):
     return f"Прочти инструкцию в Schemas - 'WebSocketModel'"
 
 
-@app.websocket("/ws_stream ")
+@app.websocket("/ws")
 async def websocket(ws: WebSocket):
     sample_rate=8000
     # Создаем поток для распознавания
@@ -86,11 +86,15 @@ async def websocket(ws: WebSocket):
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e}")
             else:
-                while recognizer.is_ready(stream):
-                    recognizer.decode_stream(stream)
+                if False:
+                    pass
+#                while recognizer.is_ready(stream):
+
                 else:
+                    recognizer.decode_stream(stream)
                     try:
-                        result = ujson.loads(recognizer.get_result_as_json_string(stream))
+                        result = stream.result_as_json_string
+#                         result = ujson.loads(recognizer.get_result_as_json_string(stream))
                     except Exception as e:
                         logger.error(f"recognizer.get_result(stream()) error - {e}")
                     else:

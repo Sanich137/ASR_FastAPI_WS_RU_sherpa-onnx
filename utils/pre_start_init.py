@@ -12,30 +12,52 @@ import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 paths = {
-    "tokens_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "lang" / "tokens.txt",
-    "encoder_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "am" / "encoder.onnx",
-    "decoder_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "am" / "decoder.onnx",
-    "joiner_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "am" / "joiner.onnx",
-    "bpe_vocab": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "lang" / "bpe.model",
+    "vosk_small_streaming_tokens_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "lang" / "tokens.txt",
+    "vosk_small_streaming_encoder_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "am" / "encoder.onnx",
+    "vosk_small_streaming_decoder_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "am" / "decoder.onnx",
+    "vosk_small_streaming_joiner_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "am" / "joiner.onnx",
+    "vosk_small_streaming_bpe_vocab": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "lang" / "bpe.model",
+
+    "vosk_full_tokens_path": BASE_DIR / "models" / "vosk-model-ru" / "lang" / "tokens.txt",
+    "vosk_full_encoder_path": BASE_DIR / "models" / "vosk-model-ru" / "am-onnx" / "encoder.onnx",
+    "vosk_full_decoder_path": BASE_DIR / "models" / "vosk-model-ru" / "am-onnx" / "decoder.onnx",
+    "vosk_full_joiner_path": BASE_DIR / "models" / "vosk-model-ru" / "am-onnx" / "joiner.onnx",
+    "vosk_full_bpe_vocab": BASE_DIR / "models" / "vosk-model-ru" / "lang" / "bpe.model",
+
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'2724.1726990043.1324706.wav',
     "trash_folder": BASE_DIR / 'trash',
 }
 
 models_arguments = {
-        "vosk": {
+        "vosk_small_streaming": {
+            "tokens": paths.get("vosk_small_streaming_tokens_path"),
+            "encoder": paths.get("vosk_small_streaming_encoder_path"),
+            "decoder": paths.get("vosk_small_streaming_decoder_path"),
+            "joiner": paths.get("vosk_small_streaming_joiner_path"),
+            "bpe_vocab": paths.get("vosk_small_streaming_bpe_vocab"),
+            "num_threads": 4,
+            "decoding_method": "greedy_search",
+            "debug": False,
+            "sample_rate": 8000,
+            "feature_dim": 80,
+            "provider": "cpu",
+                },
+
+        "vosk_full": {
             "tokens": paths.get("tokens_path"),
             "encoder": paths.get("encoder_path"),
             "decoder": paths.get("decoder_path"),
+            "bpe_vocab": paths.get("bpe_vocab"),
             "joiner": paths.get("joiner_path"),
             "num_threads": 4,
             "decoding_method": "greedy_search",
             "debug": False,
-            "sample_rate": 16000,
+            "sample_rate": 8000,
             "feature_dim": 80,
-            "bpe_vocab": paths.get("bpe_vocab"),
             "provider": "cpu",
-                }
+                },
+
             }
 
 model_config = models_arguments.get("vosk")
@@ -47,7 +69,8 @@ if model_config.get("encoder"):
     assert_file_exists(model_config.get("decoder"))
     assert_file_exists(model_config.get("joiner"))
 
-    recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
+    #recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
+    recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(
         encoder=str(model_config.get("encoder")),
         decoder=str(model_config.get("decoder")),
         joiner=str(model_config.get("joiner")),
