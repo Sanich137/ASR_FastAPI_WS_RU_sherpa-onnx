@@ -3,7 +3,7 @@ from dbm import error
 import ujson
 import asyncio
 import webrtcvad
-
+import numpy as np
 from utils.pre_start_init import app, WebSocket, WebSocketException
 from utils.pre_start_init import recognizer
 from utils.do_logging import logger
@@ -22,20 +22,33 @@ client_overlap = defaultdict()
 client_overlap_duration = defaultdict(float)
 client_start_time = defaultdict(float)
 MAX_OVERLAP_DURATION = 15.0
-FRAME_SIZE = 240  # 30ms для 8 кГц
 
-
-def find_last_speech_position(audio: bytes, frame_size: int) -> tuple:
+def find_last_speech_position(audio: bytes) -> tuple:
     """ Находит позицию последнего сегмента речи в аудио.
         Если не находит ни одного сегмента без речи, помечает его как полностью речь
     """
     speech_end = 0
     is_full = True
+    audio = np.frombuffer(audio, dtype=np.int32)
 
-    for i in range(len(audio) - frame_size, -1, -frame_size):
-        frame = audio[i:i+frame_size]
+    # Преобразование в int16
+    if audio.dtype != np.int16:
+        audio = (audio * 32767).astype(np.int16)
+
+    # Преобразование в моно (если необходимо)
+    if len(audio.shape) > 1:
+        audio = np.mean(audio, axis=1).astype(np.int16)
+
+    # Разделение на фрагменты
+    frame_duration_ms = 30
+    frame_length = int(8000 * frame_duration_ms / 1000)
+    frames = [audio[i:i + frame_length] for i in range(0, len(audio), frame_length)]
+
+    # Проверка каждого фрагмента
+    for i, frame in enumerate(reversed(frames)):
         if not vad.is_speech(frame, 8000):
-            speech_end = i + frame_size
+            speech_end = len(audio) - i*frame_length
+            logger.debug(f"Найден не голос на speech_end = {speech_end}")
             break
     else:
         is_full = False
@@ -105,14 +118,17 @@ async def websocket(ws: WebSocket):
         elif isinstance(message, dict) and message.get('bytes'):
             try:
                 # Получаем новый чанк с данными
-                chunk = await get_np_array(message.get('bytes'))
+                # chunk = await get_np_array(message.get('bytes'))  #  Todo - не забвть о конвертации в ndarray
+                chunk = message.get('bytes')
 
                 # Проверяем новый чанк перед объединением
-                is_chunk_full_speech, speech_end  = analyze_speech(chunk)
+                is_chunk_full_speech, speech_end  = find_last_speech_position(chunk)
 
-                print(is_chunk_full_speech, speech_end)
+                logger.debug(f'is_chunk_full_speech = {is_chunk_full_speech}')
+                logger.debug(f'speech_end = {speech_end}')
 
                 logger.debug("accept_waveform")
+
                 stream.accept_waveform(8000, data)
 
 

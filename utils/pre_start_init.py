@@ -46,11 +46,11 @@ models_arguments = {
                 },
 
         "Vosk5": {
-            "tokens": paths.get("tokens_path"),
-            "encoder": paths.get("encoder_path"),
-            "decoder": paths.get("decoder_path"),
-            "bpe_vocab": paths.get("bpe_vocab"),
-            "joiner": paths.get("joiner_path"),
+            "tokens": paths.get("vosk_full_tokens_path"),
+            "encoder": paths.get("vosk_full_encoder_path"),
+            "decoder": paths.get("vosk_full_decoder_path"),
+            "bpe_vocab": paths.get("vosk_full_bpe_vocab"),
+            "joiner": paths.get("vosk_full_joiner_path"),
             "num_threads": 4,
             "decoding_method": "greedy_search",
             "debug": False,
