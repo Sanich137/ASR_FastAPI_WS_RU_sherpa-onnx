@@ -2,7 +2,7 @@ from utils.pre_start_init import app
 import logging
 import datetime
 import os
-import psutil
+# import psutil
 
 
 @app.get("/is_alive")

@@ -2,16 +2,49 @@ from dbm import error
 
 import ujson
 import asyncio
+import webrtcvad
 
 from utils.pre_start_init import app, WebSocket, WebSocketException
 from utils.pre_start_init import recognizer
 from utils.do_logging import logger
 from utils.bytes_to_samples_audio import get_np_array
 from utils.tokens_to_Result import process_asr_json
-from models.fast_api_models import WebSocketModel
+
+
+from collections import defaultdict
 
 # from models.vosk_model import model
 
+vad = webrtcvad.Vad(3)
+
+# Глобальные переменные
+client_overlap = defaultdict()
+client_overlap_duration = defaultdict(float)
+client_start_time = defaultdict(float)
+MAX_OVERLAP_DURATION = 15.0
+FRAME_SIZE = 240  # 30ms для 8 кГц
+
+
+def find_last_speech_position(audio: bytes, frame_size: int) -> tuple:
+    """ Находит позицию последнего сегмента речи в аудио.
+        Если не находит ни одного сегмента без речи, помечает его как полностью речь
+    """
+    speech_end = 0
+    is_full = True
+
+    for i in range(len(audio) - frame_size, -1, -frame_size):
+        frame = audio[i:i+frame_size]
+        if not vad.is_speech(frame, 8000):
+            speech_end = i + frame_size
+            break
+    else:
+        is_full = False
+
+    return is_full, speech_end
+
+
+def bytes_to_seconds(audio_bytes: bytes) -> float:
+    return len(audio_bytes) / (8000 * 2)
 
 
 async def send_messages(_socket, _data=None, _silence=True, _error=None, log_comment=None, _last_message=False):
@@ -36,21 +69,15 @@ async def send_messages(_socket, _data=None, _silence=True, _error=None, log_com
     return is_ok
 
 
-@app.post("/ws")
-async def post_not_websocket(ws:WebSocketModel):
-    """Описание для вебсокета ниже в описании WebSocketModel """
-    return f"Прочти инструкцию в Schemas - 'WebSocketModel'"
-
-
-@app.websocket("/ws")
+@app.websocket("/ws_buffer")
 async def websocket(ws: WebSocket):
-    sample_rate=8000
+
     # Создаем поток для распознавания
     stream = recognizer.create_stream()
-    # online_recognizer = BatchRecognizer(model, sample_rate)
     wait_null_answers=True
 
     await ws.accept()
+    client_id = id(websocket)
 
     while True:
         try:
@@ -59,15 +86,12 @@ async def websocket(ws: WebSocket):
             logger.error(f"receive WebSocketException - {wse}")
             return
 
-        # logger.debug(f'Raw message - {message}')
-
         if isinstance(message, dict) and message.get('text'):
             try:
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
                     stream = recognizer.create_stream()
-#                     online_recognizer = BatchRecognizer(model, sample_rate)
                     logger.info(f"\n Task received, config -  {message.get('text')}")
                     continue
                 elif message.get('text') and 'eof' in message.get('text'):
@@ -80,9 +104,19 @@ async def websocket(ws: WebSocket):
                 logger.error(f'Error text message compiling. Message:{message} - error:{e}')
         elif isinstance(message, dict) and message.get('bytes'):
             try:
-                data = await get_np_array(message.get('bytes'))
-                stream.accept_waveform(8000, data)
+                # Получаем новый чанк с данными
+                chunk = await get_np_array(message.get('bytes'))
+
+                # Проверяем новый чанк перед объединением
+                is_chunk_full_speech, speech_end  = analyze_speech(chunk)
+
+                print(is_chunk_full_speech, speech_end)
+
                 logger.debug("accept_waveform")
+                stream.accept_waveform(8000, data)
+
+
+
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e}")
             else:

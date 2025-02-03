@@ -4,7 +4,7 @@ import os
 from utils.do_logging import logger
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketException
+from fastapi import FastAPI, WebSocket, WebSocketException, WebSocketDisconnect
 from utils.file_exists import assert_file_exists
 import sherpa_onnx
 
@@ -30,7 +30,7 @@ paths = {
 }
 
 models_arguments = {
-        "vosk_small_streaming": {
+        "Vosk5SmallStreaming": {
             "tokens": paths.get("vosk_small_streaming_tokens_path"),
             "encoder": paths.get("vosk_small_streaming_encoder_path"),
             "decoder": paths.get("vosk_small_streaming_decoder_path"),
@@ -42,9 +42,10 @@ models_arguments = {
             "sample_rate": 8000,
             "feature_dim": 80,
             "provider": "cpu",
+            "Base_Recognizer": sherpa_onnx.OnlineRecognizer
                 },
 
-        "vosk_full": {
+        "Vosk5": {
             "tokens": paths.get("tokens_path"),
             "encoder": paths.get("encoder_path"),
             "decoder": paths.get("decoder_path"),
@@ -56,34 +57,34 @@ models_arguments = {
             "sample_rate": 8000,
             "feature_dim": 80,
             "provider": "cpu",
+            "Base_Recognizer": sherpa_onnx.OfflineRecognizer
                 },
 
             }
 
-model_config = models_arguments.get("vosk")
+model_settings = models_arguments.get(config.model_name)
 
 recognizer = None
 
-if model_config.get("encoder"):
-    assert_file_exists(model_config.get("encoder"))
-    assert_file_exists(model_config.get("decoder"))
-    assert_file_exists(model_config.get("joiner"))
+if model_settings.get("encoder"):
+    assert_file_exists(model_settings.get("encoder"))
+    assert_file_exists(model_settings.get("decoder"))
+    assert_file_exists(model_settings.get("joiner"))
 
-    #recognizer = sherpa_onnx.OnlineRecognizer.from_transducer(
-    recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(
-        encoder=str(model_config.get("encoder")),
-        decoder=str(model_config.get("decoder")),
-        joiner=str(model_config.get("joiner")),
-        tokens=str(model_config.get("tokens")),
-        num_threads=model_config.get("num_threads", 1),
-        sample_rate=model_config.get("sample_rate", 8000),
-        feature_dim=model_config.get("feature_dim"),
-        decoding_method=model_config.get("decoding_method", "greedy_search"),
-        provider=model_config.get("provider", "CPU"),
+    recognizer = model_settings.get("Base_Recognizer").from_transducer(
+        encoder=str(model_settings.get("encoder")),
+        decoder=str(model_settings.get("decoder")),
+        joiner=str(model_settings.get("joiner")),
+        tokens=str(model_settings.get("tokens")),
+        num_threads=model_settings.get("num_threads", 1),
+        sample_rate=model_settings.get("sample_rate", 8000),
+        feature_dim=model_settings.get("feature_dim"),
+        decoding_method=model_settings.get("decoding_method", "greedy_search"),
+        provider=model_settings.get("provider", "CPU"),
         lm_scale=0.2,  # по умолчанию 0.1
         modeling_unit="bpe",  # по умолчанию "cjkchar" пишут что надо только для горячих слов
-        bpe_vocab=str(model_config.get("bpe_vocab")),
-        debug=model_config.get("feature_dim", False),
+        bpe_vocab=str(model_settings.get("bpe_vocab")),
+        debug=model_settings.get("feature_dim", False),
     )
     logger.debug(f"Model {config.model_name} ready to start!")
 
@@ -105,5 +106,5 @@ app = FastAPI(lifespan=lifespan,
               version="0.1",
               docs_url='/docs',
               root_path='/root',
-              title='ASR-Vosk5-GPU on SHERPA-ONNX streaming model'
+              title='ASR-Vosk5 on SHERPA-ONNX incl. streaming model'
               )

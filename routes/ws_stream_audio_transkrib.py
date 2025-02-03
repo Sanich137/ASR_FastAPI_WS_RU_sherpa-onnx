@@ -10,10 +10,6 @@ from utils.bytes_to_samples_audio import get_np_array
 from utils.tokens_to_Result import process_asr_json
 from models.fast_api_models import WebSocketModel
 
-# from models.vosk_model import model
-
-
-
 async def send_messages(_socket, _data=None, _silence=True, _error=None, log_comment=None, _last_message=False):
     ws = _socket
     is_ok = False
@@ -34,12 +30,6 @@ async def send_messages(_socket, _data=None, _silence=True, _error=None, log_com
         is_ok = True
 
     return is_ok
-
-
-@app.post("/ws")
-async def post_not_websocket(ws:WebSocketModel):
-    """Описание для вебсокета ниже в описании WebSocketModel """
-    return f"Прочти инструкцию в Schemas - 'WebSocketModel'"
 
 
 @app.websocket("/ws_stream ")
