@@ -15,8 +15,8 @@ from collections import defaultdict
 
 # from models.vosk_model import model
 
-vad = webrtcvad.Vad(3)
-
+vad = webrtcvad.Vad()
+vad.set_mode(1)
 # Глобальные переменные
 client_overlap = defaultdict()
 client_overlap_duration = defaultdict(float)
@@ -27,9 +27,9 @@ def find_last_speech_position(audio: bytes) -> tuple:
     """ Находит позицию последнего сегмента речи в аудио.
         Если не находит ни одного сегмента без речи, помечает его как полностью речь
     """
-    speech_end = 0
+    sample_width = 2
     is_full = True
-    audio = np.frombuffer(audio, dtype=np.int32)
+    audio = np.frombuffer(audio, dtype=np.int16)
 
     # Преобразование в int16
     if audio.dtype != np.int16:
@@ -39,21 +39,32 @@ def find_last_speech_position(audio: bytes) -> tuple:
     if len(audio.shape) > 1:
         audio = np.mean(audio, axis=1).astype(np.int16)
 
+    # audio = audio.astype(np.float32) / (2 ** (8 * sample_width - 1))
+
+    speech_end = len(audio)
     # Разделение на фрагменты
-    frame_duration_ms = 30
+    frame_duration_ms = 20
     frame_length = int(8000 * frame_duration_ms / 1000)
     frames = [audio[i:i + frame_length] for i in range(0, len(audio), frame_length)]
 
     # Проверка каждого фрагмента
     for i, frame in enumerate(reversed(frames)):
-        if not vad.is_speech(frame, 8000):
-            speech_end = len(audio) - i*frame_length
-            logger.debug(f"Найден не голос на speech_end = {speech_end}")
-            break
-    else:
-        is_full = False
+        try:
+            if len(frame) < frame_length:
+                continue  # Пропустить последний неполный фрагмент
+            else:
+                if not vad.is_speech(frame.tobytes(), 8000):
+                    logger.debug(f"Найден не голос на speech_end = {speech_end}")
+                    is_full = False
+                    # break
+                else:
+                    logger.debug(f"Найден ГОЛОС на speech_end = {speech_end}")
+            speech_end = len(audio) - i * frame_length  # Общая продолжительность аудио минус длинна Фрейма х количество
+            # фреймов с голосом
+        except Exception as e:
+            logger.error(f"Ошибка VAD - {e}")
 
-    return is_full, speech_end
+    return is_full, speech_end, audio[:speech_end]
 
 
 def bytes_to_seconds(audio_bytes: bytes) -> float:
@@ -63,10 +74,13 @@ def bytes_to_seconds(audio_bytes: bytes) -> float:
 async def send_messages(_socket, _data=None, _silence=True, _error=None, log_comment=None, _last_message=False):
     ws = _socket
     is_ok = False
-    data = await process_asr_json(_data)
+    if not _data:
+        data = ""
+    else:
+        data = _data.text
 
     snd_mssg = {"silence": _silence,
-                    "data": data.get("data").get("text"),
+                    "data": data,
                     "error": _error,
                     "last_message": _last_message
                     }
@@ -85,8 +99,6 @@ async def send_messages(_socket, _data=None, _silence=True, _error=None, log_com
 @app.websocket("/ws_buffer")
 async def websocket(ws: WebSocket):
 
-    # Создаем поток для распознавания
-    stream = recognizer.create_stream()
     wait_null_answers=True
 
     await ws.accept()
@@ -104,9 +116,10 @@ async def websocket(ws: WebSocket):
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
-                    stream = recognizer.create_stream()
+                    sample_rate=json_cfg.get('sample_rate', 8000)
                     logger.info(f"\n Task received, config -  {message.get('text')}")
                     continue
+
                 elif message.get('text') and 'eof' in message.get('text'):
                     logger.debug("EOF received\n")
                     break
@@ -117,54 +130,55 @@ async def websocket(ws: WebSocket):
                 logger.error(f'Error text message compiling. Message:{message} - error:{e}')
         elif isinstance(message, dict) and message.get('bytes'):
             try:
+                stream = None
+                stream = recognizer.create_stream()
+
                 # Получаем новый чанк с данными
                 # chunk = await get_np_array(message.get('bytes'))  #  Todo - не забвть о конвертации в ndarray
                 chunk = message.get('bytes')
-
+                # samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
+                samples = get_np_array(chunk, 2)
                 # Проверяем новый чанк перед объединением
-                is_chunk_full_speech, speech_end  = find_last_speech_position(chunk)
+                # is_chunk_full_speech, speech_end, np_chunk_w_speech  = find_last_speech_position(chunk)
 
-                logger.debug(f'is_chunk_full_speech = {is_chunk_full_speech}')
-                logger.debug(f'speech_end = {speech_end}')
+                # logger.debug(f'is_chunk_full_speech = {is_chunk_full_speech}')
+                # logger.debug(f'speech_end = {speech_end}')
 
                 logger.debug("accept_waveform")
 
-                stream.accept_waveform(8000, data)
-
+                # stream.accept_waveform(sample_rate=8000, waveform=np_chunk_w_speech)
+                stream.accept_waveform(sample_rate=sample_rate, waveform=samples)
 
 
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e}")
             else:
-                if False:
-                    pass
-#                while recognizer.is_ready(stream):
 
+                recognizer.decode_stream(stream)
+                try:
+                    result = stream.result
+                    logger.debug(result)
+
+                except Exception as e:
+                    logger.error(f"recognizer.get_result(stream()) error - {e}")
                 else:
-                    recognizer.decode_stream(stream)
-                    try:
-                        result = stream.result_as_json_string
-#                         result = ujson.loads(recognizer.get_result_as_json_string(stream))
-                    except Exception as e:
-                        logger.error(f"recognizer.get_result(stream()) error - {e}")
-                    else:
-                        if len(result.get("text")) == 0:
-                            if wait_null_answers:
-                                if not await send_messages(ws, _silence = True, _data = None, _error = None):
-                                    logger.error(f"send_message not ok work canceled")
-                                    return
-                                await asyncio.sleep(1)
-                            else:
-                                logger.debug("sending silence partials skipped")
-                                continue
-                        # elif 'text' in result and len(ujson.decode(result).get('text')) == 0:
-                        #     logger.debug("No text in result. Skipped")
-                        #     continue
-
-                        else:
-                            if not await send_messages(ws, _silence=False, _data=result, _error=None):
+                    if len(result.text) == 0:
+                        if wait_null_answers:
+                            if not await send_messages(ws, _silence = True, _data = None, _error = None):
                                 logger.error(f"send_message not ok work canceled")
                                 return
+                            await asyncio.sleep(0.01)
+                        else:
+                            logger.debug("sending silence partials skipped")
+                            continue
+                    # elif 'text' in result and len(ujson.decode(result).get('text')) == 0:
+                    #     logger.debug("No text in result. Skipped")
+                    #     continue
+
+                    else:
+                        if not await send_messages(ws, _silence=False, _data=result, _error=None):
+                            logger.error(f"send_message not ok work canceled")
+                            return
         else:
             error = f"Can`t parse message - {message}"
             logger.error(error)
@@ -173,26 +187,20 @@ async def websocket(ws: WebSocket):
                 logger.error(f"send_message not ok work canceled")
                 return
 
-    while recognizer.is_ready(stream):
-        recognizer.decode_stream(stream)
-        await asyncio.sleep(0.1)
+    try:
+        result = stream.result
+    except Exception as e:
+        logger.error(f"stream.result error - {e}")
     else:
-        stream.input_finished()
-
-        try:
-            result = ujson.loads(recognizer.get_result_as_json_string(stream))
-        except Exception as e:
-            logger.error(f"recognizer.get_result(s)) error - {e}")
+        if len(result.text) == 0:
+            is_silence = True
+            result = None
         else:
-            if len(result.get("text")) == 0:
-                is_silence = True
-                result = None
-            else:
-                logger.debug(result)
-                is_silence = False
+            logger.debug(result)
+            is_silence = False
 
-            if not await send_messages(ws, _silence=is_silence, _data=result, _error=None, _last_message=True):
-                logger.error(f"send_message not ok work canceled")
-                return
+        if not await send_messages(ws, _silence=is_silence, _data=result, _error=None, _last_message=True):
+            logger.error(f"send_message not ok work canceled")
+            return
 
     await ws.close()

@@ -10,7 +10,7 @@ from pydub import AudioSegment
 
 
 def online_decode(audio, time_tail):
-    sound = AudioSegment.from_bu(str(audio_path))
+    sound = AudioSegment.from_raw(str(audio_path))
 
     stream = recognizer.create_stream()
     sample_rate = audio.frame_rate

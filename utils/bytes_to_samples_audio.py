@@ -1,6 +1,7 @@
 import numpy as np
 
-async def get_np_array(audio_bytes: bytes, sample_width: int = 2) -> np.ndarray:
+
+def get_np_array(audio_bytes: bytes, sample_width: int = 2) -> np.ndarray:
     """
     Преобразует аудио в байтах в массив float32.
     :param audio_bytes: Аудиоданные в байтах.
@@ -14,9 +15,9 @@ async def get_np_array(audio_bytes: bytes, sample_width: int = 2) -> np.ndarray:
     samples = np.frombuffer(audio_bytes, dtype=dtype)
 
     # Нормализуем данные до диапазона [-1.0, 1.0]
-    samples_float32 = samples.astype(np.float32) / (2 ** (8 * sample_width - 1))
-    # samples_int16 = np.frombuffer(samples, dtype=np.int16)
-    # samples_float32 = samples_int16.astype(np.float32)
-    # samples_float32 = samples_float32 / 32768
+    # samples_float32 = samples.astype(np.float32) / (2 ** (8 * sample_width - 1))
+    # samples = np.frombuffer(samples, dtype=np.int16)
+    samples_float32 = samples.astype(np.float32)
+    samples_float32 = samples_float32 / 32768
 
     return samples_float32

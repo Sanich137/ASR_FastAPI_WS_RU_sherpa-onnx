@@ -54,7 +54,7 @@ models_arguments = {
             "num_threads": 4,
             "decoding_method": "greedy_search",
             "debug": False,
-            "sample_rate": 8000,
+            "sample_rate": 16000,
             "feature_dim": 80,
             "provider": "cpu",
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
@@ -77,7 +77,7 @@ if model_settings.get("encoder"):
         joiner=str(model_settings.get("joiner")),
         tokens=str(model_settings.get("tokens")),
         num_threads=model_settings.get("num_threads", 1),
-        sample_rate=model_settings.get("sample_rate", 8000),
+        sample_rate=model_settings.get("sample_rate", 16000),
         feature_dim=model_settings.get("feature_dim"),
         decoding_method=model_settings.get("decoding_method", "greedy_search"),
         provider=model_settings.get("provider", "CPU"),
