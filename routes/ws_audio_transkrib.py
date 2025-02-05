@@ -2,53 +2,30 @@ from dbm import error
 from pydub import AudioSegment
 
 import ujson
-import asyncio
+import config
 
 from utils.pre_start_init import app, WebSocket, WebSocketException
 from utils.pre_start_init import recognizer
 from utils.do_logging import logger
 from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from utils.chunk_doing import find_last_speech_position
-from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr
+from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr,audio_duration
+from utils.send_messages import send_messages
+from utils.tokens_to_Result import process_asr_as_object
 
 def bytes_to_seconds(audio_bytes: bytes) -> float:
     return len(audio_bytes) / (8000 * 2)
 
 
-async def send_messages(_socket, _data=None, _silence=True, _error=None, log_comment=None, _last_message=False):
-    ws = _socket
-    is_ok = False
-    if not _data:
-        data = ""
-    else:
-        data = _data.text
-
-    snd_mssg = {"silence": _silence,
-                    "data": data,
-                    "error": _error,
-                    "last_message": _last_message
-                    }
-    try:
-        await ws.send_json(snd_mssg)
-    except Exception as e:
-        logger.error(f"send_message on '{log_comment}', exception - {e}")
-    else:
-        logger.debug(snd_mssg)
-        logger.info(snd_mssg)
-        is_ok = True
-
-    return is_ok
-
-
 @app.websocket("/ws_buffer")
 async def websocket(ws: WebSocket):
-    sample_rate = 8000
     wait_null_answers=True
 
     await ws.accept()
     client_id = id(websocket)
-    audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=16000)
-    audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=16000)
+    audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
+    audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
+    audio_duration[client_id] = 0
 
     while True:
         try:
@@ -62,7 +39,7 @@ async def websocket(ws: WebSocket):
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
-                    sample_rate=json_cfg.get('sample_rate', sample_rate)
+                    sample_rate=json_cfg.get('sample_rate')
                     logger.info(f"\n Task received, config -  {message.get('text')}")
                     continue
 
@@ -88,8 +65,8 @@ async def websocket(ws: WebSocket):
                     )
 
                 # Приводим фреймрейт к фреймрейту модели
-                if sample_rate != 16000:
-                    audiosegment_chunk = audiosegment_chunk.set_frame_rate(16000)
+                if audiosegment_chunk.frame_rate != config.base_sample_rate:
+                    audiosegment_chunk = audiosegment_chunk.set_frame_rate(config.base_sample_rate)
 
                 # Копим буфер
                 audio_buffer[client_id] += audiosegment_chunk
@@ -105,25 +82,31 @@ async def websocket(ws: WebSocket):
 
                     # перевод в семплы для распознавания.
                     samples = get_np_array_samples_float32(audio_to_asr[client_id].raw_data, 2)
+
+                    # передали аудиофрагмент на распознавание
                     stream.accept_waveform(sample_rate=audiosegment_chunk.frame_rate, waveform=samples)
+
                 else:
                     continue
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e}")
             else:
+
                 recognizer.decode_stream(stream)
+
                 try:
-                    result = stream.result
+                    result = await process_asr_as_object(str(stream.result), audio_duration[client_id])
+
                     logger.debug(result)
                 except Exception as e:
                     logger.error(f"recognizer.get_result(stream()) error - {e}")
                 else:
-                    if len(result.text) == 0:
+                    if len(result.get("data").get("text")) == 0:
                         if wait_null_answers:
                             if not await send_messages(ws, _silence = True, _data = None, _error = None):
                                 logger.error(f"send_message not ok work canceled")
                                 return
-                            await asyncio.sleep(0.01)
+                            # await asyncio.sleep(0.01)
                         else:
                             logger.debug("sending silence partials skipped")
                             continue
@@ -149,14 +132,17 @@ async def websocket(ws: WebSocket):
         samples = get_np_array_samples_float32(audio_to_asr[client_id].raw_data, 2)
         last_stream.accept_waveform(sample_rate=audio_to_asr[client_id].frame_rate, waveform=samples)
         recognizer.decode_stream(last_stream)
-        last_result = last_stream.result
-        logger.debug(f"Последний результат {last_result.text}")
+        # last_result = last_stream.result
+
+        last_result = await process_asr_as_object(str(last_stream.result), audio_duration[client_id])
+
+        logger.debug(f'Последний результат {last_result.get("data").get("text")}')
 
     except Exception as e:
         logger.error(f"stream.result error - {e}")
 
     else:
-        if len(last_result.text) == 0:
+        if len(last_result.get("data").get("text")) == 0:
             is_silence = True
             result = None
         else:

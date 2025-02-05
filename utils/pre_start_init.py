@@ -39,7 +39,7 @@ models_arguments = {
             "num_threads": 4,
             "decoding_method": "greedy_search",
             "debug": False,
-            "sample_rate": 8000,
+            "sample_rate": config.base_sample_rate,
             "feature_dim": 80,
             "provider": "cpu",
             "Base_Recognizer": sherpa_onnx.OnlineRecognizer
@@ -51,10 +51,10 @@ models_arguments = {
             "decoder": paths.get("vosk_full_decoder_path"),
             "bpe_vocab": paths.get("vosk_full_bpe_vocab"),
             "joiner": paths.get("vosk_full_joiner_path"),
-            "num_threads": 1,
+            "num_threads": 2,
             "decoding_method": "greedy_search",
             "debug": False,
-            "sample_rate": 16000,
+            "sample_rate": config.base_sample_rate,
             "feature_dim": 80,
             "provider": "cpu",
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
