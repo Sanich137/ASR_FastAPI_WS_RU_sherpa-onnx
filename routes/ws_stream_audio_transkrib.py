@@ -6,7 +6,7 @@ import asyncio
 from utils.pre_start_init import app, WebSocket, WebSocketException
 from utils.pre_start_init import recognizer
 from utils.do_logging import logger
-from utils.bytes_to_samples_audio import get_np_array
+from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from utils.tokens_to_Result import process_asr_json
 from models.fast_api_models import WebSocketModel
 
@@ -70,7 +70,7 @@ async def websocket(ws: WebSocket):
                 logger.error(f'Error text message compiling. Message:{message} - error:{e}')
         elif isinstance(message, dict) and message.get('bytes'):
             try:
-                data = await get_np_array(message.get('bytes'))
+                data = await get_np_array_samples_float32(message.get('bytes'))
                 stream.accept_waveform(8000, data)
                 logger.debug("accept_waveform")
             except Exception as e:

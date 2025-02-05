@@ -4,6 +4,8 @@
     <content url="file://$MODULE_DIR$">
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/models/vosk-model-small-streaming-ru" />
+      <excludeFolder url="file://$MODULE_DIR$/models/vosk-model-ru" />
+      <excludeFolder url="file://$MODULE_DIR$/models/vosk-model-small-ru" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11 (Vosk5_FastAPI_streaming)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

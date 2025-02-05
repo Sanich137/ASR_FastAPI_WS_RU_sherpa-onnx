@@ -1,71 +1,15 @@
 from dbm import error
+from pydub import AudioSegment
 
 import ujson
 import asyncio
-import webrtcvad
-import numpy as np
+
 from utils.pre_start_init import app, WebSocket, WebSocketException
 from utils.pre_start_init import recognizer
 from utils.do_logging import logger
-from utils.bytes_to_samples_audio import get_np_array
-from utils.tokens_to_Result import process_asr_json
-
-
-from collections import defaultdict
-
-# from models.vosk_model import model
-
-vad = webrtcvad.Vad()
-vad.set_mode(1)
-# Глобальные переменные
-client_overlap = defaultdict()
-client_overlap_duration = defaultdict(float)
-client_start_time = defaultdict(float)
-MAX_OVERLAP_DURATION = 15.0
-
-def find_last_speech_position(audio: bytes) -> tuple:
-    """ Находит позицию последнего сегмента речи в аудио.
-        Если не находит ни одного сегмента без речи, помечает его как полностью речь
-    """
-    sample_width = 2
-    is_full = True
-    audio = np.frombuffer(audio, dtype=np.int16)
-
-    # Преобразование в int16
-    if audio.dtype != np.int16:
-        audio = (audio * 32767).astype(np.int16)
-
-    # Преобразование в моно (если необходимо)
-    if len(audio.shape) > 1:
-        audio = np.mean(audio, axis=1).astype(np.int16)
-
-    # audio = audio.astype(np.float32) / (2 ** (8 * sample_width - 1))
-
-    speech_end = len(audio)
-    # Разделение на фрагменты
-    frame_duration_ms = 20
-    frame_length = int(8000 * frame_duration_ms / 1000)
-    frames = [audio[i:i + frame_length] for i in range(0, len(audio), frame_length)]
-
-    # Проверка каждого фрагмента
-    for i, frame in enumerate(reversed(frames)):
-        try:
-            if len(frame) < frame_length:
-                continue  # Пропустить последний неполный фрагмент
-            else:
-                if not vad.is_speech(frame.tobytes(), 8000):
-                    logger.debug(f"Найден не голос на speech_end = {speech_end}")
-                    is_full = False
-                    # break
-                else:
-                    logger.debug(f"Найден ГОЛОС на speech_end = {speech_end}")
-            speech_end = len(audio) - i * frame_length  # Общая продолжительность аудио минус длинна Фрейма х количество
-            # фреймов с голосом
-        except Exception as e:
-            logger.error(f"Ошибка VAD - {e}")
-
-    return is_full, speech_end, audio[:speech_end]
-
+from utils.bytes_to_samples_audio import get_np_array_samples_float32
+from utils.chunk_doing import find_last_speech_position
+from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr
 
 def bytes_to_seconds(audio_bytes: bytes) -> float:
     return len(audio_bytes) / (8000 * 2)
@@ -98,11 +42,13 @@ async def send_messages(_socket, _data=None, _silence=True, _error=None, log_com
 
 @app.websocket("/ws_buffer")
 async def websocket(ws: WebSocket):
-
+    sample_rate = 8000
     wait_null_answers=True
 
     await ws.accept()
     client_id = id(websocket)
+    audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=16000)
+    audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=16000)
 
     while True:
         try:
@@ -116,7 +62,7 @@ async def websocket(ws: WebSocket):
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
-                    sample_rate=json_cfg.get('sample_rate', 8000)
+                    sample_rate=json_cfg.get('sample_rate', sample_rate)
                     logger.info(f"\n Task received, config -  {message.get('text')}")
                     continue
 
@@ -130,35 +76,45 @@ async def websocket(ws: WebSocket):
                 logger.error(f'Error text message compiling. Message:{message} - error:{e}')
         elif isinstance(message, dict) and message.get('bytes'):
             try:
-                stream = None
-                stream = recognizer.create_stream()
-
                 # Получаем новый чанк с данными
-                # chunk = await get_np_array(message.get('bytes'))  #  Todo - не забвть о конвертации в ndarray
                 chunk = message.get('bytes')
-                # samples = np.frombuffer(chunk, dtype=np.int16).astype(np.float32) / 32768.0
-                samples = get_np_array(chunk, 2)
-                # Проверяем новый чанк перед объединением
-                # is_chunk_full_speech, speech_end, np_chunk_w_speech  = find_last_speech_position(chunk)
 
-                # logger.debug(f'is_chunk_full_speech = {is_chunk_full_speech}')
-                # logger.debug(f'speech_end = {speech_end}')
+                # Переводим чанк в объект Audiosegment
+                audiosegment_chunk = AudioSegment(
+                    chunk,
+                    frame_rate = sample_rate,  # Укажи частоту дискретизации
+                    sample_width = 2,   # Ширина сэмпла (2 байта для int16)
+                    channels = 1        # Количество каналов. По умолчанию - 1, Моно.
+                    )
 
-                logger.debug("accept_waveform")
+                # Приводим фреймрейт к фреймрейту модели
+                if sample_rate != 16000:
+                    audiosegment_chunk = audiosegment_chunk.set_frame_rate(16000)
 
-                # stream.accept_waveform(sample_rate=8000, waveform=np_chunk_w_speech)
-                stream.accept_waveform(sample_rate=sample_rate, waveform=samples)
+                # Копим буфер
+                audio_buffer[client_id] += audiosegment_chunk
 
+                # Накопили больше нормы
+                if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds > 15:
 
+                    # Проверяем новый чанк перед объединением (там же режем хвост и добавляем его при необходимости)
+                    find_last_speech_position(client_id)
+
+                    stream = None
+                    stream = recognizer.create_stream()
+
+                    # перевод в семплы для распознавания.
+                    samples = get_np_array_samples_float32(audio_to_asr[client_id].raw_data, 2)
+                    stream.accept_waveform(sample_rate=audiosegment_chunk.frame_rate, waveform=samples)
+                else:
+                    continue
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e}")
             else:
-
                 recognizer.decode_stream(stream)
                 try:
                     result = stream.result
                     logger.debug(result)
-
                 except Exception as e:
                     logger.error(f"recognizer.get_result(stream()) error - {e}")
                 else:
@@ -171,10 +127,6 @@ async def websocket(ws: WebSocket):
                         else:
                             logger.debug("sending silence partials skipped")
                             continue
-                    # elif 'text' in result and len(ujson.decode(result).get('text')) == 0:
-                    #     logger.debug("No text in result. Skipped")
-                    #     continue
-
                     else:
                         if not await send_messages(ws, _silence=False, _data=result, _error=None):
                             logger.error(f"send_message not ok work canceled")
@@ -188,18 +140,30 @@ async def websocket(ws: WebSocket):
                 return
 
     try:
-        result = stream.result
+        last_stream = recognizer.create_stream()
+
+        # перевод в семплы для распознавания.
+        audio_to_asr[client_id] = audio_overlap[client_id] + audio_buffer[client_id]
+
+        logger.debug(f'итоговое сообщение - {audio_to_asr[client_id].duration_seconds} секунд')
+        samples = get_np_array_samples_float32(audio_to_asr[client_id].raw_data, 2)
+        last_stream.accept_waveform(sample_rate=audio_to_asr[client_id].frame_rate, waveform=samples)
+        recognizer.decode_stream(last_stream)
+        last_result = last_stream.result
+        logger.debug(f"Последний результат {last_result.text}")
+
     except Exception as e:
         logger.error(f"stream.result error - {e}")
+
     else:
-        if len(result.text) == 0:
+        if len(last_result.text) == 0:
             is_silence = True
             result = None
         else:
-            logger.debug(result)
+            logger.debug(last_result)
             is_silence = False
 
-        if not await send_messages(ws, _silence=is_silence, _data=result, _error=None, _last_message=True):
+        if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=None, _last_message=True):
             logger.error(f"send_message not ok work canceled")
             return
 

@@ -51,7 +51,7 @@ models_arguments = {
             "decoder": paths.get("vosk_full_decoder_path"),
             "bpe_vocab": paths.get("vosk_full_bpe_vocab"),
             "joiner": paths.get("vosk_full_joiner_path"),
-            "num_threads": 4,
+            "num_threads": 1,
             "decoding_method": "greedy_search",
             "debug": False,
             "sample_rate": 16000,
@@ -86,11 +86,21 @@ if model_settings.get("encoder"):
         bpe_vocab=str(model_settings.get("bpe_vocab")),
         debug=model_settings.get("feature_dim", False),
     )
+    recognizer
     logger.debug(f"Model {config.model_name} ready to start!")
 
 else:
     logger.error("Please specify correct model")
 
+from collections import defaultdict
+
+# Глобальные переменные
+audio_overlap = defaultdict()
+audio_buffer = defaultdict()
+audio_to_asr = defaultdict()
+buffer_duration = defaultdict(float)
+audio_duration = defaultdict(float)
+MAX_OVERLAP_DURATION = 15.0
 
 
 
