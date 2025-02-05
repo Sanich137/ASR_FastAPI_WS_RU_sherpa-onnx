@@ -1,6 +1,7 @@
 import numpy as np
 import webrtcvad
 from utils.do_logging import logger
+from utils.bytes_to_samples_audio import get_np_array_samples_int16
 from utils.pre_start_init import (audio_overlap,
                                   audio_buffer,
                                   audio_to_asr,
@@ -24,20 +25,21 @@ def find_last_speech_position(socket_id, sample_width = 2):
     frame_rate = audio_buffer[socket_id].frame_rate
     logger.debug(f"Получено из буфера на обработку аудио продолжительностью {audio_buffer[socket_id].duration_seconds} ")
 
-    audio = np.frombuffer(audio_buffer[socket_id].raw_data, dtype=np.int16)
+    # Переводим в int16 для vad
+    audio = get_np_array_samples_int16(audio_buffer[socket_id].raw_data)
 
-    # Преобразование в int16
-    if audio.dtype != np.int16:
-        audio = (audio * 32767).astype(np.int16)
-
+    # Входные данные для деления фреймов
     speech_end = len(audio)
-    # Разделение на фрагменты
     frame_duration_ms = 20
+    min_silence_frames = 2
     frame_length = int(frame_rate * frame_duration_ms / 1000)
     partial_frame_length = int()
-    frames = [audio[i:i + frame_length] for i in range(0, len(audio), frame_length)]
+
+    # Разделение на фрагменты
+    frames = [audio[i:i + frame_length] for i in range(int(len(audio)/3), len(audio), frame_length)]
 
     # Проверка каждого фрагмента на наличие голоса.
+    silence_frames = 0
     for i, frame in enumerate(reversed(frames)):
         try:
             if len(frame) < frame_length:
@@ -48,9 +50,11 @@ def find_last_speech_position(socket_id, sample_width = 2):
             else:
                 if not vad.is_speech(frame.tobytes(), sample_rate=frame_rate):
                     logger.debug(f"Найден не голос на speech_end = {speech_end-(i+1)*frame_length-partial_frame_length}")
-                    is_full = False
-                    break
+                    silence_frames+=1
+                    if silence_frames >= min_silence_frames:
+                        break
                 else:
+                    silence_frames = 0
                     # logger.debug(f"Найден ГОЛОС на speech_end = {speech_end-i*frame_length-partial_frame_length}")
                     continue
         except Exception as e:
