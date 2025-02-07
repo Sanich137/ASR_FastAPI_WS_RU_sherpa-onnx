@@ -1,4 +1,3 @@
-from dbm import error
 from pydub import AudioSegment
 
 import ujson
@@ -11,21 +10,24 @@ from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from utils.chunk_doing import find_last_speech_position
 from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr,audio_duration
 from utils.send_messages import send_messages
-from utils.tokens_to_Result import process_asr_as_object
+from utils.tokens_to_Result import process_asr_json
+from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence
+
 
 def bytes_to_seconds(audio_bytes: bytes) -> float:
     return len(audio_bytes) / (8000 * 2)
 
 
-@app.websocket("/ws_buffer")
+@app.websocket("/ws")
 async def websocket(ws: WebSocket):
     wait_null_answers=True
-
-    await ws.accept()
     client_id = id(websocket)
     audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
     audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
     audio_duration[client_id] = 0
+
+
+    await ws.accept()
 
     while True:
         try:
@@ -72,19 +74,10 @@ async def websocket(ws: WebSocket):
                 audio_buffer[client_id] += audiosegment_chunk
 
                 # Накопили больше нормы
-                if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds > 15:
+                if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds > config.MAX_OVERLAP_DURATION:
 
                     # Проверяем новый чанк перед объединением (там же режем хвост и добавляем его при необходимости)
                     find_last_speech_position(client_id)
-
-                    stream = None
-                    stream = recognizer.create_stream()
-
-                    # перевод в семплы для распознавания.
-                    samples = get_np_array_samples_float32(audio_to_asr[client_id].raw_data, 2)
-
-                    # передали аудиофрагмент на распознавание
-                    stream.accept_waveform(sample_rate=audiosegment_chunk.frame_rate, waveform=samples)
 
                 else:
                     continue
@@ -92,12 +85,14 @@ async def websocket(ws: WebSocket):
                 logger.error(f"AcceptWaveform error - {e}")
             else:
 
-                recognizer.decode_stream(stream)
+                asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
+                                                                     num_trials=config.RECOGNITION_ATTEMPTS)
 
                 try:
-                    result = await process_asr_as_object(str(stream.result), audio_duration[client_id])
-
+                    result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
+                    audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
                     logger.debug(result)
+
                 except Exception as e:
                     logger.error(f"recognizer.get_result(stream()) error - {e}")
                 else:
@@ -122,29 +117,23 @@ async def websocket(ws: WebSocket):
                 logger.error(f"send_message not ok work canceled")
                 return
 
+    # Передаём на распознавание собранный не полный буфер
+    # перевод в семплы для распознавания.
+    audio_to_asr[client_id] = audio_overlap[client_id] + audio_buffer[client_id]
+    logger.debug(f'итоговое сообщение - {audio_to_asr[client_id].duration_seconds} секунд')
+
     try:
-        last_stream = recognizer.create_stream()
-
-        # перевод в семплы для распознавания.
-        audio_to_asr[client_id] = audio_overlap[client_id] + audio_buffer[client_id]
-
-        logger.debug(f'итоговое сообщение - {audio_to_asr[client_id].duration_seconds} секунд')
-        samples = get_np_array_samples_float32(audio_to_asr[client_id].raw_data, 2)
-        last_stream.accept_waveform(sample_rate=audio_to_asr[client_id].frame_rate, waveform=samples)
-        recognizer.decode_stream(last_stream)
-        # last_result = last_stream.result
-
-        last_result = await process_asr_as_object(str(last_stream.result), audio_duration[client_id])
-
+        last_asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id], num_trials=config.RECOGNITION_ATTEMPTS)
+        last_result = await process_asr_json(last_asr_result_w_conf, audio_duration[client_id])
         logger.debug(f'Последний результат {last_result.get("data").get("text")}')
 
     except Exception as e:
-        logger.error(f"stream.result error - {e}")
+        logger.error(f"last_asr_result_w_conf error - {e}")
 
     else:
         if len(last_result.get("data").get("text")) == 0:
             is_silence = True
-            result = None
+            last_result = None
         else:
             logger.debug(last_result)
             is_silence = False
@@ -154,3 +143,8 @@ async def websocket(ws: WebSocket):
             return
 
     await ws.close()
+
+    del audio_overlap[client_id]
+    del audio_buffer[client_id]
+    del audio_to_asr[client_id]
+    del audio_duration[client_id]

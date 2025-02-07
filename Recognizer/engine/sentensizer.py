@@ -2,7 +2,6 @@ import logging
 
 import ujson
 import statistics
-from utils.states_machine import State
 
 
 #  Вычисляем скорость речи пользователя

@@ -5,11 +5,12 @@ from utils.do_logging import logger
 async def send_messages(_socket, _data=None, _silence=True, _error=None, log_comment=None, _last_message=False):
     ws = _socket
     is_ok = False
-
+    if _last_message:
+        logger.debug('Последнее сообщение')
     if not _data:
         data = ""
     else:
-        data = _data
+        data = _data.get('data')
 
     snd_mssg = {"silence": _silence,
                 "data": data,

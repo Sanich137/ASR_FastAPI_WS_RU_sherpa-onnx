@@ -5,9 +5,7 @@ from utils.bytes_to_samples_audio import get_np_array_samples_int16
 from utils.pre_start_init import (audio_overlap,
                                   audio_buffer,
                                   audio_to_asr,
-                                  buffer_duration,
-                                  audio_duration,
-                                  MAX_OVERLAP_DURATION)
+                                  )
 
 from pydub import AudioSegment
 

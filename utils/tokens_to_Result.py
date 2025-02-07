@@ -4,6 +4,8 @@ import ujson
 
 import math
 
+from utils.do_logging import logger
+
 # Функция для преобразования логарифмических вероятностей в обычные
 def logprob_to_prob(logprob):
     return math.exp(logprob)  # Используем exp для преобразования ln(prob)
@@ -11,9 +13,8 @@ def logprob_to_prob(logprob):
 
 
 # Асинхронная функция для обработки JSON
-async def process_asr_json(input_json):
+async def process_asr_json(input_json, time_shift = 0.0):
     # Парсим JSON
-    # data = ujson.loads(input_json)
     data = input_json
 
     # Формируем шаблон результата
@@ -26,7 +27,7 @@ async def process_asr_json(input_json):
     if not data:
         return result
 
-    for token, timestamp, prob in zip(data["tokens"], data["timestamps"], data["ys_probs"]):
+    for token, timestamp, prob in zip(data["tokens"], data["timestamps"], data["probs"]):
         # Если токен начинается с пробела, это начало нового слова
         if token.startswith(" "):
             if current_word["tokens"]:
@@ -57,9 +58,9 @@ async def process_asr_json(input_json):
 
         # Добавляем слово в результат
         result["data"]["result"].append({
-            "conf": conf,
-            "start": word["start"],
-            "end": word["end"],
+            "conf": round(conf, 2),
+            "start": word["start"]+round(time_shift, 2),
+            "end": word["end"]+round(time_shift, 2),
             "word": word_text
         })
 
@@ -69,7 +70,8 @@ async def process_asr_json(input_json):
     # Убираем лишний пробел в конце текста
     result["data"]["text"] = result["data"]["text"].strip()
 
-    print(result)
+    logger.debug(f'Результат изменения формата ответа - {result}')
+
     return result
 
 
@@ -77,7 +79,7 @@ async def process_asr_as_object(input_result, time_shift = 0.0):
     # Парсим STR в JSON
     data = ujson.loads(input_result)
 
-#    data = input_result
+    data = input_result
 
     # Формируем шаблон результата
     result = {"data": {"result": [], "text": ""}}
@@ -132,7 +134,7 @@ async def process_asr_as_object(input_result, time_shift = 0.0):
     # Убираем лишний пробел в конце текста
     result["data"]["text"] = result["data"]["text"].strip()
 
-    print(result)
+    logger.debug(f'Результат изменения формата ответа - {result}')
     return result
 
 
