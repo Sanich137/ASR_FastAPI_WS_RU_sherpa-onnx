@@ -2,7 +2,7 @@ import os
 
 # server settings
 host = os.getenv('HOST', '127.0.0.1')
-port = os.getenv('PORT', 49153)
+port = int(os.getenv('PORT', 49153))
 
 
 buffer_size = 20
