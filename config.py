@@ -1,6 +1,8 @@
+import os
+
 # server settings
-host = '127.0.0.1'
-port = 49153
+host = os.getenv('HOST', '127.0.0.1')
+port = os.getenv('PORT', 49153)
 
 
 buffer_size = 20
