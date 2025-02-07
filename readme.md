@@ -19,12 +19,25 @@
 Установка:
 
 1. Ставим основной пакет.
-2. Затем cd models
-3. Затем git clone models
+2. Не забываем поставить git-lfs:
+> - "sudo apt-get install git-lfs" 
+    
+- Детали тут: https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=windows
+    
+- Если не поставить, то получите ошибку: RuntimeError: Failed to load model because protobuf parsing failed.
+
+3. Затем:
+>- cd models
+>- git clone https://huggingface.co/alphacep/vosk-model-ru
 
 В окружение добавляем переменные:
-1. 
+
+LOGGING_LEVEL = INFO (уровень логирования - по умолчанию DEBUG)
+NUM_THREADS = 2 (количество потоков на распознавание. Нормально работает от двух и выше.)
+HOST = "0.0.0.0.0" 
+PORT = "49153" 
 
 Запуск проекта
 
 Тестирование ws
+

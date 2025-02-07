@@ -52,7 +52,7 @@ models_arguments = {
             "decoder": paths.get("vosk_full_decoder_path"),
             "bpe_vocab": paths.get("vosk_full_bpe_vocab"),
             "joiner": paths.get("vosk_full_joiner_path"),
-            "num_threads": 2,
+            "num_threads": os.getenv('NUM_THREADS', 1),
             "decoding_method": "greedy_search",
             "debug": False,
             "sample_rate": config.base_sample_rate,
