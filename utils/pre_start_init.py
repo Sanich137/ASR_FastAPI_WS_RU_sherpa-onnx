@@ -8,6 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketException, WebSocketDisconnect
 from utils.file_exists import assert_file_exists
 import sherpa_onnx
 
+
 import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -36,7 +37,7 @@ models_arguments = {
             "decoder": paths.get("vosk_small_streaming_decoder_path"),
             "joiner": paths.get("vosk_small_streaming_joiner_path"),
             "bpe_vocab": paths.get("vosk_small_streaming_bpe_vocab"),
-            "num_threads": 10,
+            "num_threads": os.getenv('NUM_THREADS', 1),
             "decoding_method": "greedy_search",
             "debug": False,
             "sample_rate": config.base_sample_rate,
