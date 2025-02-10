@@ -1,7 +1,6 @@
 from utils.do_logging import logger
 
 
-
 async def send_messages(_socket, _data=None, _silence=True, _error=None, log_comment=None, _last_message=False):
     ws = _socket
     is_ok = False
@@ -20,7 +19,7 @@ async def send_messages(_socket, _data=None, _silence=True, _error=None, log_com
     try:
         await ws.send_json(snd_mssg)
     except Exception as e:
-        logger.error(f"send_message on '{log_comment}', exception - {e}")
+        logger.error(f"send_message - exception - {e}")
     else:
         logger.debug(snd_mssg)
         logger.info(snd_mssg)

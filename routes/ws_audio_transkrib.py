@@ -2,6 +2,7 @@ from pydub import AudioSegment
 
 import ujson
 import config
+import uuid
 
 from utils.pre_start_init import app, WebSocket, WebSocketException
 from utils.pre_start_init import recognizer
@@ -21,7 +22,8 @@ def bytes_to_seconds(audio_bytes: bytes) -> float:
 @app.websocket("/ws")
 async def websocket(ws: WebSocket):
     wait_null_answers=True
-    client_id = id(websocket)
+    client_id = uuid.uuid4()
+    logger.info(f'Принят новый сокет id = {client_id}')
     audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
     audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
     audio_duration[client_id] = 0
