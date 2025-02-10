@@ -3,7 +3,7 @@ import logging
 import ujson
 import statistics
 
-
+# Todo - внедрить тут построение предложений.
 #  Вычисляем скорость речи пользователя
 def sensitized(is_async=False, task_id=None, raw_recognition=None):
     err_state = None

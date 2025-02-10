@@ -57,7 +57,7 @@ models_arguments = {
             "debug": False,
             "sample_rate": config.base_sample_rate,
             "feature_dim": 80,
-            "provider": "cpu",
+            "provider": "CUDA",
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
                 },
 
