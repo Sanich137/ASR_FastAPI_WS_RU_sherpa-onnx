@@ -1,0 +1,26 @@
+[Unit]
+Description=vosk5_gpu_ASR service
+After=syslog.target
+After=network.target
+
+[Service]
+# Type=simple
+User=user # Your user name
+Group=root
+
+Environment=LOGGING_LEVEL="INFO"
+Environment=NUM_THREADS=4
+Environment=HOST="0.0.0.0"
+Environment=PORT=49153
+
+# Environment=LOGGING_LEVEL="DEBUG"
+
+WorkingDirectory=/opt/Vosk5_FastAPI_streaming
+EnvironmentFile=/opt/Vosk5_FastAPI_streaming/systemctl_environment
+ExecStart=/opt/Vosk5_FastAPI_streaming/venv/bin/python3 main.py
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -2,6 +2,7 @@
 /venv/
 /models/vosk-model-small-streaming-ru/
 /models/vosk-model-ru/
+/models/giga-am-russian/
 *.log
 *.wav
 *.mp3

@@ -22,7 +22,7 @@ async def process_asr_json(input_json, time_shift = 0.0):
 
     # Собираем слова из токенов
     words = []
-    current_word = {"tokens": [], "start": None, "end": None, "probs": []}
+    current_word = {"tokens": [], "start": 0.0, "end": 0.0, "probs": []}
 
     if not data:
         return result
@@ -59,7 +59,7 @@ async def process_asr_json(input_json, time_shift = 0.0):
         # Добавляем слово в результат
         result["data"]["result"].append({
             "conf": round(conf, 2),
-            "start": word["start"]+round(time_shift, 2),
+            "start": word.get("start", 0) +round(time_shift, 2),
             "end": word["end"]+round(time_shift, 2),
             "word": word_text
         })

@@ -25,6 +25,9 @@ paths = {
     "vosk_full_joiner_path": BASE_DIR / "models" / "vosk-model-ru" / "am-onnx" / "joiner.onnx",
     "vosk_full_bpe_vocab": BASE_DIR / "models" / "vosk-model-ru" / "lang" / "bpe.model",
 
+    "gigaam_tokens_path": BASE_DIR / "models" / "giga-am-russian" / "tokens.txt",
+    "gigaam_models_path": BASE_DIR / "models" / "giga-am-russian" / "model.int8.onnx",
+
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'2724.1726990043.1324706.wav',
     "trash_folder": BASE_DIR / 'trash',
@@ -45,7 +48,6 @@ models_arguments = {
             "provider": "cpu",
             "Base_Recognizer": sherpa_onnx.OnlineRecognizer
                 },
-
         "Vosk5": {
             "tokens": paths.get("vosk_full_tokens_path"),
             "encoder": paths.get("vosk_full_encoder_path"),
@@ -60,18 +62,38 @@ models_arguments = {
             "provider": "CUDA",
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
                 },
-
+        "gigaam": {
+            "tokens": paths.get("gigaam_tokens_path"),
+            "model": paths.get("gigaam_models_path"),
+            "num_threads": int(os.getenv('NUM_THREADS', 1)),
+            "decoding_method": "greedy_search",
+            "debug": False,
+            "sample_rate": config.base_sample_rate,
+            "feature_dim": 80,
+            "provider": "CUDA",
+            "Base_Recognizer": sherpa_onnx.OfflineRecognizer
+                },
             }
 
 model_settings = models_arguments.get(config.model_name)
 
 recognizer = None
 
-if model_settings.get("encoder"):
-    assert_file_exists(model_settings.get("encoder"))
-    assert_file_exists(model_settings.get("decoder"))
-    assert_file_exists(model_settings.get("joiner"))
+if model_settings.get("tokens"):
+    assert_file_exists(model_settings.get("tokens"))
+    assert_file_exists(model_settings.get("tokens"))
+    assert_file_exists(model_settings.get("tokens"))
 
+    # recognizer = sherpa_onnx.OfflineRecognizer.from_nemo_ctc(
+    #     model=str(model_settings.get("model")),
+    #     tokens=str(model_settings.get("tokens")),
+    #     num_threads=model_settings.get("num_threads", 1),
+    #     sample_rate=model_settings.get("sample_rate", 16000),
+    #     # feature_dim=model_settings.get("feature_dim"),
+    #     # decoding_method=model_settings.get("decoding_method", "greedy_search"),
+    #     # provider=model_settings.get("provider", "CPU"),
+    #     debug=model_settings.get("feature_dim", True),
+    # )
     recognizer = model_settings.get("Base_Recognizer").from_transducer(
         encoder=str(model_settings.get("encoder")),
         decoder=str(model_settings.get("decoder")),
