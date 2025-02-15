@@ -1,6 +1,10 @@
+from distutils.dep_util import newer
+
 import numpy as np
 import ujson
 from collections import defaultdict
+
+import config
 from utils.pre_start_init import recognizer
 from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from pydub import AudioSegment
@@ -36,8 +40,9 @@ def recognise_w_calculate_confidence(audio_data,
         recognizer.decode_stream(stream)
 
         result = ujson.loads(str(stream.result))
-        tokens = result['tokens']
         timestamps = result['timestamps']
+        tokens = result['tokens']
+
         all_tokens.append(list(zip(tokens, timestamps)))
 
     # Словарь для хранения статистики по токенам
@@ -74,3 +79,47 @@ def recognise_w_calculate_confidence(audio_data,
     # Возвращаем результат в формате JSON
     return result
 
+
+
+def simple_recognise(audio_data, ) -> dict:
+    """
+    Собираем токены в слова дополнительных вычислений не производит.
+
+    :param audio_data: Аудиоданные в формате Audiosegment (puDub).
+    :return: json c параметрами probs
+    """
+
+    stream = None
+    stream = recognizer.create_stream()
+
+    # перевод в семплы для распознавания.
+    samples = get_np_array_samples_float32(audio_data.raw_data, 2)
+
+    # передали аудиофрагмент на распознавание
+
+    stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
+    recognizer.decode_stream(stream)
+
+    result = ujson.loads(str(stream.result))
+
+    return result
+
+
+# tokens = list()
+# if config.model_name == "Gigaam":
+#     for i, token in enumerate(result['tokens']):
+#         if i == 0:
+#             tokens.append(token)
+#         else:
+#             if result['tokens'][i - 1] == ' ':
+#                 tokens.append(str(' ' + token))
+#             else:
+#                 tokens.append(token)
+#
+#     for i, token in enumerate(tokens[::-1]):
+#         if token == ' ':
+#             if -(-i - 1) > len(tokens):
+#                 continue
+#             else:
+#                 tokens.pop(-i - 1)
+#                 timestamps.pop(-i - 1)

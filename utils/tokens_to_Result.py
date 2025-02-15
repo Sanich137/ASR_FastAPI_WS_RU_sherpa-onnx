@@ -137,6 +137,39 @@ async def process_asr_as_object(input_result, time_shift = 0.0):
     logger.debug(f'Результат изменения формата ответа - {result}')
     return result
 
+async def process_gigaam_asr(input_json, time_shift = 0.0):
+    # Парсим JSON
+    data = input_json
+
+    # Формируем шаблон результата
+    result = {"data": {"result": [], "text": ""}}
+
+    # Собираем слова из токенов
+    words = []
+    current_word = ""
+    start_time, end_time = 0.0, 0.0
+
+    for i, token in enumerate(data['tokens']):
+        if token != ' ':
+            if current_word == "":
+                start_time = round((data['timestamps'][i]+time_shift), 3)
+            current_word += token
+            end_time = round((data['timestamps'][i]+time_shift), 3)
+        else:
+            if current_word != "":
+                words.append({'word': current_word, 'start': start_time, 'end': end_time})
+                current_word = ""
+
+    # Добавляем последнее слово, если оно есть
+    if current_word != "":
+        words.append({'word': current_word, 'start': start_time, 'end': end_time})
+
+    # Формируем итоговый массив
+    result['data'] = {
+        'result': [{'conf': 1.0, 'start': word['start'], 'end': word['end'], 'word': word['word']} for word in words],
+        'text': data['text']
+    }
+    return result
 
 if __name__ == "__main__":
     asr_str_json = {"lang": "",

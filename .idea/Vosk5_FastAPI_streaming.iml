@@ -8,6 +8,7 @@
       <excludeFolder url="file://$MODULE_DIR$/models/vosk-model-small-ru" />
       <excludeFolder url="file://$MODULE_DIR$/models/gigaam" />
       <excludeFolder url="file://$MODULE_DIR$/models/giga-am-russian" />
+      <excludeFolder url="file://$MODULE_DIR$/models/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11 (Vosk5_FastAPI_streaming)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

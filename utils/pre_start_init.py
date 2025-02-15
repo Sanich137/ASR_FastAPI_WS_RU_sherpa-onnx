@@ -25,8 +25,8 @@ paths = {
     "vosk_full_joiner_path": BASE_DIR / "models" / "vosk-model-ru" / "am-onnx" / "joiner.onnx",
     "vosk_full_bpe_vocab": BASE_DIR / "models" / "vosk-model-ru" / "lang" / "bpe.model",
 
-    "gigaam_tokens_path": BASE_DIR / "models" / "giga-am-russian" / "tokens.txt",
-    "gigaam_models_path": BASE_DIR / "models" / "giga-am-russian" / "model.int8.onnx",
+    "gigaam_tokens_path": BASE_DIR / "models" / "GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" / "tokens.txt",
+    "gigaam_encoder_path": BASE_DIR / "models" / "GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" / "GigaAMv2_ctc_public.onnx",
 
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'2724.1726990043.1324706.wav',
@@ -42,10 +42,10 @@ models_arguments = {
             "bpe_vocab": paths.get("vosk_small_streaming_bpe_vocab"),
             "num_threads": int(os.getenv('NUM_THREADS', 1)),
             "decoding_method": "greedy_search",
-            "debug": False,
+            "debug": True,  #  if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
             "sample_rate": config.base_sample_rate,
             "feature_dim": 80,
-            "provider": "cpu",
+            "provider": config.PROVIDER,
             "Base_Recognizer": sherpa_onnx.OnlineRecognizer
                 },
         "Vosk5": {
@@ -56,22 +56,22 @@ models_arguments = {
             "joiner": paths.get("vosk_full_joiner_path"),
             "num_threads": int(os.getenv('NUM_THREADS', 1)),
             "decoding_method": "greedy_search",
-            "debug": False,
+            "debug": True if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
             "sample_rate": config.base_sample_rate,
             "feature_dim": 80,
-            "provider": "CUDA",
+            "provider": config.PROVIDER,
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
                 },
-        "gigaam": {
+        "Gigaam": {
             "tokens": paths.get("gigaam_tokens_path"),
-            "model": paths.get("gigaam_models_path"),
-            "num_threads": int(os.getenv('NUM_THREADS', 1)),
+            "model": paths.get("gigaam_encoder_path"),
+            "num_threads": int(os.getenv('NUM_THREADS', 4)),
             "decoding_method": "greedy_search",
-            "debug": False,
             "sample_rate": config.base_sample_rate,
-            "feature_dim": 80,
-            "provider": "CUDA",
-            "Base_Recognizer": sherpa_onnx.OfflineRecognizer
+            "feature_dim": 64,
+            "provider": config.PROVIDER,
+            "Base_Recognizer": sherpa_onnx.OfflineRecognizer,
+            "debug": True if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False
                 },
             }
 
@@ -79,21 +79,19 @@ model_settings = models_arguments.get(config.model_name)
 
 recognizer = None
 
-if model_settings.get("tokens"):
-    assert_file_exists(model_settings.get("tokens"))
-    assert_file_exists(model_settings.get("tokens"))
-    assert_file_exists(model_settings.get("tokens"))
 
-    # recognizer = sherpa_onnx.OfflineRecognizer.from_nemo_ctc(
-    #     model=str(model_settings.get("model")),
-    #     tokens=str(model_settings.get("tokens")),
-    #     num_threads=model_settings.get("num_threads", 1),
-    #     sample_rate=model_settings.get("sample_rate", 16000),
-    #     # feature_dim=model_settings.get("feature_dim"),
-    #     # decoding_method=model_settings.get("decoding_method", "greedy_search"),
-    #     # provider=model_settings.get("provider", "CPU"),
-    #     debug=model_settings.get("feature_dim", True),
-    # )
+if config.model_name=="Gigaam":
+    recognizer = model_settings.get("Base_Recognizer").from_nemo_ctc(
+        model=str(model_settings.get("model")),
+        tokens=str(model_settings.get("tokens")),
+        num_threads=model_settings.get("num_threads", 1),
+        sample_rate=model_settings.get("sample_rate", 16000),
+        decoding_method=model_settings.get("decoding_method", "greedy_search"),
+        provider=model_settings.get("provider", "CPU"),
+        feature_dim=model_settings.get("feature_dim", False),
+        debug=model_settings.get("debug", True),
+    )
+else:
     recognizer = model_settings.get("Base_Recognizer").from_transducer(
         encoder=str(model_settings.get("encoder")),
         decoder=str(model_settings.get("decoder")),
@@ -107,13 +105,11 @@ if model_settings.get("tokens"):
         lm_scale=0.2,  # по умолчанию 0.1
         modeling_unit="bpe",  # по умолчанию "cjkchar" пишут что надо только для горячих слов
         bpe_vocab=str(model_settings.get("bpe_vocab")),
-        debug=model_settings.get("feature_dim", False),
+        debug=model_settings.get("debug", False),
     )
 
-    logger.debug(f"Model {config.model_name} ready to start!")
+logger.debug(f"Model {config.model_name} ready to start!")
 
-else:
-    logger.error("Please specify correct model")
 
 from collections import defaultdict
 

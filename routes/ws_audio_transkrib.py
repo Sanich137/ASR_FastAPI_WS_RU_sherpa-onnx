@@ -9,10 +9,10 @@ from utils.pre_start_init import recognizer
 from utils.do_logging import logger
 from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from utils.chunk_doing import find_last_speech_position
-from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr,audio_duration
+from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr, audio_duration
 from utils.send_messages import send_messages
-from utils.tokens_to_Result import process_asr_json
-from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence
+from utils.tokens_to_Result import process_asr_json, process_gigaam_asr
+from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence, simple_recognise
 
 
 def bytes_to_seconds(audio_bytes: bytes) -> float:
@@ -76,7 +76,7 @@ async def websocket(ws: WebSocket):
                 audio_buffer[client_id] += audiosegment_chunk
 
                 # Накопили больше нормы
-                if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds > config.MAX_OVERLAP_DURATION:
+                if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds >= config.MAX_OVERLAP_DURATION:
 
                     # Проверяем новый чанк перед объединением (там же режем хвост и добавляем его при необходимости)
                     find_last_speech_position(client_id)
@@ -87,18 +87,27 @@ async def websocket(ws: WebSocket):
                 logger.error(f"AcceptWaveform error - {e}")
             else:
 
-                asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
-                                                                     num_trials=config.RECOGNITION_ATTEMPTS)
-
                 try:
-                    result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
-                    audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
-                    logger.debug(result)
+                    if config.model_name == "Gigaam":
+                        asr_result_wo_conf =simple_recognise(audio_to_asr[client_id])
+
+                        result = await process_gigaam_asr(asr_result_wo_conf, audio_duration[client_id])
+                        audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
+                        logger.debug(result)
+
+                    else:
+                        asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
+                                                                             num_trials=config.RECOGNITION_ATTEMPTS)
+
+                        result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
+                        audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
+                        logger.debug(result)
+
 
                 except Exception as e:
                     logger.error(f"recognizer.get_result(stream()) error - {e}")
                 else:
-                    if len(result.get("data").get("text")) == 0:
+                    if len(result.get("data").get("text")) == 0 or result.get("data").get("text") == ' ':
                         if wait_null_answers:
                             if not await send_messages(ws, _silence = True, _data = None, _error = None):
                                 logger.error(f"send_message not ok work canceled")
@@ -125,15 +134,29 @@ async def websocket(ws: WebSocket):
     logger.debug(f'итоговое сообщение - {audio_to_asr[client_id].duration_seconds} секунд')
 
     try:
-        last_asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id], num_trials=config.RECOGNITION_ATTEMPTS)
-        last_result = await process_asr_json(last_asr_result_w_conf, audio_duration[client_id])
-        logger.debug(f'Последний результат {last_result.get("data").get("text")}')
+
+        if config.model_name == "Gigaam":
+
+            last_asr_result_w_conf = simple_recognise(audio_to_asr[client_id])
+            last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
+            logger.debug(f'Последний результат {last_result.get("data").get("text")}')
+
+        else:
+            asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
+                                                                 num_trials=config.RECOGNITION_ATTEMPTS)
+
+            last_result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
+            audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
+            logger.debug(last_result)
 
     except Exception as e:
         logger.error(f"last_asr_result_w_conf error - {e}")
 
     else:
         if len(last_result.get("data").get("text")) == 0:
+            is_silence = True
+            last_result = None
+        elif last_result.get("data").get("text") == ' ':
             is_silence = True
             last_result = None
         else:

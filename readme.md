@@ -7,23 +7,24 @@
   - Полная версия в реализации интересна написанным буфером аудио потока. Технически с каждым новым чанком 
   мы отсекаем последние микрочанки с голосом и отправляем на распознавание всё остальное. И, если вдруг весь чанк 
   это голос, то копим чанки в один мегачанк, но не более чем 15 секунд т.к. большая модель за один стрим есть только 18. 
-  - gigaam пока не запускал
+  - Gigaam2 v2 отличается большей чувствительностью к длине чанка, кажется, не любит когда чанк начинается с голоса.   
 
 > FastApi используется в т.ч. для проверки входящих запросов, возможно, для выполнения дополнительных инструкций,
 таких как постобработка текста, история запросов и м.б. что-то ещё чего прикручу.
 
 > Модели:
 > - большая https://huggingface.co/alphacep/vosk-model-ru
-> - малая   https://huggingface.co/alphacep/vosk-model-small-ru
+> - малая   https://huggingface.co/alphacep/vosk-model-small-ru (в проекте пока не используется)
 > - Gigaam [инструкция по получению onnx от Sber](https://github.com/salute-developers/GigaAM/blob/main/inference_example.ipynb)
 > - Gigaam [Инструкция от @nshmyrev](https://k2-fsa.github.io/sherpa/onnx/pretrained_models/offline-ctc/nemo/russian.html#sherpa-onnx-nemo-ctc-giga-am-russian-2024-10-24)
-> - [Лицензия Gigaam](https://github.com/salute-developers/GigaAM/blob/main/GigaAM%20License_NC.pdf) не допускает коммерческого использования. 
+> - [Лицензия Gigaam](https://github.com/salute-developers/GigaAM/blob/main/LICENSE) **внимание! проверяйте допустимо ли коммерческое использование!**
+
 
 По умолчанию приложение работает на CPU. Как следствие с увеличением количества запросов время подготовки ответа растёт.
 
 Установка:
 
-Если GPU не нужен, то не выполняем пункты до Ставим основной пакет.
+Если GPU не нужен, то не выполняем пункты до "Ставим основной пакет".
 
 > Для поддержки GPU на линукс: 
 > Ставим Cuda 11.8 и cudNN к ней [по инструкции:](https://k2-fsa.github.io/k2/installation/cuda-cudnn.html#cuda-11-8) 
@@ -55,7 +56,6 @@ source activate-cuda-11.8.sh
 - Ставим основной пакет (не забываем инициировать и активировать виртуальное окружение).
 ```commandline
 pip install -r requirements.txt
-sudo apt-get install -y git-lfs
 sudo apt install -y ffmpeg
 ```
 Не забываем поставить git-lfs и ffmpeg [Детали тут](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=windows)
@@ -68,7 +68,10 @@ sudo apt-get install git-lfs
 - Затем копируем модель в папку:
 ```commandline
 cd models
+# Vosk
 git clone https://huggingface.co/alphacep/vosk-model-ru
+# GigaAM
+git clone https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx
 cd ..
 ```
 
@@ -80,17 +83,27 @@ python3 main.py
  
 - В окружение добавляем переменные:
 
-```LOGGING_LEVEL = INFO``` (уровень логирования - по умолчанию DEBUG)
+- ```LOGGING_LEVEL = INFO``` - (уровень логирования - по умолчанию DEBUG)
+- ```NUM_THREADS = 2``` (количество потоков на распознавание. Нормально работает от двух и выше.)
+- ```HOST = "0.0.0.0.0"``` 
+- ```PORT = "49153"```
 
-```NUM_THREADS = 2``` (количество потоков на распознавание. Нормально работает от двух и выше.)
 
-```HOST = "0.0.0.0.0"``` 
+- Доступные переменные в config.py:
 
-```PORT = "49153"```
+- `model_name = "Gigaam"` - доступные значения: Vosk5 и Gigaam
+- `base_sample_rate=8000` - sample_rate для модели. Полученное аудио будет конвертироваться в этот формат. 
+Для Vosk - 16000 для GigaAM попробуйте 8000 или 16000 (качество распознавания будет зависеть от исходного аудио.) 
+- `MAX_OVERLAP_DURATION = 15`  # Максимальная продолжительность буфера аудио. Vosk принимает от 2 до 18 секунд, Gigaam 
+не имеет ограничений, но после 15-10 секунд начинает пропускать слова и пробелы. 15 - оптимальное значение. 
+- `RECOGNITION_ATTEMPTS = 1` - временная переменная для расчёта точности распознавания. Оставить 1 и не менять.
+- `PROVIDER = "CUDA"` - CUDA или CPU.
+ 
 
 - Запускаем приложение:
 ```commandline
-source venv
+source venv/bin/activate
+python3 main.py
 ```
 
 - Проверяем запуск на 
