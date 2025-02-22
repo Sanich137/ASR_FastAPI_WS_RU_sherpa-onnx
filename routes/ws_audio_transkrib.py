@@ -5,9 +5,7 @@ import config
 import uuid
 
 from utils.pre_start_init import app, WebSocket, WebSocketException
-from utils.pre_start_init import recognizer
 from utils.do_logging import logger
-from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from utils.chunk_doing import find_last_speech_position
 from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr, audio_duration
 from utils.send_messages import send_messages

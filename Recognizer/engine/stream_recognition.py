@@ -1,6 +1,3 @@
-from distutils.dep_util import newer
-
-import numpy as np
 import ujson
 from collections import defaultdict
 
@@ -11,7 +8,7 @@ from pydub import AudioSegment
 
 
 def recognise_w_calculate_confidence(audio_data,
-                                     num_trials = 500,
+                                     num_trials = 1,
                                      time_tolerance: float = 0.5) -> dict:
     """
     Вычисляет уверенность (`conf`) для каждого слова на основе многократного распознавания.
@@ -91,7 +88,6 @@ def simple_recognise(audio_data, ) -> dict:
 
     stream = None
     stream = recognizer.create_stream()
-
     # перевод в семплы для распознавания.
     samples = get_np_array_samples_float32(audio_data.raw_data, 2)
 
