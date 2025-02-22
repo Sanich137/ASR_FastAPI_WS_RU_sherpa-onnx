@@ -4,6 +4,11 @@ from typing import Union, Annotated
 import config
 from config import port
 
+class SyncASRRequest(BaseModel):
+    AudioFileUrl: HttpUrl
+    do_punctuation: Union[bool, None] = False
+    do_dialogue: Union[bool, None] = False
+
 
 class WebSocketModel(BaseModel):
     """OpenAPI не хочет описывать WS, а я не хочу изучать OPEN API. По этому описание тут.
