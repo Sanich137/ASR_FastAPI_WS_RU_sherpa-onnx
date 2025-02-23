@@ -82,4 +82,12 @@ async def post(p:SyncASRRequest):
         logger.error(f'Ошибка получения файла - {error}, ссылка на файл - {p.AudioFileUrl}')
         result['error_description'] = error
         result['success'] = res
+
+    del audio_overlap[post_id]
+    del audio_buffer[post_id]
+    del audio_to_asr[post_id]
+    del audio_duration[post_id]
+    del posted_and_downloaded_audio[post_id]
+
+
     return result

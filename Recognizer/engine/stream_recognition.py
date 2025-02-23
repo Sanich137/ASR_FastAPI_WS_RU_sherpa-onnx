@@ -99,23 +99,3 @@ def simple_recognise(audio_data, ) -> dict:
     result = ujson.loads(str(stream.result))
 
     return result
-
-
-# tokens = list()
-# if config.model_name == "Gigaam":
-#     for i, token in enumerate(result['tokens']):
-#         if i == 0:
-#             tokens.append(token)
-#         else:
-#             if result['tokens'][i - 1] == ' ':
-#                 tokens.append(str(' ' + token))
-#             else:
-#                 tokens.append(token)
-#
-#     for i, token in enumerate(tokens[::-1]):
-#         if token == ' ':
-#             if -(-i - 1) > len(tokens):
-#                 continue
-#             else:
-#                 tokens.pop(-i - 1)
-#                 timestamps.pop(-i - 1)
