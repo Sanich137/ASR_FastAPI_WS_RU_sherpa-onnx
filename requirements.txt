@@ -20,9 +20,11 @@ psutil
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
 sherpa-onnx==1.10.43+cuda
 
+torch
+sentencepiece
+transformers
+
 numpy
 
-#pymystem3
-#pandas
 
 

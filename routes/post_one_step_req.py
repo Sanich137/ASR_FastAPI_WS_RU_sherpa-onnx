@@ -57,10 +57,20 @@ async def post(p:SyncASRRequest):
         for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
             result['data'].update({f"channel_{n_channel + 1}": list()})
             for overlap in mono_data[::config.MAX_OVERLAP_DURATION*1000]:
+
                 audio_buffer[post_id] = overlap  # Кривизна вызвана особенностями реализации буфера в сокетах
-                find_last_speech_position(post_id)
+                # Если кусок меньше заданного в конфиге, то это последние секунды аудио. И его нужно обработать полностью.
+                if overlap.duration_seconds == config.MAX_OVERLAP_DURATION:
+                    find_last_speech_position(post_id)
+                else:
+                    # По этому на распознавание подаём хвост от предыдущего + текущий кусок. В надежде, что суммарная
+                    # продолжительность не превысит максимальную? Самонадёянно, конечно.
+                    audio_to_asr[post_id] = audio_overlap[post_id] + overlap
+                    audio_overlap[post_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
+
+                # Обрабатываем основной массив данных
                 try:
-                    if config.model_name == "Gigaam":
+                    if config.model_name == "Gigaam" or config.model_name == "Whisper":
                         asr_result_wo_conf =simple_recognise(audio_to_asr[post_id])
 
                         asr_result = await process_gigaam_asr(asr_result_wo_conf, audio_duration[post_id])

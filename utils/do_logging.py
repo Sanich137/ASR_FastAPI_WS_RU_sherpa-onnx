@@ -5,7 +5,7 @@ from fastapi.logger import logging
 import datetime
 
 logger = logging.getLogger(__name__)
-if os.getenv('IS_PROD', True):
+if os.getenv('IS_PROD', 1) == 1:
     logging.basicConfig(
         filename=os.getenv('FILENAME', f'logs/ASR-{datetime.datetime.now().date()}.log'),
         filemode=os.getenv('FILEMODE', 'a'),

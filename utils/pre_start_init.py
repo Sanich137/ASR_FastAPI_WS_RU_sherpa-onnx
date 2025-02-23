@@ -28,32 +28,50 @@ paths = {
     "gigaam_tokens_path": BASE_DIR / "models" / "GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" / "tokens.txt",
     "gigaam_encoder_path": BASE_DIR / "models" / "GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" / "GigaAMv2_ctc_public.onnx",
 
+    "whisper_tokens_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-tokens.txt",
+    "whisper_encoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-encoder.onnx",
+    "whisper_decoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-decoder.onnx",
+    # "whisper_encoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-small" / "small-encoder.int8.onnx",
+    # "whisper_decoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-small" / "small-decoder.int8.onnx",
+
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'2724.1726990043.1324706.wav',
     "trash_folder": BASE_DIR / 'trash',
 }
 
 models_arguments = {
-        "Vosk5SmallStreaming": {
-            "tokens": paths.get("vosk_small_streaming_tokens_path"),
-            "encoder": paths.get("vosk_small_streaming_encoder_path"),
-            "decoder": paths.get("vosk_small_streaming_decoder_path"),
-            "joiner": paths.get("vosk_small_streaming_joiner_path"),
-            "bpe_vocab": paths.get("vosk_small_streaming_bpe_vocab"),
-            "num_threads": int(os.getenv('NUM_THREADS', 1)),
-            "decoding_method": "greedy_search",
-            "debug": True,  #  if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
-            "sample_rate": config.base_sample_rate,
-            "feature_dim": 80,
-            "provider": config.PROVIDER,
-            "Base_Recognizer": sherpa_onnx.OnlineRecognizer
-                },
+        # "Vosk5SmallStreaming": {
+        #     "tokens": paths.get("vosk_small_streaming_tokens_path"),
+        #     "encoder": paths.get("vosk_small_streaming_encoder_path"),
+        #     "decoder": paths.get("vosk_small_streaming_decoder_path"),
+        #     "joiner": paths.get("vosk_small_streaming_joiner_path"),
+        #     "bpe_vocab": paths.get("vosk_small_streaming_bpe_vocab"),
+        #     "num_threads": int(os.getenv('NUM_THREADS', 1)),
+        #     "decoding_method": "greedy_search",
+        #     "debug": True,  #  if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
+        #     "sample_rate": config.base_sample_rate,
+        #     "feature_dim": 80,
+        #     "provider": config.PROVIDER,
+        #     "Base_Recognizer": sherpa_onnx.OnlineRecognizer
+        #         },
         "Vosk5": {
             "tokens": paths.get("vosk_full_tokens_path"),
             "encoder": paths.get("vosk_full_encoder_path"),
             "decoder": paths.get("vosk_full_decoder_path"),
             "bpe_vocab": paths.get("vosk_full_bpe_vocab"),
             "joiner": paths.get("vosk_full_joiner_path"),
+            "num_threads": int(os.getenv('NUM_THREADS', 1)),
+            "decoding_method": "greedy_search",
+            "debug": True if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
+            "sample_rate": config.base_sample_rate,
+            "feature_dim": 80,
+            "provider": config.PROVIDER,
+            "Base_Recognizer": sherpa_onnx.OfflineRecognizer
+                },
+        "Whisper": {
+            "tokens": paths.get("whisper_tokens_path"),
+            "encoder": paths.get("whisper_encoder_path"),
+            "decoder": paths.get("whisper_decoder_path"),
             "num_threads": int(os.getenv('NUM_THREADS', 1)),
             "decoding_method": "greedy_search",
             "debug": True if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
@@ -90,6 +108,18 @@ if config.model_name=="Gigaam":
         provider=model_settings.get("provider", "CPU"),
         feature_dim=model_settings.get("feature_dim", False),
         debug=model_settings.get("debug", True),
+    )
+elif config.model_name=="Whisper":
+    recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
+        encoder=str(model_settings.get("encoder")),
+        decoder=str(model_settings.get("decoder")),
+        tokens=str(model_settings.get("tokens")),
+        language = "ru",
+        task = "transcribe",
+        num_threads=model_settings.get("num_threads", 1),
+        decoding_method=model_settings.get("decoding_method", "greedy_search"),
+        provider=model_settings.get("provider", "CPU"),
+        tail_paddings = -100
     )
 else:
     recognizer = model_settings.get("Base_Recognizer").from_transducer(

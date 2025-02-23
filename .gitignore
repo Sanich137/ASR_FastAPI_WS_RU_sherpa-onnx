@@ -7,4 +7,8 @@
 *.log
 *.wav
 *.mp3
+/models/ruT5-ASR-large/
 *.ogg
+/models/sherpa-onnx-whisper-large-v3/
+/models/sherpa-onnx-whisper-medium/
+/models/sherpa-onnx-whisper-small/

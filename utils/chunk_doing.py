@@ -60,8 +60,8 @@ def find_last_speech_position(socket_id, sample_width = 2):
 
     # speech_end - длина аудио фрагмента в каких единицах измерения?
     if not partial_frame_length:
-        speech_end = len(audio) - (
-                    i + 1) * frame_length  # Общая продолжительность аудио минус длинна Фрейма х количество
+        # Общая продолжительность аудио минус длинна Фрейма х количество
+        speech_end = len(audio) - (i + 1) * frame_length
     else:
         speech_end = len(audio) - i * frame_length
         # фреймов с голосом
