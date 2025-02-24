@@ -3,6 +3,7 @@ pathlib
 ujson
 setuptools
 
+
 uvicorn
 fastapi
 pydantic
@@ -20,9 +21,9 @@ psutil
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
 sherpa-onnx==1.10.43+cuda
 
-torch
-sentencepiece
-transformers
+# torch
+# sentencepiece
+# transformers
 
 numpy
 
