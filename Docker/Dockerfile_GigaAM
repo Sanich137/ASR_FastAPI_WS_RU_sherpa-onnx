@@ -1,0 +1,22 @@
+# Устанавливаем базовый образ
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+
+RUN apt-get update && apt-get install -y git
+RUN apt-get install -y git-lfs
+
+RUN apt-get install -y portaudio19-dev
+RUN apt-get install -y python3-pyaudio
+RUN apt-get install -y ffmpeg
+RUN apt-get install -y python3-pip
+
+RUN git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
+RUN mkdir logs
+RUN pip install -r ASR_FastAPI_WS_RU_sherpa-onnx/requirements.txt  # --no-cache-dir
+RUN cd ASR_FastAPI_WS_RU_sherpa-onnx/models && git clone https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx && cd ..
+
+# Внешний порт контейнера
+EXPOSE 49153
+
+# Команда для выполнения
+CMD ["python3", "ASR_FastAPI_WS_RU_sherpa-onnx/main.py"]
+    
