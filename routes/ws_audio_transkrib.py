@@ -71,7 +71,7 @@ async def websocket(ws: WebSocket):
                     audiosegment_chunk = audiosegment_chunk.set_frame_rate(config.base_sample_rate)
 
                 # Копим буфер
-                audio_buffer[client_id] += audiosegment_chunk
+                audio_buffer[client_id] += audiosegment_chunk.sample_width
 
                 # Накопили больше нормы
                 if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds >= config.MAX_OVERLAP_DURATION:
@@ -87,7 +87,7 @@ async def websocket(ws: WebSocket):
 
                 try:
                     if config.model_name == "Gigaam":
-                        asr_result_wo_conf =simple_recognise(audio_to_asr[client_id])
+                        asr_result_wo_conf =await simple_recognise(audio_to_asr[client_id])
 
                         result = await process_gigaam_asr(asr_result_wo_conf, audio_duration[client_id])
                         audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
@@ -135,10 +135,9 @@ async def websocket(ws: WebSocket):
 
         if config.model_name == "Gigaam":
 
-            last_asr_result_w_conf = simple_recognise(audio_to_asr[client_id])
+            last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id])
             last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
             logger.debug(f'Последний результат {last_result.get("data").get("text")}')
-
         else:
             asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
                                                                  num_trials=config.RECOGNITION_ATTEMPTS)

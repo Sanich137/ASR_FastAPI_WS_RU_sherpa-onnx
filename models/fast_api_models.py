@@ -2,9 +2,14 @@ from pydantic import BaseModel, HttpUrl
 from typing import Union, Annotated
 
 class SyncASRRequest(BaseModel):
+    """
+    :parameter keep_raw: - Если False, то запрос вернёт только постобработанные данные do_punctuation и do_dialogue.
+    """
+
     AudioFileUrl: HttpUrl
     do_punctuation: Union[bool, None] = False
     do_dialogue: Union[bool, None] = False
+    keep_raw: Union[bool, None] = True
 
 
 class WebSocketModel(BaseModel):

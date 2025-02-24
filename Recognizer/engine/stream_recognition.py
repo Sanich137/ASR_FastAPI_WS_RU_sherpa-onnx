@@ -80,18 +80,44 @@ def recognise_w_calculate_confidence(audio_data,
 
 
 
-def simple_recognise(audio_data, ) -> dict:
+async def simple_recognise(audio_data, ) -> dict:
     """
     Собираем токены в слова дополнительных вычислений не производит.
 
     :param audio_data: Аудиоданные в формате Audiosegment (puDub).
-    :return: json c параметрами probs
+    :return: json =
+        {
+        "data": {
+          "result": [
+
+            {
+              "conf": 1,
+              "start": 32.22,
+              "end": 32.46,
+              "word": "сейчас"
+            },
+            {
+              "conf": 1,
+              "start": 33.26,
+              "end": 33.74,
+              "word": "попробуем"
+            },
+            {
+              "conf": 1,
+              "start": 37.46,
+              "end": 37.82,
+              "word": "свидания"
+            }
+          ],
+          "text": "угу угу ладно сейчас попробуем все хорошо поняла вас спасибо да до свидания"
+        }
+
+    без дополнительных расчётов
     """
 
-    stream = None
     stream = recognizer.create_stream()
     # перевод в семплы для распознавания.
-    samples = get_np_array_samples_float32(audio_data.raw_data, 2)
+    samples = get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
 
     # передали аудиофрагмент на распознавание
 
