@@ -3,12 +3,15 @@ from typing import Union, Annotated
 
 class SyncASRRequest(BaseModel):
     """
-    :parameter keep_raw: - Если False, то запрос вернёт только постобработанные данные do_punctuation и do_dialogue.
+    :parameter keep_raw: - Если False, то запрос вернёт только пост-обработанные данные do_punctuation и do_dialogue.
+    :parameter do_echo_clearing - Проверяет наличие повторений во втором канале слов из первого с запозданием.
+    Если нужно проверить наоборот - поменяй каналы местами
     """
 
     AudioFileUrl: HttpUrl
-    do_punctuation: Union[bool, None] = False
+    do_echo_clearing: Union[bool, None] = True
     do_dialogue: Union[bool, None] = False
+    do_punctuation: Union[bool, None] = False
     keep_raw: Union[bool, None] = True
 
 

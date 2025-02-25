@@ -19,6 +19,10 @@ from models.fast_api_models import SyncASRRequest
 
 from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence, simple_recognise
 from Recognizer.engine.sentensizer import do_sensitizing
+from Recognizer.engine.echoe_clearing import remove_echo
+
+
+
 
 @app.post("/post_one_step_req")
 async def post(p:SyncASRRequest):
@@ -43,9 +47,6 @@ async def post(p:SyncASRRequest):
 
     post_id = uuid.uuid4()
     logger.info(f'Принят новый "post_one_step_req"  id = {post_id}')
-    audio_buffer[post_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
-    audio_overlap[post_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
-    audio_duration[post_id] = 0
 
     res, error =  await getting_audiofile(p.AudioFileUrl, post_id)
 
@@ -58,8 +59,12 @@ async def post(p:SyncASRRequest):
 
         # Обрабатываем чанки с аудио по 15 секунд.
         for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
-            result['raw_data'].update({f"channel_{n_channel + 1}": list()})
+
+            audio_buffer[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
+            audio_overlap[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
             audio_duration[post_id] = 0
+
+            result['raw_data'].update({f"channel_{n_channel + 1}": list()})
 
             for overlap in mono_data[::config.MAX_OVERLAP_DURATION*1000]:
 
@@ -71,7 +76,7 @@ async def post(p:SyncASRRequest):
                     # По этому на распознавание подаём хвост от предыдущего + текущий кусок. В надежде, что суммарная
                     # продолжительность не превысит максимальную? Самонадёянно, конечно.
                     audio_to_asr[post_id] = audio_overlap[post_id] + overlap
-                    audio_overlap[post_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
+                    audio_overlap[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
 
                 # Обрабатываем основной массив данных
                 try:
@@ -93,6 +98,17 @@ async def post(p:SyncASRRequest):
                 else:
                     result['raw_data'][f"channel_{n_channel + 1}"].append(asr_result)
 
+            del audio_overlap[post_id]
+            del audio_buffer[post_id]
+            del audio_to_asr[post_id]
+            del audio_duration[post_id]
+
+        if p.do_echo_clearing:
+            try:
+                result["raw_data"] = await remove_echo(result["raw_data"])
+            except Exception as e:
+                logger.error(f"Error echo clearing - {e}")
+
         if p.do_dialogue:
             try:
                 result["sentenced_data"] = await do_sensitizing(result["raw_data"])
@@ -109,15 +125,6 @@ async def post(p:SyncASRRequest):
     result['error_description'] = error
     result['success'] = res
 
-
-
-
-    # Чистим словари перед выходом
-    del audio_overlap[post_id]
-    del audio_buffer[post_id]
-    del audio_to_asr[post_id]
-    del audio_duration[post_id]
     del posted_and_downloaded_audio[post_id]
-
 
     return result

@@ -14,5 +14,5 @@ NUM_THREADS = int(os.getenv('NUM_THREADS', 4))
 LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
 
 # Recognition_settings
-MAX_OVERLAP_DURATION = 12  # Максимальная продолжительность буфера аудио (зависит от модели)
+MAX_OVERLAP_DURATION = 10  # Максимальная продолжительность буфера аудио (зависит от модели)
 RECOGNITION_ATTEMPTS = 1  # Пока не менять

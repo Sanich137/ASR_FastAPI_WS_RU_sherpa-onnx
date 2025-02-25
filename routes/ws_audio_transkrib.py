@@ -22,8 +22,8 @@ async def websocket(ws: WebSocket):
     wait_null_answers=True
     client_id = uuid.uuid4()
     logger.info(f'Принят новый сокет id = {client_id}')
-    audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
-    audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
+    audio_buffer[client_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
+    audio_overlap[client_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
     audio_duration[client_id] = 0
 
 

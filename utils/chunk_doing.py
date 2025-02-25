@@ -76,6 +76,6 @@ def find_last_speech_position(socket_id, sample_width = 2):
 
     logger.debug(f"Передано в перекрытие аудио продолжительностью {audio_overlap[socket_id].duration_seconds} ")
 
-    audio_buffer[socket_id] = AudioSegment.silent(100, frame_rate)
+    audio_buffer[socket_id] = AudioSegment.silent(1, frame_rate)
 
     return
