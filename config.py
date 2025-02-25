@@ -5,7 +5,7 @@ HOST = os.getenv('HOST', '0.0.0.0')
 PORT = int(os.getenv('PORT', 49153))
 
 # Model settings
-MODEL_NAME = os.getenv('MODEL_NAME' "Gigaam")  ## Vosk5SmallStreaming  Vosk5 Gigaam Whisper
+MODEL_NAME = os.getenv('MODEL_NAME', "Gigaam")  ## Vosk5SmallStreaming  Vosk5 Gigaam Whisper
 BASE_SAMPLE_RATE = os.getenv('BASE_SAMPLE_RATE', 8000)  # Стрим из астериска отдаёт только 8к
 PROVIDER = os.getenv('PROVIDER',"CUDA")
 NUM_THREADS = int(os.getenv('NUM_THREADS', 4))
