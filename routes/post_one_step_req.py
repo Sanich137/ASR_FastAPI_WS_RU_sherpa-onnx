@@ -43,8 +43,8 @@ async def post(p:SyncASRRequest):
 
     post_id = uuid.uuid4()
     logger.info(f'Принят новый "post_one_step_req"  id = {post_id}')
-    audio_buffer[post_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
-    audio_overlap[post_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
+    audio_buffer[post_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
+    audio_overlap[post_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
     audio_duration[post_id] = 0
 
     res, error =  await getting_audiofile(p.AudioFileUrl, post_id)
@@ -53,8 +53,8 @@ async def post(p:SyncASRRequest):
         posted_and_downloaded_audio[post_id] = AudioSegment.from_file(posted_and_downloaded_audio[post_id])
 
         # Приводим фреймрейт к фреймрейту модели
-        if posted_and_downloaded_audio[post_id].frame_rate != config.base_sample_rate:
-            posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_frame_rate(config.base_sample_rate)
+        if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
+            posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_frame_rate(config.BASE_SAMPLE_RATE)
 
         # Обрабатываем чанки с аудио по 15 секунд.
         for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
@@ -71,11 +71,11 @@ async def post(p:SyncASRRequest):
                     # По этому на распознавание подаём хвост от предыдущего + текущий кусок. В надежде, что суммарная
                     # продолжительность не превысит максимальную? Самонадёянно, конечно.
                     audio_to_asr[post_id] = audio_overlap[post_id] + overlap
-                    audio_overlap[post_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
+                    audio_overlap[post_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
 
                 # Обрабатываем основной массив данных
                 try:
-                    if config.model_name == "Gigaam" or config.model_name == "Whisper":
+                    if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Whisper":
                         asr_result_wo_conf = await simple_recognise(audio_to_asr[post_id])
 
                         asr_result = await process_gigaam_asr(asr_result_wo_conf, audio_duration[post_id])

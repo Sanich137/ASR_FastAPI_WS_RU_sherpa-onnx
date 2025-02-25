@@ -6,7 +6,7 @@ import routes, models
 
 try:
     if __name__ == '__main__':
-        uvicorn.run(app, host=config.host, port=config.port)
+        uvicorn.run(app, host=config.HOST, port=config.PORT)
 except KeyboardInterrupt:
     logger.info('\nDone')
 except Exception as e:

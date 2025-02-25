@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import os
 from utils.do_logging import logger
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, WebSocket, WebSocketException, WebSocketDisconnect
+
 from utils.file_exists import assert_file_exists
+
 import sherpa_onnx
-
-
 import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -46,9 +45,9 @@ models_arguments = {
         #     "decoder": paths.get("vosk_small_streaming_decoder_path"),
         #     "joiner": paths.get("vosk_small_streaming_joiner_path"),
         #     "bpe_vocab": paths.get("vosk_small_streaming_bpe_vocab"),
-        #     "num_threads": int(os.getenv('NUM_THREADS', 1)),
+        #     "num_threads": config.NUM_THREADS,
         #     "decoding_method": "greedy_search",
-        #     "debug": True,  #  if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
+        #     "debug": True,  #  if config.LOGGING_LEVEL == "DEBUG" else False,
         #     "sample_rate": config.base_sample_rate,
         #     "feature_dim": 80,
         #     "provider": config.PROVIDER,
@@ -60,10 +59,10 @@ models_arguments = {
             "decoder": paths.get("vosk_full_decoder_path"),
             "bpe_vocab": paths.get("vosk_full_bpe_vocab"),
             "joiner": paths.get("vosk_full_joiner_path"),
-            "num_threads": int(os.getenv('NUM_THREADS', 1)),
+            "num_threads": config.NUM_THREADS,
             "decoding_method": "greedy_search",
-            "debug": True if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
-            "sample_rate": config.base_sample_rate,
+            "debug": True if config.LOGGING_LEVEL == "DEBUG" else False,
+            "sample_rate": config.BASE_SAMPLE_RATE,
             "feature_dim": 80,
             "provider": config.PROVIDER,
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
@@ -72,10 +71,10 @@ models_arguments = {
             "tokens": paths.get("whisper_tokens_path"),
             "encoder": paths.get("whisper_encoder_path"),
             "decoder": paths.get("whisper_decoder_path"),
-            "num_threads": int(os.getenv('NUM_THREADS', 1)),
+            "num_threads": config.NUM_THREADS,
             "decoding_method": "greedy_search",
-            "debug": True if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False,
-            "sample_rate": config.base_sample_rate,
+            "debug": True if config.LOGGING_LEVEL == "DEBUG" else False,
+            "sample_rate": config.BASE_SAMPLE_RATE,
             "feature_dim": 80,
             "provider": config.PROVIDER,
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
@@ -83,22 +82,22 @@ models_arguments = {
         "Gigaam": {
             "tokens": paths.get("gigaam_tokens_path"),
             "model": paths.get("gigaam_encoder_path"),
-            "num_threads": int(os.getenv('NUM_THREADS', 4)),
+            "num_threads": config.NUM_THREADS,
             "decoding_method": "greedy_search",
-            "sample_rate": config.base_sample_rate,
+            "sample_rate": config.BASE_SAMPLE_RATE,
             "feature_dim": 64,
             "provider": config.PROVIDER,
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer,
-            "debug": True if os.getenv('LOGGING_LEVEL', 'DEBUG') == "DEBUG" else False
+            "debug": True if config.LOGGING_LEVEL == "DEBUG" else False
                 },
             }
 
-model_settings = models_arguments.get(config.model_name)
+model_settings = models_arguments.get(config.MODEL_NAME)
 
 recognizer = None
 
 
-if config.model_name=="Gigaam":
+if config.MODEL_NAME== "Gigaam":
     recognizer = model_settings.get("Base_Recognizer").from_nemo_ctc(
         model=str(model_settings.get("model")),
         tokens=str(model_settings.get("tokens")),
@@ -109,7 +108,7 @@ if config.model_name=="Gigaam":
         feature_dim=model_settings.get("feature_dim", False),
         debug=model_settings.get("debug", True),
     )
-elif config.model_name=="Whisper":
+elif config.MODEL_NAME== "Whisper":
     recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
         encoder=str(model_settings.get("encoder")),
         decoder=str(model_settings.get("decoder")),
@@ -138,7 +137,7 @@ else:
         debug=model_settings.get("debug", False),
     )
 
-logger.debug(f"Model {config.model_name} ready to start!")
+logger.debug(f"Model {config.MODEL_NAME} ready to start!")
 
 
 from collections import defaultdict

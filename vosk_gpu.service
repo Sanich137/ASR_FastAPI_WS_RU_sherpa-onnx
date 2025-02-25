@@ -15,6 +15,11 @@ Environment=PORT=49153
 
 # Environment=LOGGING_LEVEL="DEBUG"
 
+Environment=MODEL_NAME=Gigaam
+Environment=BASE_SAMPLE_RATE=8000
+Environment=PROVIDER=CUDA
+
+
 WorkingDirectory=/opt/Vosk5_FastAPI_streaming
 EnvironmentFile=/opt/Vosk5_FastAPI_streaming/systemctl_environment
 ExecStart=/opt/Vosk5_FastAPI_streaming/venv/bin/python3 main.py

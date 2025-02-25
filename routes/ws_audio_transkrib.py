@@ -22,8 +22,8 @@ async def websocket(ws: WebSocket):
     wait_null_answers=True
     client_id = uuid.uuid4()
     logger.info(f'Принят новый сокет id = {client_id}')
-    audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
-    audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=config.base_sample_rate)
+    audio_buffer[client_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
+    audio_overlap[client_id] = AudioSegment.silent(100, frame_rate=config.BASE_SAMPLE_RATE)
     audio_duration[client_id] = 0
 
 
@@ -67,8 +67,8 @@ async def websocket(ws: WebSocket):
                     )
 
                 # Приводим фреймрейт к фреймрейту модели
-                if audiosegment_chunk.frame_rate != config.base_sample_rate:
-                    audiosegment_chunk = audiosegment_chunk.set_frame_rate(config.base_sample_rate)
+                if audiosegment_chunk.frame_rate != config.BASE_SAMPLE_RATE:
+                    audiosegment_chunk = audiosegment_chunk.set_frame_rate(config.BASE_SAMPLE_RATE)
 
                 # Копим буфер
                 audio_buffer[client_id] += audiosegment_chunk.sample_width
@@ -86,7 +86,7 @@ async def websocket(ws: WebSocket):
             else:
 
                 try:
-                    if config.model_name == "Gigaam":
+                    if config.MODEL_NAME == "Gigaam":
                         asr_result_wo_conf =await simple_recognise(audio_to_asr[client_id])
 
                         result = await process_gigaam_asr(asr_result_wo_conf, audio_duration[client_id])
@@ -133,7 +133,7 @@ async def websocket(ws: WebSocket):
 
     try:
 
-        if config.model_name == "Gigaam":
+        if config.MODEL_NAME == "Gigaam":
 
             last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id])
             last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
