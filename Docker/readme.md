@@ -17,7 +17,7 @@ docker build -t asr /path/to/Dockerfile_GigaAM
 ```commandline
 docker run --runtime=nvidia -it --rm -p 8888:49153 asr
 ```
-- для запуска в Pycharm не забываем указать дополнительный **Run options**:  "--runtime=nvidia"
+- для запуска в Pycharm не забываем указать дополнительный **Run options**:  "--runtime=nvidia -p 8888:49153"
 
 > 6. Сервис будет доступен по адресу http://127.0.0.1:8888/docs#
 
