@@ -34,7 +34,7 @@ paths = {
     # "whisper_decoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-small" / "small-decoder.int8.onnx",
 
     "BASE_DIR": BASE_DIR,
-    "test_file": BASE_DIR /'trash'/'2724.1726990043.1324706.wav',
+    "test_file": BASE_DIR /'trash'/'111.wav',
     "trash_folder": BASE_DIR / 'trash',
 }
 
@@ -157,13 +157,13 @@ posted_and_downloaded_audio = defaultdict()
 async def lifespan(app: FastAPI):
     # on_start
     logger.debug("Приложение  FastAPI запущено")
-    # await state_audio_classifier.infinity_worker()
+
     yield  # on_stop
     logger.debug("Приложение FastAPI завершено")
 
 app = FastAPI(lifespan=lifespan,
-              version="0.1",
+              version="1.0",
               docs_url='/docs',
               root_path='/root',
-              title='ASR-Vosk5 on SHERPA-ONNX incl. streaming model'
+              title='ASR on SHERPA-ONNX'
               )

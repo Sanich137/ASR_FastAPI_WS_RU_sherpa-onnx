@@ -1,9 +1,27 @@
 import trash.test_data
 from typing import List, Dict, Any
+from difflib import SequenceMatcher
+
+def are_words_similar(word1: str, word2: str, similarity_threshold: float = 0.8) -> bool:
+    """
+    Проверяет, похожи ли два слова на основе коэффициента схожести.
+    :param word1: Первое слово.
+    :param word2: Второе слово.
+    :param similarity_threshold: Порог схожести (от 0 до 1).
+    :return: True, если слова похожи, иначе False.
+    """
+
+    similarity = SequenceMatcher(None, word1, word2).ratio()
+    if similarity >= similarity_threshold:
+        if similarity != 1:
+            print(f"==== слово '{word1}' похоже на слово '{word2}'")
+
+        return True
 
 
 
-async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float = 0.4) -> Dict[str, List[Dict[str, Any]]]:
+
+async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float = 2) -> Dict[str, List[Dict[str, Any]]]:
     output_json = {}
 
     # Получаем список каналов
@@ -15,7 +33,7 @@ async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float 
 
     # Проходим по всем каналам
     for i, channel_name in enumerate(channels):
-    #for i, channel_name in enumerate(reversed(channels)):
+    # for i, channel_name in enumerate(reversed(channels)):
         for message in output_json[channel_name]:
             if not message.get("silence", False):  # Игнорируем тишину
                 # Создаём список для хранения слов, которые не являются эхом
@@ -31,14 +49,15 @@ async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float 
                                 if not other_message.get("silence", False):  # Игнорируем тишину
                                     for other_word in other_message["data"]["result"]:
                                         # Проверяем, находится ли слово в пределах дельты до или после текущего слова
-                                        if abs(word["end"] - other_word["end"]) <= delta and word["word"] == other_word["word"]:
+                                        if abs(word["end"] - other_word["end"]) <= delta and \
+                                            are_words_similar(word["word"], other_word["word"]):
                                             # Если слово найдено до текущего, удаляем его из текущего канала
-                                            if other_word["end"] < word["end"]:
+                                            if other_word["end"] < word["end"]: # Оставляем, если сдвиг слишком мал
                                                 is_echo = True
 
-                                                print(f"<--- слово '{word['word']}' найдено до текущего, удаляем его из текущего канала")
-                                                print(f"В текущем канале время {word['end']}")
-                                                print(f"В другом канале время {word['end']}")
+                                                print(f"<--- слово '{word['word']}' найдено до текущего, удаляем '{word['word']}' из текущего канала")
+                                                print(f"В текущем канале время {word['start']}")
+                                                print(f"В другом канале время {other_word['start']}")
 
 
                                                 break
@@ -49,7 +68,10 @@ async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float 
                                                     [w["word"] for w in other_message["data"]["result"]]
                                                 )
                                                 print(
-                                                    f"---> слово '{word['word']}' найдено после текущего, удаляем его из другого канала")
+                                                    f"---> слово '{word['word']}' найдено после текущего, удаляем '{other_word['word']}' из другого канала")
+                                                print(f"В текущем канале время {word['start']}")
+                                                print(f"В другом канале время {other_word['start']}")
+
                                     if is_echo:
                                         break
                             if is_echo:
@@ -62,6 +84,7 @@ async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float 
                 # Обновляем результат и текст в текущем сообщении
                 message["data"]["result"] = cleaned_words
                 message["data"]["text"] = " ".join([w["word"] for w in cleaned_words])
+        # break
 
     return output_json
 

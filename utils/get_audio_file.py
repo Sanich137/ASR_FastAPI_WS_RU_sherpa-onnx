@@ -1,9 +1,14 @@
 import os
 import logging
+from typing import Any, Coroutine
+
 import httpx
 import io
 
+from pydub import AudioSegment
+
 from utils.pre_start_init import posted_and_downloaded_audio
+from utils.pre_start_init import paths
 
 async def getting_audiofile(file_url, post_id) -> [bool, str]:
     res = False
@@ -34,4 +39,21 @@ async def getting_audiofile(file_url, post_id) -> [bool, str]:
 
     return res, error
 
+async def open_audiofile(post_id) -> tuple[bool, str]:
+    res = False
+    error = str()
+    file = paths.get('test_file')
+    file_ext = str(file).split('/')[-1].split('.')[-1]
+    buffer = io.BytesIO()
 
+    if file_ext in ['mp3', 'wav', 'ogg']:
+        try:
+            posted_and_downloaded_audio[post_id] = AudioSegment.from_file(file=file).export(buffer,  format="wav")
+        except Exception as e:
+            logging.error(f"Error_file_opening = {e}")
+        else:
+            res = True
+    else:
+        error = "No audio file in request link"
+
+    return res, error
