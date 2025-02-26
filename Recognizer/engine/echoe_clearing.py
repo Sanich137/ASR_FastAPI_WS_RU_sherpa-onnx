@@ -1,4 +1,4 @@
-import trash.test_data
+# import trash.test_data
 from typing import List, Dict, Any
 from difflib import SequenceMatcher
 
@@ -90,10 +90,10 @@ async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float 
 
 
 
-if __name__ == "__main__":
-
-    input_data = trash.test_data.for_echo["raw_data"]
-    print(remove_echo(input_data))
+# if __name__ == "__main__":
+#
+#     input_data = trash.test_data.for_echo["raw_data"]
+#     print(remove_echo(input_data))
 
 
 
