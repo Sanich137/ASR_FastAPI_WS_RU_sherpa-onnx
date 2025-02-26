@@ -71,7 +71,7 @@ async def websocket(ws: WebSocket):
                     audiosegment_chunk = audiosegment_chunk.set_frame_rate(config.BASE_SAMPLE_RATE)
 
                 # Копим буфер
-                audio_buffer[client_id] += audiosegment_chunk.sample_width
+                audio_buffer[client_id] += audiosegment_chunk
 
                 # Накопили больше нормы
                 if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds >= config.MAX_OVERLAP_DURATION:
@@ -87,6 +87,7 @@ async def websocket(ws: WebSocket):
 
                 try:
                     if config.MODEL_NAME == "Gigaam":
+
                         asr_result_wo_conf =await simple_recognise(audio_to_asr[client_id])
 
                         result = await process_gigaam_asr(asr_result_wo_conf, audio_duration[client_id])

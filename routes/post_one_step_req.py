@@ -46,7 +46,7 @@ async def post(p:SyncASRRequest):
     }
 
     post_id = uuid.uuid4()
-    logger.info(f'Принят новый "post_one_step_req"  id = {post_id}')
+    logger.debug(f'Принят новый "post_one_step_req"  id = {post_id}')
 
     if p.AudioFileUrl:
         res, error =  await getting_audiofile(p.AudioFileUrl, post_id)
