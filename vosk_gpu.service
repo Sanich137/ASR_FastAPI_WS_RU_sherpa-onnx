@@ -1,5 +1,5 @@
 [Unit]
-Description=vosk5_gpu_ASR service
+Description=ASR service
 After=syslog.target
 After=network.target
 
@@ -18,6 +18,7 @@ Environment=PORT=49153
 Environment=MODEL_NAME=Gigaam
 Environment=BASE_SAMPLE_RATE=8000
 Environment=PROVIDER=CUDA
+Environment=IS_PROD=1
 
 
 WorkingDirectory=/opt/Vosk5_FastAPI_streaming

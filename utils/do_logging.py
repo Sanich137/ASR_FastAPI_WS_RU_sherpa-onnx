@@ -1,32 +1,22 @@
 # -*- coding: utf-8 -*-
-
-import os
+import config
 from fastapi.logger import logging
-import datetime
 
 logger = logging.getLogger(__name__)
-if os.getenv('IS_PROD', 1) == 1:
+
+if config.IS_PROD == 1:
     logging.basicConfig(
-        filename=os.getenv('FILENAME', f'logs/ASR-{datetime.datetime.now().date()}.log'),
-        filemode=os.getenv('FILEMODE', 'a'),
-        level=os.getenv('LOGGING_LEVEL', 'DEBUG'),
-        format=os.getenv('LOGGING_FORMAT', u'#%(levelname)-8s %(filename)s [LINE:%(lineno)d] [%(asctime)s]  %(message)s'),
+        filename=config.FILENAME,
+        filemode=config.FILEMODE,
+        level=config.LOGGING_LEVEL,
+        format=config.LOGGING_FORMAT,
         encoding = "UTF-8"
         )
 else:
     logging.basicConfig(
-        level=os.getenv('LOGGING_LEVEL', 'DEBUG'),
-        format=os.getenv('LOGGING_FORMAT', u'#%(levelname)-8s %(filename)s [LINE:%(lineno)d] [%(asctime)s]  %(message)s'),
+        level=config.LOGGING_LEVEL,
+        format=config.LOGGING_FORMAT,
         encoding = "UTF-8"
         )
 
-logger.debug(f"Using LOGGING_LEVEL '{os.getenv('LOGGING_LEVEL', 'DEBUG')}'")
-
-# Todo - удалить после настройки логирования sherpa
-
-# if os.getenv('LOGGING_LEVEL','INFO') == "DEBUG":
-#     logger.debug("Vosk full logging mode enabled")
-#     SetLogLevel(0)
-# else:
-#     logger.debug("Vosk logging only error mode enabled")
-#     SetLogLevel(-1)
+logger.debug(f"Using LOGGING_LEVEL '{config.LOGGING_LEVEL}'")
