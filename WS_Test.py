@@ -56,13 +56,13 @@ async def ws_audio_to_text(uri, file_path, frame_rate=8000, wait_null_answers=Fa
                         await websocket.send(data)
                     else:
                         await asyncio.sleep(0.01)
-                        print("Ждём 5 сек")
+                        # print("Ждём 5 сек")
                         pause_when = pause_when+20058003
 
                     try:
                         ws_answer = ujson.loads(await asyncio.wait_for(websocket.recv(), 0.01))
-                        # print(ws_answer.get("data").get("text"))
-                        print(ws_answer)
+                        print(ws_answer.get("data").get("text"))
+                        # print(ws_answer)
                         # recognised_raw_text[n_channel].append(ws_answer)
                     except ConnectionClosedOK:
                         print("Connection closed from outer client")
@@ -84,8 +84,8 @@ async def ws_audio_to_text(uri, file_path, frame_rate=8000, wait_null_answers=Fa
                 try:
                     ws_answer = ujson.loads(await asyncio.wait_for(websocket.recv(), 0.01))
                     try:
-                        # print(ws_answer.get("data").get("text"))
-                        print(ws_answer)
+                        print(ws_answer.get("data").get("text"))
+                        # print(ws_answer)
                     except Exception :
                         # print(ws_answer.get("data").get("text"))
                         print(ws_answer)
@@ -105,6 +105,6 @@ async def ws_audio_to_text(uri, file_path, frame_rate=8000, wait_null_answers=Fa
 
     return recognised_raw_text
 
-path_to_file = Path(".\\trash\\1.wav")
+path_to_file = Path(".\\trash\\111.wav")
 
 asyncio.run(ws_audio_to_text('ws://127.0.0.1:49153/ws', path_to_file))

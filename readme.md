@@ -32,7 +32,7 @@
 Если GPU не нужен, то не выполняем пункты до "Ставим основной пакет".
 
 > Для поддержки GPU на линукс: 
-> Ставим Cuda 11.8 и cudNN к ней [по инструкции:](https://k2-fsa.github.io/k2/installation/cuda-cudnn.html#cuda-11-8) 
+> Ставим Cuda 11.8 и cudNN к ней. 
 
 ```commandline
 sudo apt update && apt upgrade -y
@@ -50,6 +50,8 @@ sudo ./cuda_11.8.0_520.61.05_linux.run \
 wget https://huggingface.co/csukuangfj/cudnn/resolve/main/cudnn-linux-x86_64-8.9.1.23_cuda11-archive.tar.xz
 sudo tar xvf cudnn-linux-x86_64-8.9.1.23_cuda11-archive.tar.xz --strip-components=1 -C /usr/local/cuda-11.8.0
 ```
+Взято из [инструкции:](https://k2-fsa.github.io/k2/installation/cuda-cudnn.html#cuda-11-8)
+
 
 Если у Вас установлено несколько версий CUDA, 
 то используем файл для переключения на cuda 11.8 [activate-cuda-11.8.sh](activate-cuda-11.8.sh) 
