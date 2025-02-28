@@ -1,40 +1,33 @@
-> Сервер для Распознавания на базе FastAPI для Vosk 5 версии и GigaAM
+# Сервер для распознавания речи на базе FastAPI
 
-- В работе можно использовать две версии - vosk-model-ru и gigaam. Реализация интересна написанным буфером аудио потока.
-Технически с каждым новым чанком мы копим их в большой мегачанк, но у него отсекаем последние секунды с голосом, так,
-чтобы разрыв чанка не попал на голос. Потом этот Хвостик добавляем к следующему большому чанку. 
-И, если вдруг весь большой чанк это голос, то отправляем его часть.  Размер большого чанка настраивается, по умолчанию 15 секунд.
-Это обусловлено самими моделями. Vosk больше 18 секунд не берёт, а ГигаАм начинает пропускать слова и пробелы.
+Этот проект представляет собой сервер для распознавания речи, использующий модели Vosk и GigaAM. Сервер реализован на базе FastAPI и поддерживает как потоковую передачу аудио, так и обработку аудиофайлов через POST-запросы.
 
-Использовать можно как сокеты, так и пост со ссылкой на аудио.
+## Основные особенности
 
-[//]: # (  - Стриминговая версия с каждым новым чанком **будет** отдавать текст с накоплением. Говорят, оно работает быстрее.)
+- Поддержка двух моделей распознавания речи: **Vosk** и **GigaAM**.
+- Реализация буфера аудио потока с возможностью настройки размера чанка.
+- Поддержка как CPU, так и GPU (с использованием CUDA).
+- Возможность использования сокетов для потоковой передачи данных.
+- Интеграция с FastAPI для обработки входящих запросов и постобработки текста.
 
-[//]: # (  на самом деле Sherpa-onnx настолько быстр, что разницы быть не должно.)
-  - vosk-model-ru версия отличается высоким качеством распознавания относительно 0.42 версии.  
-  - GigaAMv2_CTC отличается большей чувствительностью к длине чанка, кажется, не любит когда чанк начинается с голоса. Высокое качество.   
+## Установка и настройка
 
-> FastApi используется в т.ч. для проверки входящих запросов, возможно, для выполнения дополнительных инструкций,
-таких как постобработка текста, история запросов и м.б. что-то ещё чего прикручу.
+### Предварительные требования
 
+- Убедитесь, что у вас установлены `python3`, `git`,`pip`, `git-lfs` и `ffmpeg`
+- Для работы с GPU установите CUDA и cuDNN **обязательно!** по инструкции ниже.
+- Если работа с GPU не требуется, "Установка CUDA и cuDNN (для GPU)" не выполняйте, в переменной окружения укажите `PROVIDER=CPU` 
 
-> Модели:
-> - Vosk большая [модель на HF](https://huggingface.co/alphacep/vosk-model-ru)
-> - Малая стриминговая  [модель на HF](https://huggingface.co/alphacep/vosk-model-small-ru) (в проекте пока не используется)
-> - GigaAM [модель на HF](https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx). [Лицензия Gigaam](https://github.com/salute-developers/GigaAM/blob/main/LICENSE) 
-> - **внимание! проверяйте допустимо ли коммерческое использование!**
+#### Установка зависимостей
 
+```bash
+pip install -r requirements.txt
+sudo apt install -y ffmpeg
+sudo apt-get install git-lfs
+``` 
+#### Установка CUDA и cuDNN (для GPU)
 
-По умолчанию приложение работает на CPU. Как следствие с увеличением количества запросов время подготовки ответа растёт.
-
-Установка:
-
-Если GPU не нужен, то не выполняем пункты до "Ставим основной пакет".
-
-> Для поддержки GPU на линукс: 
-> Ставим Cuda 12.4 и cudNN к ней. 
-
-```commandline
+```bash
 sudo apt update && apt upgrade -y
 sudo apt install gcc
 wget https://developer.download.nvidia.com/compute/cuda/12.4.0/local_installers/cuda_12.4.0_550.54.14_linux.run &&
@@ -50,94 +43,83 @@ chmod +x cuda_12.4.0_550.54.14_linux.run
 wget https://huggingface.co/csukuangfj/cudnn/resolve/main/cudnn-linux-x86_64-8.9.7.29_cuda12-archive.tar.xz
 tar xvf cudnn-linux-x86_64-8.9.7.29_cuda12-archive.tar.xz --strip-components=1 -C /usr/local/cuda-12.4.0
 ```
-Взято из [инструкции:](https://k2-fsa.github.io/k2/installation/cuda-cudnn.html#cuda-11-8)
-
-
-Если у Вас установлено несколько версий CUDA, 
-то используем файл для переключения на cuda 11.8 [activate-cuda-11.8.sh](activate-cuda-12.4.sh) 
-и переключаем на него:
-```commandline
-source activate-cuda-11.8.sh
+- Активация вновь установленного CUDA происходит с помощью [activate-cuda-12.4.sh](activate-cuda-12.4.sh) и действует до перезагрузки. 
+```bash
+source activate-cuda-12.4.sh
+```
+### Загрузка модели Vosk
+```bash
+cd models && git clone https://huggingface.co/alphacep/vosk-model-ru && cd ..
+```
+### Загрузка модели GigaAM
+```bash 
+cd models && git clone https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx && cd ..
 ```
 
-- Ставим основной пакет (не забываем инициировать и активировать виртуальное окружение).
-```commandline
-pip install -r requirements.txt
-sudo apt install -y ffmpeg
+### Конфигурация
+- Переменные в окружении:
 ```
-Не забываем поставить git-lfs и ffmpeg [Детали тут](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage?platform=windows)
- [или тут](https://github.com/git-lfs/git-lfs/blob/main/INSTALLING.md). Если не поставить, то получите ошибку: RuntimeError: Failed to load model because protobuf parsing failed.
-
-```commandline
-sudo apt-get install git-lfs
-```
-
-- Затем копируем модель в папку:
-```commandline
-cd models
-# Vosk
-git clone https://huggingface.co/alphacep/vosk-model-ru
-# GigaAM
-git clone https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx
-cd ..
+LOGGING_LEVEL="INFO"   # доступные значения: INFO, DEBUG
+NUM_THREADS=4          # Желательно не менее 2
+HOST="0.0.0.0"
+PORT=49153
+MODEL_NAME=Gigaam      # доступные значения: Vosk5 и Gigaam. 
+BASE_SAMPLE_RATE=8000  # для Gigaam лучше 8000, для Vosk5 - 16000 
+PROVIDER=CUDA          # доступные значения: CUDA и CPU 
+IS_PROD=1              # Влияет на логирование. Если 1, то логи пишем в файл. Если 0, то выводим в консоль.
 ```
 
-- Запуск приложения:
 
-```commandline
-python3 main.py
-```
- 
-- В окружение добавляем переменные:
-
-- `LOGGING_LEVEL = INFO` - (уровень логирования - по умолчанию DEBUG)
-- `NUM_THREADS = 2` (количество потоков на распознавание. Нормально работает от двух и выше.)
-- `HOST = "0.0.0.0"` 
-- `PORT = "49153"`
-
-
-- Доступные переменные в config.py:
-
-- `model_name = "Gigaam"` - доступные значения: Vosk5 и Gigaam
-- `base_sample_rate=8000` - sample_rate для модели. Полученное аудио будет конвертироваться в этот формат. 
-Для Vosk - 16000 для GigaAM попробуйте 8000 или 16000 (качество распознавания будет зависеть от исходного аудио.) 
-- `MAX_OVERLAP_DURATION = 15`  # Максимальная продолжительность буфера аудио. Vosk принимает от 2 до 18 секунд, Gigaam 
-не имеет ограничений, но после 15-10 секунд начинает пропускать слова и пробелы. 15 - оптимальное значение. 
-- `RECOGNITION_ATTEMPTS = 1` - временная переменная для расчёта точности распознавания. Оставить 1 и не менять.
-- `PROVIDER = "CUDA"` - CUDA или CPU.
- 
-
-- Запускаем приложение:
-```commandline
+## Запуск и тестирование
+#### Запуск сервера
+```bash
+cd /opt/ASR_FastAPI_WS_RU_sherpa-onnx
 source venv/bin/activate
 python3 main.py
 ```
 
-- Проверяем запуск на 
+#### Тестирование.
+
+Для тестирования можно использовать [WS_Test.py](WS_Test.py) или перейти на страницу документации API:
 ```commandline
 http://127.0.0.1:49153/docs#/
-``` 
-
--  Для тестирования можно использовать - [WS_Test.py](WS_Test.py)
-
-
-> Если используем приложение как service в ubuntu, то поможет пример файла [.service](vosk_gpu.service) 
-c активацией нужных переменных CUDA. Не забудьте изменить имя пользователя в файле и поместить его в:
-```commandline
-cd /etc/systemd/system
 ```
 
-запустить сервис: 
+## Запуск как сервис в Ubuntu
+- Для запуска приложения как сервиса в Ubuntu используйте пример файла [vosk_gpu.service](vosk_gpu.service). 
+- Не забудьте изменить имя пользователя в файле и поместить его в /etc/systemd/system
+- В случае запуска приложения как сервис, за корректное использование путей до CUDA будет отвечать файл [systemctl_environment](systemctl_environment)
 
-```commandline
+``` bash
+sudo cp vosk_gpu.service /etc/systemd/system/
+```
+
+### Запустите сервис:
+
+```bash
 sudo systemctl start vosk_gpu
 ```
 
-Проверить как он работает:
-```commandline
+### Проверьте работу сервиса:
+
+```bash
 journalctl -eu vosk_gpu -f
 ```
-И, если всё ОК, то включить его в автозагрузку:
-```commandline
+
+### Включите сервис в автозагрузку:
+
+```bash
 sudo systemctl enable vosk_gpu
 ```
+
+# Лицензия и коммерческое использование
+
+- Vosk: Модель доступна по лицензии [Apache 2.0](https://github.com/alphacep/vosk-api?tab=Apache-2.0-1-ov-file).
+- GigaAM: Модель доступна по лицензии [MIT](https://github.com/salute-developers/GigaAM/blob/main/LICENSE).
+
+- Внимание! Проверяйте допустимость коммерческого использования моделей перед их использованием в коммерческих проектах.
+
+## Заключение
+- Если у вас возникли вопросы или предложения по улучшению проекта, пожалуйста, свяжитесь со мной через [GitHub Issues](https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx/issues).
+
+
