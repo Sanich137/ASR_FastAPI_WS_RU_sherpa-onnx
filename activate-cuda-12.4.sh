@@ -1,4 +1,4 @@
-export CUDA_HOME=/usr/local/cuda-11.8.0
+export CUDA_HOME=/usr/local/cuda-12.4.0
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib:$LD_LIBRARY_PATH
 

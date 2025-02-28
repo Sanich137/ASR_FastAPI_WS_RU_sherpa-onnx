@@ -105,6 +105,6 @@ async def ws_audio_to_text(uri, file_path, frame_rate=8000, wait_null_answers=Fa
 
     return recognised_raw_text
 
-path_to_file = Path(".\\trash\\111.wav")
+path_to_file = Path(".\\trash\\long.mp3")
 
 asyncio.run(ws_audio_to_text('ws://127.0.0.1:49153/ws', path_to_file))

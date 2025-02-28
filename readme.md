@@ -32,29 +32,29 @@
 Если GPU не нужен, то не выполняем пункты до "Ставим основной пакет".
 
 > Для поддержки GPU на линукс: 
-> Ставим Cuda 11.8 и cudNN к ней. 
+> Ставим Cuda 12.4 и cudNN к ней. 
 
 ```commandline
 sudo apt update && apt upgrade -y
 sudo apt install gcc
-wget https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run &&
-chmod +x cuda_11.8.0_520.61.05_linux.run
-sudo ./cuda_11.8.0_520.61.05_linux.run \
-   --silent \
+wget https://developer.download.nvidia.com/compute/cuda/12.4.0/local_installers/cuda_12.4.0_550.54.14_linux.run &&
+chmod +x cuda_12.4.0_550.54.14_linux.run
+./cuda_12.4.0_550.54.14_linux.run \
+  --silent \
   --toolkit \
-  --installpath=/usr/local/cuda-11.8.0 \
+  --installpath=/usr/local/cuda-12.4.0 \
   --no-opengl-libs \
   --no-drm \
-  --no-man-page \
+  --no-man-page\
   --override
-wget https://huggingface.co/csukuangfj/cudnn/resolve/main/cudnn-linux-x86_64-8.9.1.23_cuda11-archive.tar.xz
-sudo tar xvf cudnn-linux-x86_64-8.9.1.23_cuda11-archive.tar.xz --strip-components=1 -C /usr/local/cuda-11.8.0
+wget https://huggingface.co/csukuangfj/cudnn/resolve/main/cudnn-linux-x86_64-8.9.7.29_cuda12-archive.tar.xz
+tar xvf cudnn-linux-x86_64-8.9.7.29_cuda12-archive.tar.xz --strip-components=1 -C /usr/local/cuda-12.4.0
 ```
 Взято из [инструкции:](https://k2-fsa.github.io/k2/installation/cuda-cudnn.html#cuda-11-8)
 
 
 Если у Вас установлено несколько версий CUDA, 
-то используем файл для переключения на cuda 11.8 [activate-cuda-11.8.sh](activate-cuda-11.8.sh) 
+то используем файл для переключения на cuda 11.8 [activate-cuda-11.8.sh](activate-cuda-12.4.sh) 
 и переключаем на него:
 ```commandline
 source activate-cuda-11.8.sh
