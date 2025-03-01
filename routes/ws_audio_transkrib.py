@@ -58,6 +58,13 @@ async def websocket(ws: WebSocket):
                 # Получаем новый чанк с данными
                 chunk = message.get('bytes')
 
+                # Дополняем данные до нужного размера, если они приходят не полными
+                required_size = sample_rate * 1
+                padding_size = (required_size - (len(chunk) % required_size)) % required_size
+                chunk += b'\x00' * padding_size  # Добавляем нулевые байты
+
+
+
                 # Переводим чанк в объект Audiosegment
                 audiosegment_chunk = AudioSegment(
                     chunk,

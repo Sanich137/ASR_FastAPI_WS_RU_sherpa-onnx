@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FastAPI ASR Demo</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 8px 16px; margin: 5px; cursor: pointer; }
+        .status { color: #666; font-style: italic; }
+        .error { color: red; }
+        .pre-audio { cursor: pointer; color: blue; }
+
+        /* Стили для индикатора */
+        #volumeIndicator {
+            width: 100px;
+            height: 20px;
+            background-color: #ddd;
+            margin: 10px 0;
+            position: relative;
+        }
+
+        #volumeLevel {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.1s;
+        }
+    </style>
+
+
+    </style>
+</head>
+<body>
+    <h1>Демо Сервиса по распознаванию речи на FASTAPI</h1>
+        <!-- Индикатор уровня звука -->
+
+    <!-- Секция: Примеры аудио -->
+    <div class="section">
+        <h3>Примеры аудио:</h3>
+        <div class="pre-audio" onclick="setUrl('https://example.com/audio1.wav')">Пример 1</div>
+        <div class="pre-audio" onclick="setUrl('https://example.com/audio2.mp3')">Пример 2</div>
+    </div>
+
+    <!-- Секция: Распознавание по URL -->
+    <div class="section">
+        <h3>Распознать по ссылке</h3>
+        <input type="text" id="audioUrl" placeholder="URL аудиофайла" style="width: 300px;">
+        <button onclick="processUrl()">Отправить</button>
+        <div>
+            <label><input type="checkbox" id="doEchoClearing" checked> Очистка эха</label>
+            <label><input type="checkbox" id="do_dialogue"> Пунктуация</label>
+        </div>
+        <div id="resultUrl" class="result"></div>
+        <div id="errorUrl" class="error"></div>
+    </div>
+
+    <!-- Секция: Потоковое распознавание -->
+    <div class="section">
+        <h3>Потоковая запись с микрофона</h3>
+        <button id="startRecording">Начать запись</button>
+        <button id="stopRecording" disabled>Остановить</button>
+        <div id="volumeIndicator"></div>
+        <div id="volumeLevel"></div>
+        <div id="statusStream" class="status"></div>
+        <div id="resultStream" class="result"></div>
+        <div id="errorStream" class="error"></div>
+    </div>
+
+    <script>
+        // Общие функции
+        function setUrl(url) {
+            document.getElementById('audioUrl').value = url;
+        }
+
+        function downloadText(filename, text) {
+            const blob = new Blob([text], {type: 'text/plain'});
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+        }
+
+        // Обработка URL
+        async function processUrl() {
+            const urlElem = document.getElementById('audioUrl');
+            const resultElem = document.getElementById('resultUrl');
+            const errorElem = document.getElementById('errorUrl');
+
+            try {
+                const response = await fetch('/post_one_step_req', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        AudioFileUrl: urlElem.value,
+                        do_echo_clearing: document.getElementById('doEchoClearing').checked,
+                        do_dialogue: document.getElementById('do_dialogue').checked
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    resultElem.innerHTML = `
+                        <p>Текст: ${data.punctuated_data?.text || data.raw_data.text}</p>
+                        <button onclick="downloadText('result.txt',
+                            '${data.punctuated_data?.text || data.raw_data.text}')">
+                            Скачать TXT
+                        </button>
+                    `;
+                    errorElem.textContent = '';
+                } else {
+                    errorElem.textContent = data.error_description;
+                }
+            } catch (e) {
+                errorElem.textContent = 'Ошибка: ' + e.message;
+            }
+        }
+
+        // WebSocket обработка
+        let mediaRecorder;
+        let ws;
+        let audioContext;
+        let analyser;
+        let microphone;
+
+        // Элементы для индикатора
+        const volumeLevel = document.getElementById('volumeLevel');
+
+        // Функция для обновления индикатора
+        function updateVolumeIndicator(volume) {
+            const level = Math.min(100, Math.max(0, volume * 100)); // Ограничиваем от 0 до 100
+            volumeLevel.style.width = level + '%';
+        }
+
+        // Настройка анализатора звука
+        function setupAudioAnalyzer(stream) {
+            audioContext = new AudioContext();
+            analyser = audioContext.createAnalyser();
+            microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+
+            // Настройка анализатора
+            analyser.fftSize = 32;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            // Функция для обновления индикатора
+            function analyzeAudio() {
+                analyser.getByteFrequencyData(dataArray);
+                const volume = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength / 255;
+                updateVolumeIndicator(volume);
+                requestAnimationFrame(analyzeAudio);
+            }
+
+            analyzeAudio();
+        }
+
+        // Начало записи
+        document.getElementById('startRecording').onclick = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                setupAudioAnalyzer(stream); // Настройка анализатора
+
+                // Настройка WebSocket
+                ws = new WebSocket('ws://' + window.location.host + '/ws');
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({
+                            config: {
+                                sample_rate: 16000,
+                                wait_null_answers: false
+                            }
+                    }));
+
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.ondataavailable = async (e) => {
+                        const audioChunk = await e.data.arrayBuffer();
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(audioChunk);
+                        }
+                    };
+                    mediaRecorder.start(1000); // Отправка данных каждые 1000мс
+                };
+
+                // Управление кнопками
+                document.getElementById('startRecording').disabled = true;
+                document.getElementById('stopRecording').disabled = false;
+            } catch (error) {
+                console.error('Ошибка доступа к микрофону:', error);
+            }
+        };
+
+        // Остановка записи
+        document.getElementById('stopRecording').onclick = () => {
+            if (ws) {
+                ws.send(JSON.stringify({
+                    text: JSON.stringify({ eof: 1 })
+                }));
+                ws.close();
+            }
+            if (mediaRecorder) {
+                mediaRecorder.stop();
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+
+            // Управление кнопками
+            document.getElementById('startRecording').disabled = false;
+            document.getElementById('stopRecording').disabled = true;
+
+            // Сброс индикатора
+            updateVolumeIndicator(0);
+        };
+    </script>
+</body>
+</html>

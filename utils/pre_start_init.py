@@ -3,7 +3,7 @@
 from utils.do_logging import logger
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, WebSocket, WebSocketException, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketException, WebSocketDisconnect
 
 from utils.file_exists import assert_file_exists
 
