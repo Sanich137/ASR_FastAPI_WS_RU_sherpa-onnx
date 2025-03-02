@@ -1,8 +1,13 @@
+import io
+
 from pydub import AudioSegment
 
 import ujson
 import config
 import uuid
+from io import BytesIO
+import subprocess
+
 
 from utils.pre_start_init import app, WebSocket, WebSocketException
 from utils.do_logging import logger
@@ -10,6 +15,7 @@ from utils.chunk_doing import find_last_speech_position
 from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr, audio_duration
 from utils.send_messages import send_messages
 from utils.tokens_to_Result import process_asr_json, process_gigaam_asr
+from utils.opus_to_raw import do_opus_to_raw_convertion
 from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence, simple_recognise
 
 
@@ -29,6 +35,19 @@ async def websocket(ws: WebSocket):
 
     await ws.accept()
 
+    # ffmpeg_process = subprocess.Popen(
+    #     [
+    #         "ffmpeg",
+    #         "-f", "webm",  # формат входных данных
+    #         "-i", "pipe:0",  # читаем из stdin
+    #         "-f", "wav",  # выходной формат
+    #         "pipe:1"  # пишем в stdout
+    #     ],
+    #     stdin=subprocess.PIPE,
+    #     stdout=subprocess.PIPE,
+    #     stderr=subprocess.PIPE
+    # )
+
     while True:
         try:
             message = await ws.receive()
@@ -40,6 +59,7 @@ async def websocket(ws: WebSocket):
             try:
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
+                    audio_cfg = json_cfg.get("audio_format", 'raw')
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
                     sample_rate=json_cfg.get('sample_rate')
                     logger.info(f"\n Task received, config -  {message.get('text')}")
@@ -58,24 +78,37 @@ async def websocket(ws: WebSocket):
                 # Получаем новый чанк с данными
                 chunk = message.get('bytes')
 
-                # Дополняем данные до нужного размера, если они приходят не полными
-                required_size = sample_rate * 1
-                padding_size = (required_size - (len(chunk) % required_size)) % required_size
-                chunk += b'\x00' * padding_size  # Добавляем нулевые байты
+                if audio_cfg == 'raw':
+                    # Переводим чанк в объект Audiosegment
+                    audiosegment_chunk = AudioSegment(
+                        chunk,
+                        frame_rate = sample_rate,  # Укажи частоту дискретизации
+                        sample_width = 2,   # Ширина сэмпла (2 байта для int16)
+                        channels = 1        # Количество каналов. По умолчанию - 1, Моно.
+                        )
+                else:
+                    try:
+                        buffer = BytesIO()
+                        # Запускаем FFmpeg для конвертации
+                        subprocess.run([
+                            "ffmpeg", "-i", "input.webm", "-f", "wav", buffer
+                        ])
+
+                        audiosegment_chunk = AudioSegment.from_file(buffer)
 
 
+                    except Exception as e:
+                        logger.error(f"Ошибка принятия аудио - {e}")
+                    else:
+                        logger.info("Чанк принят и распознан")
+                        audiosegment_chunk.export('chunk.wav', "wav")
 
-                # Переводим чанк в объект Audiosegment
-                audiosegment_chunk = AudioSegment(
-                    chunk,
-                    frame_rate = sample_rate,  # Укажи частоту дискретизации
-                    sample_width = 2,   # Ширина сэмпла (2 байта для int16)
-                    channels = 1        # Количество каналов. По умолчанию - 1, Моно.
-                    )
 
                 # Приводим фреймрейт к фреймрейту модели
                 if audiosegment_chunk.frame_rate != config.BASE_SAMPLE_RATE:
                     audiosegment_chunk = audiosegment_chunk.set_frame_rate(config.BASE_SAMPLE_RATE)
+                if audiosegment_chunk.channels != 1:
+                    audiosegment_chunk = audiosegment_chunk.set_channels(1)
 
                 # Копим буфер
                 audio_buffer[client_id] += audiosegment_chunk
@@ -91,7 +124,6 @@ async def websocket(ws: WebSocket):
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e}")
             else:
-
                 try:
                     if config.MODEL_NAME == "Gigaam":
 
@@ -171,7 +203,6 @@ async def websocket(ws: WebSocket):
         if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=None, _last_message=True):
             logger.error(f"send_message not ok work canceled")
             return
-
     await ws.close()
 
     del audio_overlap[client_id]

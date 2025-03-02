@@ -3,7 +3,7 @@ setuptools
 httpx~=0.28.1
 pathlib~=1.0.1
 ujson~=5.10.0
-numpy
+numpy~=2.2.2
 
 uvicorn~=0.34.0
 fastapi~=0.115.8
@@ -26,6 +26,6 @@ sherpa-onnx==1.10.46+cuda
 # sentencepiece
 # transformers
 
-
-
-
+# https://apps.microsoft.com/detail/9n5tdp8vcmhs?hl=ru-RU&gl=RU
+# Поддержка opus на Windows
+opuslib~=3.0.1
