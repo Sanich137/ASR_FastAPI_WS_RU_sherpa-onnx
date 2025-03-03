@@ -9,6 +9,7 @@ uvicorn~=0.34.0
 fastapi~=0.115.8
 pydantic~=2.10.6
 websockets~=14.2
+jinja2
 
 soundfile
 # vosk

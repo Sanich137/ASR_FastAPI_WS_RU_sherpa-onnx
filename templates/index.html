@@ -18,43 +18,45 @@
     <h1>Демо Сервиса по распознаванию речи на FASTAPI</h1>
         <!-- Индикатор уровня звука -->
 
-    <!-- Секция: Примеры аудио -->
-    <div class="section">
-        <h3>Примеры аудио:</h3>
-        <div class="pre-audio" onclick="setUrl('https://example.com/audio1.wav')">Пример 1</div>
-        <div class="pre-audio" onclick="setUrl('https://example.com/audio2.mp3')">Пример 2</div>
-    </div>
+<!--    &lt;!&ndash; Секция: Примеры аудио &ndash;&gt;-->
+<!--    <div class="section">-->
+<!--        <h3>Примеры аудио:</h3>-->
+<!--        <div class="pre-audio" onclick="setUrl('https://example.com/audio1.wav')">Пример 1</div>-->
+<!--        <div class="pre-audio" onclick="setUrl('https://example.com/audio2.mp3')">Пример 2</div>-->
+<!--    </div>-->
 
-    <!-- Секция: Распознавание по URL -->
-    <div class="section">
-        <h3>Распознать по ссылке</h3>
-        <input type="text" id="audioUrl" placeholder="URL аудиофайла" style="width: 300px;">
-        <button onclick="processUrl()">Отправить</button>
-        <div>
-            <label><input type="checkbox" id="doEchoClearing" checked> Очистка эха</label>
-            <label><input type="checkbox" id="do_dialogue"> Пунктуация</label>
-        </div>
-        <div id="resultUrl" class="result"></div>
-        <div id="errorUrl" class="error"></div>
-    </div>
+<!--    &lt;!&ndash; Секция: Распознавание по URL &ndash;&gt;-->
+<!--    <div class="section">-->
+<!--        <h3>Распознать по ссылке</h3>-->
+<!--        <input type="text" id="audioUrl" placeholder="URL аудиофайла" style="width: 300px;">-->
+<!--        <button onclick="processUrl()">Отправить</button>-->
+<!--        <div>-->
+<!--            <label><input type="checkbox" id="doEchoClearing" checked> Очистка эха</label>-->
+<!--            <label><input type="checkbox" id="do_dialogue"> Пунктуация</label>-->
+<!--        </div>-->
+<!--        <div id="resultUrl" class="result"></div>-->
+<!--        <div id="errorUrl" class="error"></div>-->
+<!--    </div>-->
 
     <!-- Секция: Загрузка и отправка WAV файла -->
     <div class="section">
-        <h3>Загрузить и отправить WAV файл</h3>
+        <h3>Распознать WAV файл. Обработка через WEbSockets</h3>
         <input type="file" id="audioFile" accept=".wav" style="display: none;">
         <button onclick="document.getElementById('audioFile').click()">Выбрать файл</button>
         <button id="sendFileButton" onclick="sendFile()" disabled>Отправить файл</button>
         <div id="resultFile" class="result"></div>
         <div id="errorFile" class="error"></div>
     </div>
+
     <!-- Секция: Ответы сервера -->
     <div class="section">
         <h3>Ответы сервера:</h3>
-        <div id="serverResponses" style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-top: 10px;">
+        <button onclick="clearServerResponses()">Очистить вывод</button>
+        <div id="serverResponses" style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;
+        margin-top: 10px; word-wrap: break-word; white-space: pre-wrap;">
             <!-- Здесь будут отображаться ответы сервера -->
         </div>
     </div>
-
 
 
 <script>
@@ -121,18 +123,21 @@
         });
 
 
-        // Функция для добавления ответа сервера в блок
-
-        function  addServerResponse(message) {
+        function addServerResponse(message) {
             const serverResponsesElem = document.getElementById('serverResponses');
             const responseDiv = document.createElement('div');
             responseDiv.style.marginBottom = '10px';
-            responseDiv.style.padding = '5px';
+            responseDiv.style.padding = '10px';
             responseDiv.style.backgroundColor = '#f9f9f9';
             responseDiv.style.border = '1px solid #ddd';
+            responseDiv.style.borderRadius = '5px';
+            responseDiv.style.wordWrap = 'break-word'; // Перенос текста
+            responseDiv.style.whiteSpace = 'pre-wrap'; // Сохраняет форматирование
 
-            const timestamp = new Date().toLocaleTimeString(); // Добавляем временную метку
-            responseDiv.innerHTML = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+            // Форматируем JSON-ответ с отступами и переносами строк
+            const formattedMessage = JSON.stringify(message, null, 2);
+            responseDiv.textContent = formattedMessage;
+
             serverResponsesElem.appendChild(responseDiv);
 
             // Прокручиваем блок вниз
@@ -159,31 +164,81 @@
             return { sampleRate, numChannels, bitsPerSample };
         }
 
-        // Функция для отправки аудио данных чанками
-        async function sendAudioChunks(arrayBuffer, chunkSize) {
-            const dataView = new Uint8Array(arrayBuffer);
-            let offset = 44; // Пропускаем заголовок WAV файла (первые 44 байта)
+        async function sendChannel(arrayBuffer, channel, numChannels, chunkSize, sampleRate) {
+            return new Promise((resolve, reject) => {
+                const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+                const socket = new WebSocket(wsUrl);
 
-            while (offset < dataView.length) {
-                // Определяем размер текущего чанка
-                const endOffset = Math.min(offset + chunkSize, dataView.length);
-                const chunk = dataView.slice(offset, endOffset); // Вырезаем чанк
+                socket.onopen = async function() {
+                    // Отправляем конфигурацию
+                    socket.send(JSON.stringify({
+                        config: {
+                            sample_rate: sampleRate,
+                            wait_null_answers: true
+                        }
+                    }));
 
-                // Отправляем чанк
-                socket.send(chunk);
+                    const dataView = new Uint8Array(arrayBuffer);
+                    const bytesPerSample = 2; // 16 бит = 2 байта на сэмпл
+                    let offset = 44 + channel * bytesPerSample; // Пропускаем заголовок и смещаемся на нужный канал
 
-                // Увеличиваем смещение
-                offset = endOffset;
+                    while (offset < dataView.length) {
+                        // Определяем размер текущего чанка
+                        const endOffset = Math.min(offset + chunkSize * numChannels, dataView.length);
+                        const chunk = new Uint8Array((endOffset - offset) / numChannels);
 
-                // Добавляем небольшую задержку (по желанию)
-                await new Promise((resolve) => setTimeout(resolve, 100)); // 100 мс задержка
-            }
+                        // Копируем данные для текущего канала
+                        for (let i = 0; i < chunk.length; i += bytesPerSample) {
+                            const sampleOffset = offset + i * numChannels;
+                            chunk[i] = dataView[sampleOffset];
+                            chunk[i + 1] = dataView[sampleOffset + 1];
+                        }
 
-            // Отправляем EOF
-            socket.send(JSON.stringify({ eof: 1 }));
+                        // Отправляем чанк
+                        socket.send(chunk);
+
+                        // Увеличиваем смещение
+                        offset += chunkSize * numChannels;
+
+                        // Добавляем небольшую задержку (по желанию)
+                        await new Promise((resolve) => setTimeout(resolve, 100)); // 100 мс задержка
+                    }
+
+                    // Отправляем EOF
+                    socket.send(JSON.stringify({ eof: 1 }));
+                };
+
+                socket.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+
+                    // Добавляем ответ сервера в блок
+                    addServerResponse(data);
+
+                    if (data.last_message) {
+                        // Если получено сообщение о завершении, закрываем сокет
+                        socket.close();
+                        resolve();
+                    }
+                };
+
+                socket.onerror = function(error) {
+                    reject('Ошибка WebSocket: ' + error.message);
+                };
+
+                socket.onclose = function() {
+                    console.log(`Сокет для канала ${channel} закрыт`);
+                };
+            });
         }
 
-        // Функция отправки файла
+        async function sendAllChannels(arrayBuffer, numChannels, chunkSize, sampleRate) {
+            for (let channel = 0; channel < numChannels; channel++) {
+                await sendChannel(arrayBuffer, channel, numChannels, chunkSize, sampleRate);
+                console.log("конец канала");
+            }
+        }
+
         async function sendFile() {
             const resultElem = document.getElementById('resultFile');
             const errorElem = document.getElementById('errorFile');
@@ -199,64 +254,25 @@
                 const arrayBuffer = e.target.result;
 
                 try {
-                    // Извлекаем sample_rate и другие параметры из WAV файла
-                    const { sampleRate, numChannels, bitsPerSample } = readWavHeader(arrayBuffer);
+                    // Извлекаем sample_rate и количество каналов из WAV файла
+                    const { sampleRate, numChannels } = readWavHeader(arrayBuffer);
 
-                    // Открываем WebSocket соединение
-                    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
-                    socket = new WebSocket(wsUrl);
+                    // Отправляем все каналы
+                    const chunkSize = 65536; // Размер чанка в байтах (64 КБ)
+                    await sendAllChannels(arrayBuffer, numChannels, chunkSize, sampleRate);
 
-                    socket.onopen = function() {
-                        // Отправляем конфигурацию
-                        socket.send(JSON.stringify({
-                            config: {
-                                sample_rate: sampleRate, // Пример значения, измените по необходимости
-                                sample_width: bitsPerSample,
-                                channels: numChannels,
-                                wait_null_answers: true
-                            }
-                        }));
-
-                        // Отправляем аудио данные чанками
-                        const chunkSize = 65536*4; // Размер чанка в байтах (64 КБ)
-                        // Отправляем аудио данные чанками
-                        sendAudioChunks(arrayBuffer, chunkSize);
-                    };
-
-                    socket.onmessage = function(event) {
-                        const data = JSON.parse(event.data);
-                        addServerResponse(data); // Добавляем ответ сервера в блок
-
-                        if (data.success) {
-                            resultElem.innerHTML = `
-                        <p>Текст: ${data.punctuated_data?.text || data.raw_data.text}</p>
-                        <button onclick="downloadText('result.txt',
-                            '${data.punctuated_data?.text || data.raw_data.text}')">
-                            Скачать TXT
-                        </button>
-                    `;
-                            errorElem.textContent = '';
-                        } else {
-                            errorElem.textContent = data.error_description;
-                        }
-                    };
-
-                    socket.onerror = function(error) {
-                        errorElem.textContent = 'Ошибка WebSocket: ' + error.message;
-                    };
-
-                    socket.onclose = function() {
-                        console.log('WebSocket соединение закрыто');
-                    };
+                    console.log("Все каналы отправлены");
                 } catch (e) {
-                    errorElem.textContent = 'Ошибка при чтении WAV файла: ' + e.message;
+                    errorElem.textContent = 'Ошибка: ' + e.message;
                 }
             };
 
             reader.readAsArrayBuffer(file);
         }
-
+        function clearServerResponses() {
+            const serverResponsesElem = document.getElementById('serverResponses');
+            serverResponsesElem.innerHTML = ''; // Очищаем содержимое блока
+        }
     </script>
 </body>
 </html>

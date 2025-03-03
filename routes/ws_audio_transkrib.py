@@ -60,6 +60,8 @@ async def websocket(ws: WebSocket):
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
                     audio_cfg = json_cfg.get("audio_format", 'raw')
+                    sample_width = json_cfg.get("sample_width", 2)
+                    channels = json_cfg.get("channels", 1)
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
                     sample_rate=json_cfg.get('sample_rate')
                     logger.info(f"\n Task received, config -  {message.get('text')}")
