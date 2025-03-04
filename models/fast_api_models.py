@@ -1,11 +1,14 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field
 from typing import Union, Annotated
+from fastapi import UploadFile
 
 class SyncASRRequest(BaseModel):
     """
     :parameter keep_raw: - Если False, то запрос вернёт только пост-обработанные данные do_punctuation и do_dialogue.
-    :parameter do_echo_clearing - Проверяет наличие повторений во втором канале слов из первого с запозданием.
-    Если нужно проверить наоборот - поменяй каналы местами
+    :parameter do_echo_clearing - Проверяет наличие повторений между каналами
+    :parameter do_dialogue - Собирает из распознанного текста фразы, разделённые более длинным молчанием,
+                             чем некое среднее значение.
+    :parameter do_punctuation - расставляет пунктуацию. Пока в разработке
     """
 
     AudioFileUrl: HttpUrl
@@ -13,6 +16,22 @@ class SyncASRRequest(BaseModel):
     do_dialogue: Union[bool, None] = False
     do_punctuation: Union[bool, None] = False
     keep_raw: Union[bool, None] = True
+
+
+class PostFileRequest(BaseModel):
+    """
+    Модель для проверки запроса пользователя.
+
+    :param keep_raw: Если False, то запрос вернёт только пост-обработанные данные do_punctuation и do_dialogue.
+    :param do_echo_clearing: Проверяет наличие повторений между каналами.
+    :param do_dialogue: Собирает из распознанного текста фразы, разделённые более длинным молчанием,
+    чем некое среднее значение.
+    :param do_punctuation: Расставляет пунктуацию. Пока в разработке.
+    """
+    keep_raw: bool = True
+    do_echo_clearing: bool = False
+    do_dialogue: bool = False
+    do_punctuation: bool = False
 
 
 class WebSocketModel(BaseModel):

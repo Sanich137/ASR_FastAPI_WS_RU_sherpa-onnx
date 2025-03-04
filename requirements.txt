@@ -10,6 +10,7 @@ fastapi~=0.115.8
 pydantic~=2.10.6
 websockets~=14.2
 jinja2
+python-multipart
 
 soundfile
 # vosk
@@ -26,7 +27,3 @@ sherpa-onnx==1.10.46+cuda
 # torch
 # sentencepiece
 # transformers
-
-# https://apps.microsoft.com/detail/9n5tdp8vcmhs?hl=ru-RU&gl=RU
-# Поддержка opus на Windows
-opuslib~=3.0.1

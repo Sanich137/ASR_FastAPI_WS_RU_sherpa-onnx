@@ -39,7 +39,8 @@ async def getting_audiofile(file_url, post_id) -> [bool, str]:
 
     return res, error
 
-async def open_audiofile(post_id) -> tuple[bool, str]:
+# Todo - убрать корягу ниже
+async def open_default_audiofile(post_id) -> tuple[bool, str]:
     res = False
     error = str()
     file = paths.get('test_file')

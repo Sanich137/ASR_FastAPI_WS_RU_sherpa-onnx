@@ -12,7 +12,7 @@ from utils.pre_start_init import (app,
                                   audio_to_asr,
                                   audio_duration)
 from utils.do_logging import logger
-from utils.get_audio_file import getting_audiofile, open_audiofile
+from utils.get_audio_file import getting_audiofile, open_default_audiofile
 from utils.chunk_doing import find_last_speech_position
 
 from models.fast_api_models import SyncASRRequest
@@ -51,7 +51,7 @@ async def post(p:SyncASRRequest):
     if p.AudioFileUrl:
         res, error =  await getting_audiofile(p.AudioFileUrl, post_id)
     else:
-        res, error = await open_audiofile(post_id)
+        res, error = await open_default_audiofile(post_id)
 
     if res:
         posted_and_downloaded_audio[post_id] = AudioSegment.from_file(posted_and_downloaded_audio[post_id])

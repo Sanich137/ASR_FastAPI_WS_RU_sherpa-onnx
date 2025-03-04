@@ -35,19 +35,6 @@ async def websocket(ws: WebSocket):
 
     await ws.accept()
 
-    # ffmpeg_process = subprocess.Popen(
-    #     [
-    #         "ffmpeg",
-    #         "-f", "webm",  # формат входных данных
-    #         "-i", "pipe:0",  # читаем из stdin
-    #         "-f", "wav",  # выходной формат
-    #         "pipe:1"  # пишем в stdout
-    #     ],
-    #     stdin=subprocess.PIPE,
-    #     stdout=subprocess.PIPE,
-    #     stderr=subprocess.PIPE
-    # )
-
     while True:
         try:
             message = await ws.receive()
