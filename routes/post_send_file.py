@@ -11,8 +11,10 @@ from utils.pre_start_init import (app,
                                   audio_buffer,
                                   audio_overlap,
                                   audio_to_asr,
-                                  audio_duration,
-                                  UploadFile, File, Depends)
+                                  audio_duration)
+
+from fastapi import (UploadFile, File, Depends, Form)
+
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 
@@ -23,11 +25,27 @@ from Recognizer.engine.sentensizer import do_sensitizing
 from Recognizer.engine.echoe_clearing import remove_echo
 
 
+# Функция для извлечения параметров из FormData
+def get_file_request(
+    keep_raw: Annotated[bool, Form()] = True,
+    do_echo_clearing: Annotated[bool, Form()] = False,
+    do_dialogue: Annotated[bool, Form()] = False,
+    do_punctuation: Annotated[bool, Form()] = False,
+) -> PostFileRequest:
+    return PostFileRequest(
+        keep_raw=keep_raw,
+        do_echo_clearing=do_echo_clearing,
+        do_dialogue=do_dialogue,
+        do_punctuation=do_punctuation,
+    )
+
+
 @app.post("/post_file")
 async def receive_file(
     file: Annotated[UploadFile, File(description="Аудиофайл для обработки")],
-    params: Annotated[PostFileRequest, Depends()]
-):
+    params: Annotated[PostFileRequest, Depends(get_file_request)]
+    ):
+
     """
     :param file: Файл, который будет обработан.
     :param params:

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>FastAPI ASR Demo</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
@@ -31,8 +32,27 @@
 <!--        <input type="text" id="audioUrl" placeholder="URL аудиофайла" style="width: 300px;">-->
 <!--        <button onclick="processUrl()">Отправить</button>-->
 <!--        <div>-->
-<!--            <label><input type="checkbox" id="doEchoClearing" checked> Очистка эха</label>-->
-<!--            <label><input type="checkbox" id="do_dialogue"> Пунктуация</label>-->
+<!--            <div class="form-group checkbox-group">-->
+<!--                <div class="checkbox">-->
+<!--                    <input type="checkbox" name="keep_raw" checked>-->
+<!--                    <span>Сохранить сырые данные</span>-->
+<!--                </div>-->
+
+<!--                <div class="checkbox">-->
+<!--                    <input type="checkbox" name="do_echo_clearing">-->
+<!--                    <span>Очистка эха</span>-->
+<!--                </div>-->
+
+<!--                <div class="checkbox">-->
+<!--                    <input type="checkbox" name="do_dialogue">-->
+<!--                    <span>Разделение на диалоги</span>-->
+<!--                </div>-->
+
+<!--                <div class="checkbox">-->
+<!--                    <input type="checkbox" name="do_punctuation">-->
+<!--                    <span>Расстановка пунктуации</span>-->
+<!--                </div>-->
+<!--            </div>-->
 <!--        </div>-->
 <!--        <div id="resultUrl" class="result"></div>-->
 <!--        <div id="errorUrl" class="error"></div>-->
@@ -46,6 +66,41 @@
         <button id="sendFileButton" onclick="sendFile()" disabled>Отправить файл</button>
         <div id="resultFile" class="result"></div>
         <div id="errorFile" class="error"></div>
+    </div>
+
+
+    <!-- Секция: Загрузка и отправка audio-файла через POST -->
+    <div class="section">
+        <h3>Распознать аудио файл. Обработка через Post</h3>
+        <form id="uploadForm" enctype="multipart/form-data">
+            <div class="form-group checkbox-group">
+                <div class="checkbox">
+                    <input type="checkbox" name="keep_raw" checked>
+                    <span>Сохранить сырые данные</span>
+                </div>
+
+                <div class="checkbox">
+                    <input type="checkbox" name="do_echo_clearing">
+                    <span>Очистка эха</span>
+                </div>
+
+                <div class="checkbox">
+                    <input type="checkbox" name="do_dialogue">
+                    <span>Разделение на диалоги</span>
+                </div>
+
+                <div class="checkbox">
+                    <input type="checkbox" name="do_punctuation">
+                    <span>Расстановка пунктуации</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="file">Выберите файл:</label>
+                <input type="file" id="file" name="file" accept="audio/*" required>
+                <button type="submit" class="submit-button">Отправить</button>
+            </div>
+        </form>
     </div>
 
     <!-- Секция: Ответы сервера -->
@@ -273,6 +328,59 @@
             const serverResponsesElem = document.getElementById('serverResponses');
             serverResponsesElem.innerHTML = ''; // Очищаем содержимое блока
         }
+
+        // Получаем элементы DOM
+        const form = document.getElementById('uploadForm');
+        const serverResponses = document.getElementById('serverResponses');
+
+        // Обработчик отправки формы
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Предотвращаем стандартную отправку формы
+
+
+            // Собираем актуальные значения чекбоксов
+            const formData = new FormData(form);
+            // Отладка: проверяем, что FormData содержит правильные данные
+
+            for (let [key, value] of formData.entries()) {
+                console.log(key, value);
+            }
+
+            try {
+            // Показываем индикатор загрузки
+            serverResponses.innerHTML = '<p>Загрузка...</p>';
+
+            // Отправляем запрос
+            const Url = `/post_file`
+            const response = await fetch(Url, {
+                method: 'POST',
+                body: formData
+            });
+
+            // Получаем ответ
+            const data = await response.json();
+
+
+            // Форматируем и отображаем ответ
+            addServerResponse(data)
+
+        } catch (error) {
+            serverResponses.innerHTML = `
+                <div class="error">
+                    <strong>Ошибка при обработке запроса:</strong> ${error.message}
+                </div>
+            `;
+        }
+        });
+
+        // Функция для форматирования размера файла
+        function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
+        }
+
     </script>
 </body>
 </html>

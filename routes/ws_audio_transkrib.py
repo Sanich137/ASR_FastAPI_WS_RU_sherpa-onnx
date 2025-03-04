@@ -1,5 +1,6 @@
 import io
 
+from fastapi import FastAPI
 from pydub import AudioSegment
 
 import ujson
@@ -9,7 +10,8 @@ from io import BytesIO
 import subprocess
 
 
-from utils.pre_start_init import app, WebSocket, WebSocketException
+from utils.pre_start_init import app
+from fastapi import WebSocket, WebSocketException
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 from utils.pre_start_init import audio_buffer, audio_overlap, audio_to_asr, audio_duration

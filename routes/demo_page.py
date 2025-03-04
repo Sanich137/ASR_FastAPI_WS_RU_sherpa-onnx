@@ -1,5 +1,6 @@
 
-from utils.pre_start_init import app, WebSocket, WebSocketException, Request
+from utils.pre_start_init import app
+from fastapi import WebSocket, WebSocketException, Request
 from utils.do_logging import logger
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
