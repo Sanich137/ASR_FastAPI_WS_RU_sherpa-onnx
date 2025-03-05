@@ -25,7 +25,7 @@ from Recognizer.engine.echoe_clearing import remove_echo
 
 
 @app.post("/post_one_step_req")
-async def post(p:SyncASRRequest):
+async def post(params:SyncASRRequest):
     """
     На вход принимает HttpUrl - прямую ссылку на скачивание файла 'mp3', 'wav' или 'ogg'.\n
     Если на вход передаётся не моно, то ответ будет в несколько элементов списка для каждого канала.\n
@@ -36,10 +36,13 @@ async def post(p:SyncASRRequest):
     При проектировании таймаутов учитывайте скорость распознавания (около 100 секунд аудио распознаётся за 2-5 секунд
     распознавания одного канала)
     """
-    error = False
+    res = False
+    error_description = str()
+
+
     result = {
-        "success":error,
-        "error_description": str(),
+        "success":res,
+        "error_description": error_description,
         "raw_data": dict(),
         "sentenced_data": dict(),
         "punctuated_data": dict(),
@@ -48,10 +51,10 @@ async def post(p:SyncASRRequest):
     post_id = uuid.uuid4()
     logger.debug(f'Принят новый "post_one_step_req"  id = {post_id}')
 
-    if p.AudioFileUrl:
-        res, error =  await getting_audiofile(p.AudioFileUrl, post_id)
+    if params.AudioFileUrl:
+        res, error_description =  await getting_audiofile(params.AudioFileUrl, post_id)
     else:
-        res, error = await open_default_audiofile(post_id)
+        res, error_description = await open_default_audiofile(post_id)
 
     if res:
         posted_and_downloaded_audio[post_id] = AudioSegment.from_file(posted_and_downloaded_audio[post_id])
@@ -106,26 +109,31 @@ async def post(p:SyncASRRequest):
             del audio_to_asr[post_id]
             del audio_duration[post_id]
 
-        if p.do_echo_clearing:
+        if params.do_echo_clearing:
             try:
                 result["raw_data"] = await remove_echo(result["raw_data"])
             except Exception as e:
                 logger.error(f"Error echo clearing - {e}")
+                error_description = f"Error echo clearing - {e}"
+                res = False
 
-        if p.do_dialogue:
+        if params.do_dialogue:
             try:
-                result["sentenced_data"] = await do_sensitizing(result["raw_data"])
+                result["sentenced_data"] = await do_sensitizing(result["raw_data"], params.do_punctuation)
             except Exception as e:
                 logger.error(f"await do_sensitizing - {e}")
-                error = f"do_sensitizing - {e}"
+                error_description = f"do_sensitizing - {e}"
+                res = False
             else:
-                if not p.keep_raw:
+                if not params.keep_raw:
                     result["raw_data"].clear()
+        else:
+            result["sentenced_data"].clear()
 
     else:
-        logger.error(f'Ошибка получения файла - {error}, ссылка на файл - {p.AudioFileUrl}')
+        logger.error(f'Ошибка получения файла - {error}, ссылка на файл - {params.AudioFileUrl}')
 
-    result['error_description'] = error
+    result['error_description'] = error_description
     result['success'] = res
 
     del posted_and_downloaded_audio[post_id]

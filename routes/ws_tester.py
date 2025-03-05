@@ -1,4 +1,5 @@
-from utils.pre_start_init import app, WebSocket, WebSocketDisconnect
+from utils.pre_start_init import app
+from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
 

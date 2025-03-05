@@ -4,7 +4,6 @@ import argparse
 import numpy as np
 from transformers import AutoTokenizer
 import onnxruntime as ort
-import onnx
 
 # Прогнозируемые знаки препинания
 PUNK_MAPPING = {".": "PERIOD", ",": "COMMA", "?": "QUESTION"}
@@ -78,7 +77,7 @@ class SbertPuncCaseOnnx:
         self.session = ort.InferenceSession(f"{onnx_model_path}/model.onnx",
                                             providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
 
-    def punctuate(self, text):
+    async def punctuate(self, text):
         text = text.strip().lower()
 
         # Разобъем предложение на слова

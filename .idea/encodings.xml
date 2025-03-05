@@ -3,10 +3,11 @@
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/GPU-transcriber-2025-02-07.log" charset="windows-1251" />
     <file url="file://$PROJECT_DIR$/GPU-transcriber-2025-02-10.log" charset="windows-1251" />
-    <file url="file://$PROJECT_DIR$/Logs/ASR-2025-02-10.log" charset="windows-1251" />
-    <file url="file://$PROJECT_DIR$/Logs/ASR-2025-02-11.log" charset="windows-1251" />
-    <file url="file://$PROJECT_DIR$/Logs/ASR-2025-02-12.log" charset="windows-1251" />
-    <file url="file://$PROJECT_DIR$/Logs/ASR-2025-02-13.log" charset="windows-1251" />
-    <file url="file://$PROJECT_DIR$/Logs/ASR-2025-02-14.log" charset="windows-1251" />
+    <file url="file://$PROJECT_DIR$/logs/ASR-2025-02-10.log" charset="windows-1251" />
+    <file url="file://$PROJECT_DIR$/logs/ASR-2025-02-11.log" charset="windows-1251" />
+    <file url="file://$PROJECT_DIR$/logs/ASR-2025-02-12.log" charset="windows-1251" />
+    <file url="file://$PROJECT_DIR$/logs/ASR-2025-02-13.log" charset="windows-1251" />
+    <file url="file://$PROJECT_DIR$/logs/ASR-2025-02-14.log" charset="windows-1251" />
+    <file url="file://$PROJECT_DIR$/requirements.txt" charset="UTF-8" />
   </component>
 </project>

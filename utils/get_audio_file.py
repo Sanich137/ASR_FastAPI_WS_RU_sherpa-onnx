@@ -42,7 +42,7 @@ async def getting_audiofile(file_url, post_id) -> [bool, str]:
 # Todo - убрать корягу ниже
 async def open_default_audiofile(post_id) -> tuple[bool, str]:
     res = False
-    error = str()
+    error_description = str()
     file = paths.get('test_file')
     file_ext = str(file).split('/')[-1].split('.')[-1]
     buffer = io.BytesIO()
@@ -55,6 +55,6 @@ async def open_default_audiofile(post_id) -> tuple[bool, str]:
         else:
             res = True
     else:
-        error = "No audio file in request link"
+        error_description = "No audio file in request link"
 
-    return res, error
+    return res, error_description

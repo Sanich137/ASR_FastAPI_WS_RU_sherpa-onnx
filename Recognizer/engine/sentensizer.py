@@ -5,8 +5,9 @@ import asyncio
 from Punctuation import sbertpunc
 
 # is_async=False, task_id=None, raw_recognition=None):
-async def do_sensitizing(input_asr_json, is_async = False):
+async def do_sensitizing(input_asr_json, do_punctuation, is_async = False):
     """
+    :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
     :param is_async: Ранее был реализован сервис постановки задачи на распознавание в работу. И, как следствие,
     результат нужно было хранить в отдельном месте до его получения и удаления. Сейчас скорость обработки аудио уже не
     требует такого. Понаблюдать, при необходимости можно удалить (и часть кода связанная с хранением переменных)
@@ -60,6 +61,10 @@ async def do_sensitizing(input_asr_json, is_async = False):
                 else:
                     continue
 
+                # # Расставляем пунктуацию, если требуется
+                # if do_punctuation:
+                #   one_text_only = await sbertpunc.punctuate(one_text_only)
+
             if not words:
                 err_state = f"Err_No_words in {channel}"
             elif len(words) == 1:
@@ -91,9 +96,15 @@ async def do_sensitizing(input_asr_json, is_async = False):
                         end_time = word.get('end')
 
                     else:
+                        # Расставляем пунктуацию, если требуется
+                        if do_punctuation:
+                          text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
+                        else:
+                          text = ' '.join(str(word) for word in sentences)
+
                         sentence_element.append({
                             "start": start_time,
-                            "text": sbertpunc.punctuate(' '.join(str(word) for word in sentences)),
+                            "text": text,
                             "speaker": channel
                         })
                         sentences = list()
@@ -102,11 +113,15 @@ async def do_sensitizing(input_asr_json, is_async = False):
                         end_time = 0
                         continue
 
+                # Расставляем пунктуацию, если требуется
+                if do_punctuation:
+                  text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
+                else:
+                  text = ' '.join(str(word) for word in sentences)
 
-                text_to_puctuate = ' '.join(str(word) for word in sentences)
                 sentence_element.append({
                     "start": start_time,
-                    "text":  sbertpunc.punctuate(text_to_puctuate),
+                    "text":  text,
                     "speaker": channel
                 })
 

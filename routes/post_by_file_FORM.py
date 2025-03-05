@@ -135,7 +135,7 @@ async def receive_file(
 
     if params.do_dialogue:
         try:
-            result["sentenced_data"] = await do_sensitizing(result["raw_data"])
+            result["sentenced_data"] = await do_sensitizing(result["raw_data"], params.do_punctuation)
         except Exception as e:
             logger.error(f"await do_sensitizing - {e}")
             error_description = f"do_sensitizing - {e}"
@@ -143,6 +143,8 @@ async def receive_file(
         else:
             if not params.keep_raw:
                 result["raw_data"].clear()
+    else:
+        result["sentenced_data"].clear()
 
 
 
