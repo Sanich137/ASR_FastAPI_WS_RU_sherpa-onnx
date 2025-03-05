@@ -2,6 +2,7 @@
 import ujson
 import statistics
 import asyncio
+from Punctuation import sbertpunc
 
 # is_async=False, task_id=None, raw_recognition=None):
 async def do_sensitizing(input_asr_json, is_async = False):
@@ -92,7 +93,7 @@ async def do_sensitizing(input_asr_json, is_async = False):
                     else:
                         sentence_element.append({
                             "start": start_time,
-                            "text": ' '.join(str(word) for word in sentences),
+                            "text": sbertpunc.punctuate(' '.join(str(word) for word in sentences)),
                             "speaker": channel
                         })
                         sentences = list()
@@ -101,9 +102,11 @@ async def do_sensitizing(input_asr_json, is_async = False):
                         end_time = 0
                         continue
 
+
+                text_to_puctuate = ' '.join(str(word) for word in sentences)
                 sentence_element.append({
                     "start": start_time,
-                    "text": ' '.join(str(word) for word in sentences),
+                    "text":  sbertpunc.punctuate(text_to_puctuate),
                     "speaker": channel
                 })
 

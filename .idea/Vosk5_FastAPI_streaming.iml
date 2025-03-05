@@ -7,6 +7,7 @@
       <excludeFolder url="file://$MODULE_DIR$/models/ruT5-ASR-large" />
       <excludeFolder url="file://$MODULE_DIR$/models/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" />
       <excludeFolder url="file://$MODULE_DIR$/models/vosk-model-ru" />
+      <excludeFolder url="file://$MODULE_DIR$/models/sbert_punc_case_ru_onnx" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11 (Vosk5_FastAPI_streaming)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
