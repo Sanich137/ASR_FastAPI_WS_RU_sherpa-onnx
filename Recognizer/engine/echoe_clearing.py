@@ -5,9 +5,9 @@ from difflib import SequenceMatcher
 def are_words_similar(word1: str, word2: str, similarity_threshold: float = 0.8) -> bool:
     """
     Проверяет, похожи ли два слова на основе коэффициента схожести.
-    :param word1: Первое слово.
-    :param word2: Второе слово.
-    :param similarity_threshold: Порог схожести (от 0 до 1).
+    :param: word1: Первое слово.
+    :param: word2: Второе слово.
+    :param: similarity_threshold: Порог схожести (от 0 до 1).
     :return: True, если слова похожи, иначе False.
     """
 
