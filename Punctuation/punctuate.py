@@ -5,7 +5,12 @@ import numpy as np
 from transformers import AutoTokenizer
 import onnxruntime as ort
 
-ort.set_default_logger_severity(0)
+# import faulthandler
+# faulthandler.enable()
+# ort.set_default_logger_severity(0)
+
+
+
 # Прогнозируемые знаки препинания
 PUNK_MAPPING = {".": "PERIOD", ",": "COMMA", "?": "QUESTION"}
 
