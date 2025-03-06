@@ -5,6 +5,7 @@ import numpy as np
 from transformers import AutoTokenizer
 import onnxruntime as ort
 
+ort.set_default_logger_severity(0)
 # Прогнозируемые знаки препинания
 PUNK_MAPPING = {".": "PERIOD", ",": "COMMA", "?": "QUESTION"}
 
@@ -75,7 +76,8 @@ class SbertPuncCaseOnnx:
     def __init__(self, onnx_model_path):
         self.tokenizer = AutoTokenizer.from_pretrained(onnx_model_path, strip_accents=False)
         self.session = ort.InferenceSession(f"{onnx_model_path}/model.onnx",
-                                            providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+                                            # providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+                                            providers=['CPUExecutionProvider'])
 
     async def punctuate(self, text):
         text = text.strip().lower()

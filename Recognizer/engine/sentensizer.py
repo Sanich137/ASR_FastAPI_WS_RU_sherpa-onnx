@@ -129,6 +129,9 @@ async def do_sensitizing(input_asr_json, do_punctuation, is_async = False):
             sentenced_recognition.append(sentence_element)
 
             # Собрали только текст
+            if do_punctuation:
+                one_text_only = str(await sbertpunc.punctuate(one_text_only))
+
             text_only.append(one_text_only)
 
     sentenced_recognition_joined = [element for sentence in sentenced_recognition for element in sentence]
