@@ -19,44 +19,44 @@
     <h1>Демо Сервиса по распознаванию речи на FASTAPI</h1>
         <!-- Индикатор уровня звука -->
 
-<!--    &lt;!&ndash; Секция: Примеры аудио &ndash;&gt;-->
-<!--    <div class="section">-->
-<!--        <h3>Примеры аудио:</h3>-->
-<!--        <div class="pre-audio" onclick="setUrl('https://example.com/audio1.wav')">Пример 1</div>-->
-<!--        <div class="pre-audio" onclick="setUrl('https://example.com/audio2.mp3')">Пример 2</div>-->
-<!--    </div>-->
+    <!-- Секция: Примеры аудио -->
+    <div class="section">
+        <h3>Примеры аудио:</h3>
+        <div class="pre-audio" onclick="setUrl('https://cdn.chatwm.opensmodel.sberdevices.ru/GigaAM/example.wav')">Пример из GigaAM репозитория</div>
+        <div class="pre-audio" onclick="setUrl('https://huggingface.co/alphacep/vosk-model-ru/resolve/main/test.wav')">Пример из Vosk репозитория</div>
+    </div>
 
-<!--    &lt;!&ndash; Секция: Распознавание по URL &ndash;&gt;-->
-<!--    <div class="section">-->
-<!--        <h3>Распознать по ссылке</h3>-->
-<!--        <input type="text" id="audioUrl" placeholder="URL аудиофайла" style="width: 300px;">-->
-<!--        <button onclick="processUrl()">Отправить</button>-->
-<!--        <div>-->
-<!--            <div class="form-group checkbox-group">-->
-<!--                <div class="checkbox">-->
-<!--                    <input type="checkbox" name="keep_raw" checked>-->
-<!--                    <span>Сохранить сырые данные</span>-->
-<!--                </div>-->
+    <!-- Секция: Распознавание по URL -->
+    <div class="section">
+        <h3>Распознать по ссылке</h3>
+        <input type="text" id="audioUrl" placeholder="URL аудиофайла" style="width: 300px;">
+        <button onclick="processUrl()">Отправить</button>
+        <div>
+            <div class="form-group checkbox-group">
+                <div class="checkbox">
+                    <input type="checkbox" id="keep_raw" name="keep_raw" checked>
+                    <span>Сохранить сырые данные</span>
+                </div>
 
-<!--                <div class="checkbox">-->
-<!--                    <input type="checkbox" name="do_echo_clearing">-->
-<!--                    <span>Очистка эха</span>-->
-<!--                </div>-->
+                <div class="checkbox">
+                    <input type="checkbox" id="do_echo_clearing" name="do_echo_clearing">
+                    <span>Очистка эха</span>
+                </div>
 
-<!--                <div class="checkbox">-->
-<!--                    <input type="checkbox" name="do_dialogue">-->
-<!--                    <span>Разделение на диалоги</span>-->
-<!--                </div>-->
+                <div class="checkbox">
+                    <input type="checkbox" id="do_dialogue" name="do_dialogue">
+                    <span>Разделение на диалоги</span>
+                </div>
 
-<!--                <div class="checkbox">-->
-<!--                    <input type="checkbox" name="do_punctuation">-->
-<!--                    <span>Расстановка пунктуации</span>-->
-<!--                </div>-->
-<!--            </div>-->
-<!--        </div>-->
-<!--        <div id="resultUrl" class="result"></div>-->
-<!--        <div id="errorUrl" class="error"></div>-->
-<!--    </div>-->
+                <div class="checkbox">
+                    <input type="checkbox" id="do_punctuation" name="do_punctuation">
+                    <span>Расстановка пунктуации</span>
+                </div>
+            </div>
+        </div>
+        <div id="resultUrl" class="result"></div>
+        <div id="errorUrl" class="error"></div>
+    </div>
 
     <!-- Секция: Загрузка и отправка WAV файла -->
     <div class="section">
@@ -130,40 +130,56 @@
         }
 
         // Обработка URL
-        async function processUrl() {
-            const urlElem = document.getElementById('audioUrl');
-            const resultElem = document.getElementById('resultUrl');
-            const errorElem = document.getElementById('errorUrl');
+        function processUrl() {
+        // Получаем URL аудиофайла
+        const audioUrl = document.getElementById('audioUrl').value;
 
-            try {
-                const response = await fetch('/post_one_step_req', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        AudioFileUrl: urlElem.value,
-                        do_echo_clearing: document.getElementById('doEchoClearing').checked,
-                        do_dialogue: document.getElementById('do_dialogue').checked
-                    })
-                });
+        // Получаем значения чекбоксов
+        const keepRaw = document.getElementById('keep_raw').checked;
+        const doEchoClearing = document.getElementById('do_echo_clearing').checked;
+        const doDialogue = document.getElementById('do_dialogue').checked;
+        const doPunctuation = document.getElementById('do_punctuation').checked;
 
-                const data = await response.json();
-
-                if (data.success) {
-                    resultElem.innerHTML = `
-                        <p>Текст: ${data.punctuated_data?.text || data.raw_data.text}</p>
-                        <button onclick="downloadText('result.txt',
-                            '${data.punctuated_data?.text || data.raw_data.text}')">
-                            Скачать TXT
-                        </button>
-                    `;
-                    errorElem.textContent = '';
-                } else {
-                    errorElem.textContent = data.error_description;
-                }
-            } catch (e) {
-                errorElem.textContent = 'Ошибка: ' + e.message;
-            }
+        // Очищаем предыдущие ошибки
+        function clearServerResponses() {
+            const serverResponsesElem = document.getElementById('serverResponses');
+            serverResponsesElem.innerHTML = ''; // Очищаем содержимое блока
         }
+
+        // Получаем элементы DOM
+        const serverResponses = document.getElementById('serverResponses');
+
+
+        // Формируем данные для отправки
+        const data = {
+            AudioFileUrl: audioUrl,
+            keep_raw: keepRaw,
+            do_echo_clearing: doEchoClearing,
+            do_dialogue: doDialogue,
+            do_punctuation: doPunctuation
+        };
+
+        // Показываем индикатор загрузки
+        serverResponses.innerHTML = '<p>Загрузка...</p>';
+
+        // Отправляем запрос на сервер
+        fetch('/post_one_step_req', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Отображаем результат в блоке serverResponses
+            addServerResponse(data);
+        })
+        .catch(error => {
+            // Отображаем ошибку
+            document.getElementById('errorUrl').innerText = 'Ошибка: ' + error.message;
+        });
+    }
 
         // Блок отправки файла в сокет
 

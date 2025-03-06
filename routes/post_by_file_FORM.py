@@ -59,7 +59,6 @@ async def receive_file(
         "error_description": error_description,
         "raw_data": dict(),
         "sentenced_data": dict(),
-        "punctuated_data": dict(),
     }
     post_id = uuid.uuid4()
     logger.debug(f'Принят новый "post_file"  id = {post_id}')

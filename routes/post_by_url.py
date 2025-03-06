@@ -45,7 +45,6 @@ async def post(params:SyncASRRequest):
         "error_description": error_description,
         "raw_data": dict(),
         "sentenced_data": dict(),
-        "punctuated_data": dict(),
     }
 
     post_id = uuid.uuid4()
@@ -131,7 +130,7 @@ async def post(params:SyncASRRequest):
             result["sentenced_data"].clear()
 
     else:
-        logger.error(f'Ошибка получения файла - {error}, ссылка на файл - {params.AudioFileUrl}')
+        logger.error(f'Ошибка получения файла - {error_description}, ссылка на файл - {params.AudioFileUrl}')
 
     result['error_description'] = error_description
     result['success'] = res
