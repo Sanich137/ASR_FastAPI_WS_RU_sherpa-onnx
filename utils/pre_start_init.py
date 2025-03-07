@@ -45,11 +45,9 @@ audio_overlap = defaultdict()
 audio_buffer = defaultdict()
 audio_to_asr = defaultdict()
 audio_duration = defaultdict(float)
+ws_collected_asr_res = defaultdict()
 
 posted_and_downloaded_audio = defaultdict()
-
-
-# sbertpunc = SbertPuncCaseOnnx(model_path)
 
 
 @asynccontextmanager

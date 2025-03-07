@@ -50,7 +50,7 @@
 
                 <div class="checkbox">
                     <input type="checkbox" id="do_punctuation" name="do_punctuation">
-                    <span>Расстановка пунктуации</span>
+                    <span>Расстановка пунктуации. Работает только одновременно с "Разделение на диалоги"</span>
                 </div>
             </div>
         </div>
@@ -60,10 +60,25 @@
 
     <!-- Секция: Загрузка и отправка WAV файла -->
     <div class="section">
-        <h3>Распознать WAV файл. Обработка через WEbSockets</h3>
+        <h3>Распознать WAV файл. Обработка через WebSockets</h3>
         <input type="file" id="audioFile" accept=".wav" style="display: none;">
         <button onclick="document.getElementById('audioFile').click()">Выбрать файл</button>
         <button id="sendFileButton" onclick="sendFile()" disabled>Отправить файл</button>
+
+        <!-- Чекбоксы для настроек -->
+        <div class="form-group checkbox-group">
+
+            <div class="checkbox">
+                <input type="checkbox" id="ws_do_dialogue" name="ws_do_dialogue">
+                <span>Разделение на диалоги</span>
+            </div>
+
+            <div class="checkbox">
+                <input type="checkbox" id="ws_do_punctuation" name="ws_do_punctuation">
+                <span>Расстановка пунктуации</span>
+            </div>
+        </div>
+
         <div id="resultFile" class="result"></div>
         <div id="errorFile" class="error"></div>
     </div>
@@ -91,7 +106,7 @@
 
                 <div class="checkbox">
                     <input type="checkbox" name="do_punctuation">
-                    <span>Расстановка пунктуации</span>
+                    <span>Расстановка пунктуации. Работает только одновременно с "Разделение на диалоги"</span>
                 </div>
             </div>
 
@@ -241,12 +256,18 @@
                 const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
                 const socket = new WebSocket(wsUrl);
 
+                // Получаем значения чекбоксов
+                const doDialogue = document.getElementById('ws_do_dialogue').checked;
+                const doPunctuation = document.getElementById('ws_do_punctuation').checked;
+
                 socket.onopen = async function() {
                     // Отправляем конфигурацию
                     socket.send(JSON.stringify({
                         config: {
-                            sample_rate: sampleRate,
-                            wait_null_answers: true
+                            sample_rate: sampleRate, // Пример: 16000
+                            wait_null_answers: true,
+                            do_dialogue: doDialogue,
+                            do_punctuation: doPunctuation
                         }
                     }));
 

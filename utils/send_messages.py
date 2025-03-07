@@ -1,7 +1,10 @@
 from utils.do_logging import logger
 
 
-async def send_messages(_socket, _data=None, _silence=True, _error=None, log_comment=None, _last_message=False):
+async def send_messages(_socket, _data=None, _silence=True, _error=None, _last_message=False,
+                        _sentenced_data=None):
+    if _sentenced_data is None:
+        _sentenced_data = dict()
     ws = _socket
     is_ok = False
     if _last_message:
@@ -14,7 +17,8 @@ async def send_messages(_socket, _data=None, _silence=True, _error=None, log_com
     snd_mssg = {"silence": _silence,
                 "data": data,
                 "error": _error,
-                "last_message": _last_message
+                "last_message": _last_message,
+                "sentenced_data": _sentenced_data,
                 }
     try:
         await ws.send_json(snd_mssg)

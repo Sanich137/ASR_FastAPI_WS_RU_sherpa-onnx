@@ -145,9 +145,6 @@ async def receive_file(
     else:
         result["sentenced_data"].clear()
 
-
-
-
     result['error_description'] = error_description
     result['success'] = res
 
