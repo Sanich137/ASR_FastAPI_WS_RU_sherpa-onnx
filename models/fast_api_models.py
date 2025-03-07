@@ -39,12 +39,16 @@ class WebSocketModel(BaseModel):
     \n
     \n Подключение на порт: 49153
     \n На вход жду поток binary, buffer_size +- 6400, mono, wav.
-    \n На вход я должен получить словарь {'text': '{ "config" : { "sample_rate" : any(int/float), "wait_null_answers": Bool}}'}
-    \n (значение по ключу text - строка. мне удобнее получать json, но на тестовом стенде не завелось именно отправление json)
-    \n Далее сообщения с данными {"bytes": binary} - словарь
+    \n На вход я должен получить словарь {'text': { "config" : { "sample_rate" : any(int/float), "wait_null_answers": Bool,
+    "do_dialogue": Bool, "do_punctuation": Bool}}}
+    \n do_punctuation отработает только если do_dialogue = True
+    \n Далее сообщения с данными {"bytes": binary}
     \n По окончании передачи {'text': '{ "eof" : 1}'}
-    \n Ответ получать в формате:     {"silence": Bool,"data": str, "error": None/str}
-    \n Пример ответа data: {
+    \n Ответ получать в формате:     {"silence": Bool,"data": str, "error": None/str, "last_message": Bool,
+  "sentenced_data": {}}
+
+
+    \n Пример ответа "data": {
   "result" : [{
       "conf" : 1.000000,
       "end" : 3.120000,
@@ -66,5 +70,24 @@ class WebSocketModel(BaseModel):
   "text" : "здравствуйте вы ... записываются"
 }
 
+Пример ответа "sentenced_data": {
+    "raw_text_sentenced_recognition": "channel_1: Татьяна, добрый день. Меня зовут Ульяна.\nchannel_1: Звоню уточнить по поводу документов.\n",
+    "list_of_sentenced_recognitions": [
+      {
+        "start": 2.28,
+        "text": "Татьяна, добрый день. Меня зовут Ульяна.",
+        "speaker": "channel_1"
+      },
+      {
+        "start": 8.24,
+        "text": "Звоню уточнить по поводу документов.",
+        "speaker": "channel_1"
+      },
+    ],
+    "full_text_only": [
+      "Татьяна, добрый день. Меня зовут Ульяна. Звоню уточнить по поводу документов."
+    ],
+    "err_state": null
+  }
     """
     pass
