@@ -33,6 +33,7 @@ async def websocket(ws: WebSocket):
     audio_format = 'raw'
     sample_rate = config.BASE_SAMPLE_RATE  # Если не получен фреймрейт в конфиге сокета, по попытается принять с конфигом модели.
     sentenced_data = None
+    error_description = None
 
     await ws.accept()
 
@@ -152,10 +153,10 @@ async def websocket(ws: WebSocket):
                             logger.error(f"send_message not ok work canceled")
                             return
         else:
-            error = f"Can`t parse message - {message}"
-            logger.error(error)
+            error_description = f"Can`t parse message - {message}"
+            logger.error(error_description)
 
-            if not await send_messages(ws, _silence=False, _data=None, _error=error):
+            if not await send_messages(ws, _silence=False, _data=None, _error=error_description):
                 logger.error(f"send_message not ok work canceled")
                 return
 
@@ -165,22 +166,28 @@ async def websocket(ws: WebSocket):
     logger.debug(f'итоговое сообщение - {audio_to_asr[client_id].duration_seconds} секунд')
 
     try:
-
-        if config.MODEL_NAME == "Gigaam":
-
-            last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id])
-            last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
-            logger.debug(f'Последний результат {last_result.get("data").get("text")}')
-
-            ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
-            logger.debug(last_result)
+        try:
+            if audio_to_asr[client_id].duration_seconds < 2:
+                audio_to_asr[client_id] = audio_to_asr[client_id] + AudioSegment.silent(1000, frame_rate=sample_rate)
+        except Exception as e:
+            logger.error(f"Error getting len of last chunk - {e}")
+            last_result = None
+            error_description = f"Error getting len of last chunk - {e}"
         else:
-            asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
-                                                                 num_trials=config.RECOGNITION_ATTEMPTS)
-            last_result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
-            audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
-            ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
-            logger.debug(last_result)
+            if config.MODEL_NAME == "Gigaam":
+                last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id])
+                last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
+                logger.debug(f'Последний результат {last_result.get("data").get("text")}')
+
+                ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
+                logger.debug(last_result)
+            else:
+                asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
+                                                                     num_trials=config.RECOGNITION_ATTEMPTS)
+                last_result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
+                audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
+                ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
+                logger.debug(last_result)
 
     except Exception as e:
         logger.error(f"last_asr_result_w_conf error - {e}")
@@ -204,7 +211,7 @@ async def websocket(ws: WebSocket):
                 logger.error(f"await do_sensitizing - {e}")
                 error_description = f"do_sensitizing - {e}"
 
-        if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=None, _last_message=True,
+        if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=error_description, _last_message=True,
                                    _sentenced_data=sentenced_data):
             logger.error(f"send_message not ok work canceled")
             return
