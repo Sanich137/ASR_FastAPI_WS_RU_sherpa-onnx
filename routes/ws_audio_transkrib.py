@@ -203,8 +203,6 @@ async def websocket(ws: WebSocket):
             except Exception as e:
                 logger.error(f"await do_sensitizing - {e}")
                 error_description = f"do_sensitizing - {e}"
-        else:
-            del ws_collected_asr_res[client_id]
 
         if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=None, _last_message=True,
                                    _sentenced_data=sentenced_data):
@@ -217,3 +215,15 @@ async def websocket(ws: WebSocket):
     del audio_to_asr[client_id]
     del audio_duration[client_id]
     del ws_collected_asr_res[client_id]
+
+    # try:
+    #     print(f'/n \
+    #     audio_overlap = {audio_overlap} \
+    #     audio_buffer = {audio_buffer} \
+    #     audio_to_asr = {audio_to_asr} \
+    #     audio_duration = {audio_duration} \
+    #     ws_collected_asr_res = {ws_collected_asr_res} \
+    #         ')
+    # except Exception as e:
+    #     logger.error(f"Error printing globals - {e}")
+
