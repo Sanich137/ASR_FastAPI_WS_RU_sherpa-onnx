@@ -89,7 +89,7 @@ class SbertPuncCaseOnnx:
         if len(tokenizer_output.input_ids) > 512:
             return " ".join(
                 [
-                    self.punctuate(" ".join(text_part))
+                    await self.punctuate(" ".join(text_part))
                     for text_part in np.array_split(words, 2)
                 ]
             )

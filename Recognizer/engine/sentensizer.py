@@ -65,9 +65,8 @@ async def do_sensitizing(input_asr_json, do_punctuation, is_async = False):
                 # if do_punctuation:
                 #   one_text_only = await sbertpunc.punctuate(one_text_only)
 
-            if not words:
+            if len(words) < 1:
                 err_state = f"Err_No_words in {channel}"
-            elif len(words) == 1:
                 print(f"В списке слов только одно слово в канале {channel}")
             else:
                 between_words_delta = []
