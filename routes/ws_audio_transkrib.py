@@ -143,6 +143,14 @@ async def websocket(ws: WebSocket):
                         if wait_null_answers:
                             if not await send_messages(ws, _silence = True, _data = None, _error = None):
                                 logger.error(f"send_message not ok work canceled")
+                                try:
+                                    del audio_overlap[client_id]
+                                    del audio_buffer[client_id]
+                                    del audio_to_asr[client_id]
+                                    del audio_duration[client_id]
+                                    del ws_collected_asr_res[client_id]
+                                except Exception as e:
+                                    logger.error(f"error clearing globals after abnormal closing socket - {e}")
                                 return
                             # await asyncio.sleep(0.01)
                         else:
@@ -151,6 +159,14 @@ async def websocket(ws: WebSocket):
                     else:
                         if not await send_messages(ws, _silence=False, _data=asr_result_words, _error=None):
                             logger.error(f"send_message not ok work canceled")
+                            try:
+                                del audio_overlap[client_id]
+                                del audio_buffer[client_id]
+                                del audio_to_asr[client_id]
+                                del audio_duration[client_id]
+                                del ws_collected_asr_res[client_id]
+                            except Exception as e:
+                                logger.error(f"error clearing globals after abnormal closing socket - {e}")
                             return
         else:
             error_description = f"Can`t parse message - {message}"
@@ -158,6 +174,14 @@ async def websocket(ws: WebSocket):
 
             if not await send_messages(ws, _silence=False, _data=None, _error=error_description):
                 logger.error(f"send_message not ok work canceled")
+                try:
+                    del audio_overlap[client_id]
+                    del audio_buffer[client_id]
+                    del audio_to_asr[client_id]
+                    del audio_duration[client_id]
+                    del ws_collected_asr_res[client_id]
+                except Exception as e:
+                    logger.error(f"error clearing globals after abnormal closing socket - {e}")
                 return
 
     # Передаём на распознавание собранный не полный буфер
@@ -214,14 +238,27 @@ async def websocket(ws: WebSocket):
         if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=error_description, _last_message=True,
                                    _sentenced_data=sentenced_data):
             logger.error(f"send_message not ok work canceled")
+            try:
+                del audio_overlap[client_id]
+                del audio_buffer[client_id]
+                del audio_to_asr[client_id]
+                del audio_duration[client_id]
+                del ws_collected_asr_res[client_id]
+            except Exception as e:
+                logger.error(f"error clearing globals after abnormal closing socket - {e}")
             return
+
     await ws.close()
 
-    del audio_overlap[client_id]
-    del audio_buffer[client_id]
-    del audio_to_asr[client_id]
-    del audio_duration[client_id]
-    del ws_collected_asr_res[client_id]
+    try:
+        del audio_overlap[client_id]
+        del audio_buffer[client_id]
+        del audio_to_asr[client_id]
+        del audio_duration[client_id]
+        del ws_collected_asr_res[client_id]
+    except Exception as e:
+        logger.error(f"error clearing globals after NORMAL closing socket - {e}")
+    return
 
     # try:
     #     print(f'/n \
