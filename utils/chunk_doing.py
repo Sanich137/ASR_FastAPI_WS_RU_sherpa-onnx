@@ -56,7 +56,9 @@ def find_last_speech_position(socket_id, sample_width = 2):
                     # logger.debug(f"Найден ГОЛОС на speech_end = {speech_end-i*frame_length-partial_frame_length}")
                     continue
         except Exception as e:
-            logger.error(f"Ошибка VAD - {e}")
+            logger.error(f"Ошибка VAD - {e}"
+                         f"\nframe_rate = {frame_rate}"
+                         f"\nframe_length = {frame_length}")
 
     # speech_end - длина аудио фрагмента в каких единицах измерения?
     if not partial_frame_length:
@@ -70,7 +72,7 @@ def find_last_speech_position(socket_id, sample_width = 2):
 
     audio_to_asr[socket_id] = audio_overlap[socket_id] + audio_buffer[socket_id][:separation_time]
 
-    audio_overlap[socket_id] = audio_buffer[socket_id][separation_time:audio_buffer[socket_id].duration_seconds * 1000]
+    audio_overlap[socket_id] = audio_buffer[socket_id][separation_time:]
 
     logger.debug(f"Передано на ASR аудио продолжительностью {audio_to_asr[socket_id].duration_seconds} ")
 

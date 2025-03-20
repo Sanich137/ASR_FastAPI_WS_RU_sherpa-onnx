@@ -27,16 +27,15 @@ async def process_asr_json(input_json, time_shift = 0.0):
     if not data:
         return result
 
-    for token, timestamp, prob in zip(data["tokens"], data["timestamps"], data["probs"]):
+    for token, timestamp in zip(data["tokens"], data["timestamps"]):
         # Если токен начинается с пробела, это начало нового слова
         if token.startswith(" "):
             if current_word["tokens"]:
                 words.append(current_word)
-            current_word = {"tokens": [token.strip()], "start": timestamp, "end": timestamp, "probs": [prob]}
+            current_word = {"tokens": [token.strip()], "start": timestamp, "end": timestamp}
         else:
             current_word["tokens"].append(token)
             current_word["end"] = timestamp
-            current_word["probs"].append(prob)
 
     # Добавляем последнее слово
     if current_word["tokens"]:
@@ -47,14 +46,8 @@ async def process_asr_json(input_json, time_shift = 0.0):
         # Объединяем токены в слово
         word_text = "".join(word["tokens"]).strip()
 
-        # Преобразуем лог-вероятности в обычные
-        probs = [logprob_to_prob(p) for p in word["probs"]]
-
-        # Рассчитываем среднюю вероятность
-        avg_prob = sum(probs) / len(probs)
-
-        # Нормализуем conf, чтобы уверенные предсказания были ближе к 1
-        conf = 1 - math.exp(-avg_prob * 5)  # Масштабирующий коэффициент (5) можно настроить
+        # Требуется в принимающем приложении. Для общей работы смысла не имеет.
+        conf = 1
 
         # Добавляем слово в результат
         result["data"]["result"].append({
@@ -74,68 +67,6 @@ async def process_asr_json(input_json, time_shift = 0.0):
 
     return result
 
-
-async def process_asr_as_object(input_result, time_shift = 0.0):
-    # Парсим STR в JSON
-    data = ujson.loads(input_result)
-
-    data = input_result
-
-    # Формируем шаблон результата
-    result = {"data": {"result": [], "text": ""}}
-
-    # Собираем слова из токенов
-    words = []
-    current_word = {"tokens": [], "start": None, "end": None, "probs": []}
-
-    if not data:
-        return result
-
-    for token, timestamp in zip(data["tokens"], data["timestamps"]):
-        # Если токен начинается с пробела, это начало нового слова
-        if token.startswith(" "):
-            if current_word["tokens"]:
-                words.append(current_word)
-            current_word = {"tokens": [token.strip()], "start": float(timestamp)+time_shift,
-                            "end": float(timestamp)+time_shift, }
-        else:
-            current_word["tokens"].append(token)
-            current_word["end"] = float(timestamp)+time_shift
-
-    # Добавляем последнее слово
-    if current_word["tokens"]:
-        words.append(current_word)
-
-
-    for word in words:
-        # Объединяем токены в слово
-        word_text = "".join(word["tokens"]).strip()
-
-        # # Преобразуем лог-вероятности в обычные
-        # probs = [logprob_to_prob(p) for p in word["probs"]]
-        #
-        # # Рассчитываем среднюю вероятность
-        # avg_prob = sum(probs) / len(probs)
-        #
-        # # Нормализуем conf, чтобы уверенные предсказания были ближе к 1
-        # conf = 1 - math.exp(-avg_prob * 5)  # Масштабирующий коэффициент (5) можно настроить
-
-        # Добавляем слово в результат
-        result["data"]["result"].append({
-            # "conf": conf,
-            "start": word["start"],
-            "end": word["end"],
-            "word": word_text
-        })
-
-        # Добавляем слово в итоговый текст
-        result["data"]["text"] += word_text + " "
-
-    # Убираем лишний пробел в конце текста
-    result["data"]["text"] = result["data"]["text"].strip()
-
-    logger.debug(f'Результат изменения формата ответа - {result}')
-    return result
 
 async def process_gigaam_asr(input_json, time_shift = 0.0):
     # Парсим JSON
@@ -191,4 +122,65 @@ if __name__ == "__main__":
 
 
 
-    asyncio.run(process_asr_as_object(asr_str_json))
+# async def process_asr_as_object(input_result, time_shift = 0.0):
+#     # Парсим STR в JSON
+#     data = ujson.loads(input_result)
+#
+#     data = input_result
+#
+#     # Формируем шаблон результата
+#     result = {"data": {"result": [], "text": ""}}
+#
+#     # Собираем слова из токенов
+#     words = []
+#     current_word = {"tokens": [], "start": None, "end": None, "probs": []}
+#
+#     if not data:
+#         return result
+#
+#     for token, timestamp in zip(data["tokens"], data["timestamps"]):
+#         # Если токен начинается с пробела, это начало нового слова
+#         if token.startswith(" "):
+#             if current_word["tokens"]:
+#                 words.append(current_word)
+#             current_word = {"tokens": [token.strip()], "start": float(timestamp)+time_shift,
+#                             "end": float(timestamp)+time_shift, }
+#         else:
+#             current_word["tokens"].append(token)
+#             current_word["end"] = float(timestamp)+time_shift
+#
+#     # Добавляем последнее слово
+#     if current_word["tokens"]:
+#         words.append(current_word)
+#
+#
+#     for word in words:
+#         # Объединяем токены в слово
+#         word_text = "".join(word["tokens"]).strip()
+#
+#         # # Преобразуем лог-вероятности в обычные
+#         # probs = [logprob_to_prob(p) for p in word["probs"]]
+#         #
+#         # # Рассчитываем среднюю вероятность
+#         # avg_prob = sum(probs) / len(probs)
+#         #
+#         # # Нормализуем conf, чтобы уверенные предсказания были ближе к 1
+#         # conf = 1 - math.exp(-avg_prob * 5)  # Масштабирующий коэффициент (5) можно настроить
+#
+#         # Добавляем слово в результат
+#         result["data"]["result"].append({
+#             # "conf": conf,
+#             "start": word["start"],
+#             "end": word["end"],
+#             "word": word_text
+#         })
+#
+#         # Добавляем слово в итоговый текст
+#         result["data"]["text"] += word_text + " "
+#
+#     # Убираем лишний пробел в конце текста
+#     result["data"]["text"] = result["data"]["text"].strip()
+#
+#     logger.debug(f'Результат изменения формата ответа - {result}')
+#     return result
+#
