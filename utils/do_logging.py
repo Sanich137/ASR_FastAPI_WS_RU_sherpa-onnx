@@ -19,4 +19,3 @@ else:
         encoding = "UTF-8"
         )
 
-logger.debug(f"Using LOGGING_LEVEL '{config.LOGGING_LEVEL}'")

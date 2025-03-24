@@ -5,9 +5,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 
-import sherpa_onnx
-import config
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 paths = {
     "vosk_small_streaming_tokens_path": BASE_DIR / "models" / "vosk-model-small-streaming-ru" / "lang" / "tokens.txt",
@@ -28,10 +25,14 @@ paths = {
     "whisper_tokens_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-tokens.txt",
     "whisper_encoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-encoder.onnx",
     "whisper_decoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-decoder.onnx",
+
     # "whisper_encoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-small" / "small-encoder.int8.onnx",
     # "whisper_decoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-small" / "small-decoder.int8.onnx",
-
+    # Todo - говорят производительность Whisper пофиксили. Протестить!
     "punctuation_model_path": BASE_DIR / "models" / "sbert_punc_case_ru_onnx",
+
+    "segmentation_model": BASE_DIR / "models" / "Diar_model" / "model.onnx",
+    "embedding_extractor_model": BASE_DIR / "models" / "Diar_model" / "wespeaker_en_voxceleb_resnet293_LM_meta.onnx",
 
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'111.wav',
