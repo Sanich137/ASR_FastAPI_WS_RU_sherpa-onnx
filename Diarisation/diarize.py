@@ -3,6 +3,7 @@ from Diarisation import init_speaker_diarization
 from datetime import datetime as dt
 from pydub import AudioSegment
 from utils.do_logging import logger
+from utils.pre_start_init import paths
 import asyncio
 
 
@@ -64,8 +65,7 @@ if __name__ == "__main__":
 
     time_start = dt.now()
     # wave_filename = path+"protocol.mp3"
-    wave_filename = "C://Users//kojevnikov//PycharmProjects//Vosk5_FastAPI_streaming//trash//long.mp3"
-    # wave_filename = path+"q.wav"
+    wave_filename = str(paths.get("trash_folder"))+"//q.wav"
 
     audio_data = AudioSegment.from_file(wave_filename).split_to_mono()[0][0:60000]
 
