@@ -26,13 +26,28 @@ class PostFileRequest(BaseModel):
     :param do_echo_clearing: Проверяет наличие повторений между каналами.
     :param do_dialogue: Собирает из распознанного текста фразы, разделённые более длинным молчанием,
     чем некое среднее значение.
-    :param do_punctuation: Расставляет пунктуацию. Пока в разработке.
+    :param do_punctuation: Расставляет пунктуацию.
     """
     keep_raw: bool = True
     do_echo_clearing: bool = False
     do_dialogue: bool = False
     do_punctuation: bool = False
 
+
+class PostFileRequestDiarize(BaseModel):
+    """
+    Модель для проверки запроса пользователя.
+    :param keep_raw: Если False, то запрос вернёт только пост-обработанные данные do_punctuation и do_dialogue.
+    :param do_echo_clearing: Проверяет наличие повторений между каналами.
+    :param num_speakers: Предполагаемое количество спикеров в разговоре. -1 - значит мы не знаем сколько спикеров и определяем их параметром cluster_threshold.
+    :param cluster_threshold: Значение от 0 до 1. Чем меньше, тем более чувствительное выделение спикеров (тем их больше)
+    :param do_punctuation: Расставляет пунктуацию.
+    """
+    keep_raw: bool = True
+    do_echo_clearing: bool = False
+    do_punctuation: bool = False
+    num_speakers: int = -1,
+    cluster_threshold: float = 0.2
 
 class WebSocketModel(BaseModel):
     """OpenAPI не хочет описывать WS, а я не хочу изучать OPEN API. По этому описание тут.

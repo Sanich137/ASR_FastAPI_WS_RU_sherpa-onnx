@@ -116,6 +116,11 @@ async def simple_recognise(audio_data, ) -> dict:
     без дополнительных расчётов
     """
 
+    # Приводим фреймрейт к фреймрейту модели
+    if audio_data.frame_rate != config.BASE_SAMPLE_RATE:
+        audio_data = audio_data.set_frame_rate(config.BASE_SAMPLE_RATE)
+
+
     stream = recognizer.create_stream()
     # перевод в семплы для распознавания.
     samples = get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)

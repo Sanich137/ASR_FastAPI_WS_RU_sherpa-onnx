@@ -10,10 +10,11 @@ async def init_speaker_diarization(num_speakers: int = -1,
     diarization_model_config = sherpa_onnx.OfflineSpeakerDiarizationConfig(
         segmentation=sherpa_onnx.OfflineSpeakerSegmentationModelConfig(
             pyannote=sherpa_onnx.OfflineSpeakerSegmentationPyannoteModelConfig(
-                    model=segmentation_model,),
+                    model=segmentation_model,
+                    ),
             provider= 'cuda',  # Похоже пока всегда cpu
-            num_threads = 3, # Похоже пока всегда в 1 поток
-            debug = False
+            num_threads = 1, # Похоже пока всегда в 1 поток
+            debug = True
             ),
         embedding=sherpa_onnx.SpeakerEmbeddingExtractorConfig(
             model=embedding_extractor_model

@@ -32,7 +32,9 @@ paths = {
     "punctuation_model_path": BASE_DIR / "models" / "sbert_punc_case_ru_onnx",
 
     "segmentation_model": BASE_DIR / "models" / "Diar_model" / "model.onnx",
-    "embedding_extractor_model": BASE_DIR / "models" / "Diar_model" / "wespeaker_en_voxceleb_resnet293_LM_meta.onnx",
+    "embedding_extractor_model": BASE_DIR / "models" / "Diar_model" / "wespeaker_en_voxceleb_resnet34_LM.onnx",
+    # "embedding_extractor_model": BASE_DIR / "models" / "Diar_model" / "wespeaker_en_voxceleb_resnet152_LM.onnx",
+    # "embedding_extractor_model": BASE_DIR / "models" / "Diar_model" / "voxblink2_samresnet100_meta.onnx",
 
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'111.wav',
