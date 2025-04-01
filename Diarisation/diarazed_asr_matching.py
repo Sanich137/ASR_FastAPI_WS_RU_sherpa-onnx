@@ -1,4 +1,4 @@
-from intervaltree import IntervalTree
+# from intervaltree import IntervalTree
 
 async def do_diarized_dialogue(asr_data: list, diarized_data: list):
     """
