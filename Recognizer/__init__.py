@@ -4,7 +4,6 @@ from utils.do_logging import logger
 import config
 import sherpa_onnx
 
-
 models_arguments = {
         # "Vosk5SmallStreaming": {
         #     "tokens": paths.get("vosk_small_streaming_tokens_path"),
@@ -60,6 +59,13 @@ models_arguments = {
             }
 
 model_settings = models_arguments.get(config.MODEL_NAME)
+
+logger.debug(f"{config.MODEL_NAME} chosen model!")
+logger.debug(f'Path to model - {model_settings.get("model")}')
+if not model_settings.get("model").exists():
+    logger.error("Model files does`nt exist")
+    raise FileExistsError
+
 
 recognizer = None
 
