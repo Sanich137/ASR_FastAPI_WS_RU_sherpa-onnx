@@ -42,7 +42,6 @@ def find_last_speech_position(socket_id, sample_width = 2):
         try:
             if len(frame) < frame_length:
                 # Пропустить последний неполный фрагмент
-                # Todo Похоже, его всегда нужно добавлять в audio_overlap
                 partial_frame_length = len(frame)
                 continue
             else:
