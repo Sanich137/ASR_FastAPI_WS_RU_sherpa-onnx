@@ -19,20 +19,20 @@ async def do_diarized_dialogue(asr_data: list, diarized_data: list):
                 # "err_state": err_state - ошибка, если не удалось
             }
         """
-    # собираем все слова после распознавания в один список
-    word_list = list()
-    word_list = sum([data.get("data").get("result") for data in asr_data], [])
-    print(word_list)
-    pass
-
     # Создание интервального дерева для диаризации
     diarization_tree = IntervalTree()
 
-    for speaker_start, speaker_end, speaker_id in diarization_segments:
+    # собираем все слова после распознавания в один список
+    words_list = sum([data.get("data").get("result") for data in asr_data], [])
+    print(words_list)
+    pass
+
+
+    for speaker_start, speaker_end, speaker_id in diarized_data:
         diarization_tree.addi(speaker_start, speaker_end, speaker_id)
 
     # Сопоставление слов со спикерами
-    for word in asr_words:
+    for word in words_list:
         overlapping = diarization_tree.overlap(word.start, word.end)
         if overlapping:
             best_match = max(overlapping, key=lambda x: x.end - x.begin)

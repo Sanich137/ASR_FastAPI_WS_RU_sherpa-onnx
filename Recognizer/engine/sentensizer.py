@@ -103,6 +103,7 @@ async def do_sensitizing(input_asr_json, do_punctuation, is_async = False):
 
                         sentence_element.append({
                             "start": start_time,
+                            "end": end_time,
                             "text": text,
                             "speaker": channel
                         })
@@ -120,6 +121,7 @@ async def do_sensitizing(input_asr_json, do_punctuation, is_async = False):
 
                 sentence_element.append({
                     "start": start_time,
+                    "end": end_time,
                     "text":  text,
                     "speaker": channel
                 })
