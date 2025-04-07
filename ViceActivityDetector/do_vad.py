@@ -2,37 +2,56 @@ import numpy as np
 import onnxruntime as ort
 from pydub import AudioSegment
 from pathlib import Path
-
+from utils.pre_start_init import paths
+from utils.do_logging import logger
 
 class SileroVAD:
-    def __init__(self, onnx_path: str, sr: int = 16000):
+    def __init__(self, onnx_path: str = str(paths.get("vad_model_path")), sample_rate: int = 16000):
         self.session = ort.InferenceSession(onnx_path)
-        self.sr = sr
+        self.sample_rate = sample_rate
 
-        # Инициализация состояния согласно спецификации модели
+        # Инициализация состояния
         self.state = np.zeros((2, 1, 128), dtype=np.float32)  # [2, 1, 128]
 
         # Стандартный размер фрейма для Silero VAD v5
         self.frame_size = 512  # 31ms при 16000 Hz
 
+        self.prob_level = 0.5
+
+    def set_mode(self, mode: int):
+        """
+        Higher level stets higher sensitivity
+        :param mode: Int from 1 to 3.
+        """
+        if mode not in [1, 2, 3]:
+            self.prob_level = 0.5
+        elif mode == 1:
+            self.prob_level = 0.75
+        elif mode == 2:
+            self.prob_level = 0.5
+        elif mode == 3:
+            self.prob_level = 0.25
+
     def reset_state(self):
         """Сброс состояния к начальному"""
         self.state = np.zeros((2, 1, 128), dtype=np.float32)
 
-    def is_speech(self, audio_frame: np.ndarray) -> bool:
+    def is_speech(self, audio_frame: np.ndarray, sample_rate = None) -> bool:
         """Обработка аудио-фрейма
         Args:
-            audio_frame: 1D numpy array размером 512 сэмплов
+            :param audio_frame: 1D numpy array размером 512 сэмплов
+            :param sample_rate:
         Returns:
-            tuple: (speech_probability, new_state)
+            bool: is_speech or not not speech
         """
-        if len(audio_frame) != self.frame_size:
-            raise ValueError(f"Ожидается фрейм размером {self.frame_size}, получен {len(audio_frame)}")
+
+        # if len(audio_frame) != self.frame_size:
+        #     raise ValueError(f"Ожидается фрейм размером {self.frame_size}, получен {len(audio_frame)}")
 
         inputs = {
             'input': audio_frame.reshape(1, -1).astype(np.float32),  # [1, 512]
             'state': self.state,
-            'sr': np.array(self.sr, dtype=np.int64)
+            'sr': np.array(self.sample_rate, dtype=np.int64)  # scalar int64
         }
 
         outputs = self.session.run(['output', 'stateN'], inputs)
@@ -40,8 +59,9 @@ class SileroVAD:
         self.state = outputs[1]  # Обновляем состояние
 
         prob = float(outputs[0][0, 0])
-
-        if prob >= 0.5:
+        logger.debug(f"probs = {prob}")
+        if prob >= self.prob_level:
+            logger.debug("Найден голос")
             return True
         else:
             return False
@@ -59,14 +79,14 @@ class SileroVAD:
         inputs = {
             'input': audio_frame.reshape(1, -1).astype(np.float32),  # [1, 512]
             'state': self.state,
-            'sr': np.array(self.sr, dtype=np.int64)
+            'sr': self.sample_rate
         }
 
         outputs = self.session.run(['output', 'stateN'], inputs)
 
         self.state = outputs[1]  # Обновляем состояние
 
-        return float(outputs[0][0, 0]), outputs[1]
+        return float(outputs[0][0, 0]), self.state
 
 
 def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> np.ndarray:
@@ -97,8 +117,8 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> n
 if __name__ == "__main__":
     # Инициализация VAD
     print("Инициализация VAD...")
-    vad = SileroVAD("silero_v5__vad_orig.onnx")
-
+    vad = SileroVAD("../models/VAD_silero_v5/silero_vad.onnx")
+    vad.set_mode(3)
     # Загрузка и подготовка аудио
     audio_file = Path("C:/Users/kojevnikov/PycharmProjects/Sherpa_onnx_vosk_GPU/trash/q.Wav")
     audio_frames = load_and_preprocess_audio(audio_file)
@@ -107,8 +127,10 @@ if __name__ == "__main__":
 
     # Обработка каждого фрейма
     for i, frame in enumerate(audio_frames):
+        # print(vad.is_speech(frame))
+
         prob, _ = vad(frame)
-        if prob >= 0.5:
+        if prob >= vad.prob_level:
             print(f"Найден голос на {i * vad.frame_size / 16000}")
         else:
             print(f"Не голос на {i * vad.frame_size / 16000}")

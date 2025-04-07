@@ -23,7 +23,8 @@ psutil
 # For ASR
 #sherpa-onnx
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
-sherpa-onnx==1.11.2+cuda
+# sherpa-onnx==1.11.2+cuda
+sherpa-onnx==1.11.3+cuda
 
 # For punctuation
 # torch

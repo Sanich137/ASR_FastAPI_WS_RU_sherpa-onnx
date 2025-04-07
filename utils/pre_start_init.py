@@ -30,6 +30,7 @@ paths = {
     # "whisper_decoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-small" / "small-decoder.int8.onnx",
     # Todo - говорят производительность Whisper пофиксили. Протестить!
     "punctuation_model_path": BASE_DIR / "models" / "sbert_punc_case_ru_onnx",
+    "vad_model_path": BASE_DIR / "models" / "VAD_silero_v5" / "silero_vad.onnx",
 
     "segmentation_model": BASE_DIR / "models" / "Diar_model" / "model.onnx",
     "embedding_extractor_model": BASE_DIR / "models" / "Diar_model" / "wespeaker_en_voxceleb_resnet34_LM.onnx",

@@ -1,7 +1,10 @@
 import numpy as np
 import webrtcvad
+from ViceActivityDetector.do_vad import SileroVAD
 from utils.do_logging import logger
 from utils.bytes_to_samples_audio import get_np_array_samples_int16
+from utils.bytes_to_samples_audio import get_np_array_samples_float32
+
 from utils.pre_start_init import (audio_overlap,
                                   audio_buffer,
                                   audio_to_asr,
@@ -18,19 +21,26 @@ def find_last_speech_position(socket_id, sample_width = 2):
         4. Остаток, хвост, складываем отдельно как overlap
         5. Если не находит ни одного сегмента без речи, помечаем его как полностью речь и отдаём ра распознавание
     """
-    vad = webrtcvad.Vad()
-    vad.set_mode(1)
+#    vad = webrtcvad.Vad()
+#     vad.set_mode(1)
+    vad = SileroVAD()
+    vad.set_mode(2)
     frame_rate = audio_buffer[socket_id].frame_rate
+
+    if audio_buffer[socket_id].frame_rate != 16000:
+        audio_buffer[socket_id] = audio_buffer[socket_id].set_frame_rate(16000)
+
     logger.debug(f"Получено из буфера на обработку аудио продолжительностью {audio_buffer[socket_id].duration_seconds} ")
 
     # Переводим в int16 для vad
-    audio = get_np_array_samples_int16(audio_buffer[socket_id].raw_data)
+    # audio = get_np_array_samples_int16(audio_buffer[socket_id].raw_data)
+    audio = get_np_array_samples_float32(audio_buffer[socket_id].raw_data)
 
     # Входные данные для деления фреймов
     speech_end = len(audio)
-    frame_duration_ms = 20
-    min_silence_frames = 2
-    frame_length = int(frame_rate * frame_duration_ms / 1000)
+    frame_duration_ms = 32
+    min_silence_frames = 15
+    frame_length = 512
     partial_frame_length = int()
 
     # Разделение на фрагменты
@@ -45,7 +55,7 @@ def find_last_speech_position(socket_id, sample_width = 2):
                 partial_frame_length = len(frame)
                 continue
             else:
-                if not vad.is_speech(frame.tobytes(), sample_rate=frame_rate):
+                if not vad.is_speech(frame, sample_rate=frame_rate):
                     logger.debug(f"Найден не голос на speech_end = {speech_end-(i+1)*frame_length-partial_frame_length}")
                     silence_frames+=1
                     if silence_frames >= min_silence_frames:
