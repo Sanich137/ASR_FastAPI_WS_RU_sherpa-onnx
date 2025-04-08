@@ -12,20 +12,6 @@ import requests
 # else:
 #     logger.info(f"загружена VAD модель ")
 
-# if not paths.get("vad_model_path").exists():
-#     logger.info("Модель silero_vad.onnx отсутствует. Предпринимаем попытку скачать её.")
-#     try:
-#         wget.download(
-#             url="https://github.com/snakers4/silero-vad/blob/v5.0/files/silero_vad.onnx?raw=true",
-#             out=str(paths.get("vad_model_path")),
-#         )
-#     except Exception as e:
-#         logger.error(f"Не удалось загрузить модель silero_vad.onnx - {e}. "
-#                      f"Корректная работа на файлах продолжительнее {config.MAX_OVERLAP_DURATION} не гарантируется")
-#     else:
-#         logger.info("Модель silero_vad.onnx успешно загружена")
-
-
 if not paths.get("vad_model_path").exists():
     logger.info("Модель silero_vad.onnx отсутствует. Предпринимаем попытку скачать её.")
     url = "https://github.com/snakers4/silero-vad/blob/v5.0/files/silero_vad.onnx?raw=true"
