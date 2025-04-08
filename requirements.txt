@@ -1,6 +1,7 @@
 setuptools
 
 httpx~=0.28.1
+
 pathlib~=1.0.1
 ujson~=5.10.0
 numpy~=1.26.4
@@ -15,13 +16,11 @@ ujson
 soundfile
 
 pydub~=0.25.1
-webrtcvad~=2.0.10
 
 tqdm
 psutil
 
 # For ASR
-#sherpa-onnx
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
 sherpa-onnx==1.11.3+cuda
 

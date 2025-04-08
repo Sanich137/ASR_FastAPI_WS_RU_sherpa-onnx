@@ -5,8 +5,10 @@ from pathlib import Path
 from utils.pre_start_init import paths
 from utils.do_logging import logger
 
+
 class SileroVAD:
-    def __init__(self, onnx_path: str = str(paths.get("vad_model_path")), sample_rate: int = 16000):
+    def __init__(self, onnx_path: Path = paths.get("vad_model_path"), sample_rate: int = 16000):
+
         self.session = ort.InferenceSession(onnx_path)
         self.sample_rate = sample_rate
 
