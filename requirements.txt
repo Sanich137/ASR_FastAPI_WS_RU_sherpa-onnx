@@ -3,17 +3,17 @@ setuptools
 httpx~=0.28.1
 pathlib~=1.0.1
 ujson~=5.10.0
-numpy
+numpy~=1.26.4
 
 uvicorn~=0.34.0
-fastapi~=0.115.8
-pydantic~=2.10.6
-websockets~=14.2
+fastapi~=0.115.12
+pydantic~=2.11.2
+websockets~=15.0.1
 jinja2
 python-multipart
-
+ujson
 soundfile
-# vosk
+
 pydub~=0.25.1
 webrtcvad~=2.0.10
 
@@ -23,14 +23,11 @@ psutil
 # For ASR
 #sherpa-onnx
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
-# sherpa-onnx==1.11.2+cuda
 sherpa-onnx==1.11.3+cuda
 
-# For punctuation
-# torch
-transformers
 onnxruntime
-onnxruntime-gpu
+# onnxruntime-gpu
 
-# sentencepiece
 
+# For punctuation
+transformers~=4.51.0

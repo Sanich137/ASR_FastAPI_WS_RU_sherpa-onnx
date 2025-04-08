@@ -1,5 +1,5 @@
 import numpy as np
-import onnxruntime as ort
+from Recognizer import ort
 from pydub import AudioSegment
 from pathlib import Path
 from utils.pre_start_init import paths
@@ -18,6 +18,10 @@ class SileroVAD:
 
         self.prob_level = 0.5
 
+    def reset_state(self):
+        """Сброс состояния к начальному"""
+        self.state = np.zeros((2, 1, 128), dtype=np.float32)
+
     def set_mode(self, mode: int):
         """
         Higher level stets higher sensitivity
@@ -32,12 +36,8 @@ class SileroVAD:
         elif mode == 3:
             self.prob_level = 0.25
 
-    def reset_state(self):
-        """Сброс состояния к начальному"""
-        self.state = np.zeros((2, 1, 128), dtype=np.float32)
-
     def is_speech(self, audio_frame: np.ndarray, sample_rate = None) -> bool:
-        """Обработка аудио-фрейма
+        """Обработка аудио-фрейма (миничанка)
         Args:
             :param audio_frame: 1D numpy array размером 512 сэмплов
             :param sample_rate:
@@ -45,8 +45,8 @@ class SileroVAD:
             bool: is_speech or not not speech
         """
 
-        # if len(audio_frame) != self.frame_size:
-        #     raise ValueError(f"Ожидается фрейм размером {self.frame_size}, получен {len(audio_frame)}")
+        if len(audio_frame) != self.frame_size:
+            raise ValueError(f"Ожидается фрейм размером {self.frame_size}, получен {len(audio_frame)}")
 
         inputs = {
             'input': audio_frame.reshape(1, -1).astype(np.float32),  # [1, 512]
@@ -67,7 +67,7 @@ class SileroVAD:
             return False
 
     def __call__(self, audio_frame: np.ndarray) -> tuple:
-        """Обработка аудио-фрейма
+        """Обработка аудио-фрейма с выдачей вероятностей.
         Args:
             audio_frame: 1D numpy array размером 512 сэмплов
         Returns:
@@ -90,7 +90,8 @@ class SileroVAD:
 
 
 def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> np.ndarray:
-    """Загрузка аудио и подготовка фреймов"""
+    """Загрузка аудио и подготовка фреймов для обработки файла целиком"""
+
     audio = AudioSegment.from_file(file_path)
 
     # Конвертируем в моно 16kHz если нужно

@@ -22,6 +22,9 @@ IS_PROD = int(os.getenv('IS_PROD', 1))
 MAX_OVERLAP_DURATION = 15  # Максимальная продолжительность буфера аудио (зависит от модели) приемлемый диапазон 10-15 сек.
 RECOGNITION_ATTEMPTS = 1  # Пока не менять
 
+# Vad_settings
+sensitivity = 2  # 1 or 2 or 3. Higher - more words.
+
 print(f"Using '{LOGGING_LEVEL}' LOGGING_LEVEL")
 
 

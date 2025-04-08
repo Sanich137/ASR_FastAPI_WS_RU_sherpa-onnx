@@ -45,40 +45,30 @@ models_arguments = {
             "provider": config.PROVIDER,
             "Base_Recognizer": sherpa_onnx.OfflineRecognizer
                 },
-        "Gigaam": {
-            "tokens": paths.get("gigaam_tokens_path"),
-            "model": paths.get("gigaam_encoder_path"),
-            "num_threads": config.NUM_THREADS,
-            "decoding_method": "greedy_search",
-            "sample_rate": config.BASE_SAMPLE_RATE,
-            "feature_dim": 64,
-            "provider": config.PROVIDER,
-            "Base_Recognizer": sherpa_onnx.OfflineRecognizer,
-            "debug": True if config.LOGGING_LEVEL == "DEBUG" else False
-                },
             }
 
 model_settings = models_arguments.get(config.MODEL_NAME)
 
 logger.debug(f"{config.MODEL_NAME} chosen model!")
-logger.debug(f'Path to model - {model_settings.get("model")}')
-if not model_settings.get("model").exists():
-    logger.error("Model files does`nt exist")
-    raise FileExistsError
+
+# Todo - тут нужно отработать для разных моделей
+# if not model_settings.get("model").exists():
+#     logger.error("Model files does`nt exist")
+#     raise FileExistsError
 
 
 recognizer = None
 
 if config.MODEL_NAME== "Gigaam":
-    recognizer = model_settings.get("Base_Recognizer").from_nemo_ctc(
-        model=str(model_settings.get("model")),
-        tokens=str(model_settings.get("tokens")),
-        num_threads=model_settings.get("num_threads", 1),
-        sample_rate=model_settings.get("sample_rate", 16000),
-        decoding_method=model_settings.get("decoding_method", "greedy_search"),
-        provider=model_settings.get("provider", "CPU"),
-        feature_dim=model_settings.get("feature_dim", False),
-        debug=model_settings.get("debug", True),
+    recognizer = sherpa_onnx.OfflineRecognizer.from_nemo_ctc(
+        model=str(paths.get("gigaam_encoder_path")),
+        tokens=str(paths.get("gigaam_tokens_path")),
+        num_threads=config.NUM_THREADS,
+        sample_rate=config.BASE_SAMPLE_RATE,
+        decoding_method="greedy_search",
+        provider=config.PROVIDER,
+        feature_dim=64,
+        debug=True if config.LOGGING_LEVEL == "DEBUG" else False,
     )
 elif config.MODEL_NAME== "Whisper":
     recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
@@ -110,3 +100,7 @@ else:
     )
 
 logger.debug(f"Model {config.MODEL_NAME} ready to start!")
+
+# По неведомой причине, если импорт onnxruntime происходит до старта  recognizer - инициация модели не происходит.
+# Поэтому импорт onnxruntime происходит в этой части кода.
+import onnxruntime as ort
