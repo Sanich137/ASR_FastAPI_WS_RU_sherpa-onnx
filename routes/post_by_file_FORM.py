@@ -13,8 +13,6 @@ from utils.pre_start_init import (app,
                                   audio_to_asr,
                                   audio_duration)
 
-from fastapi import (UploadFile, File, Depends, Form)
-
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 
@@ -24,13 +22,23 @@ from Recognizer.engine.stream_recognition import recognise_w_calculate_confidenc
 from Recognizer.engine.sentensizer import do_sensitizing
 from Recognizer.engine.echoe_clearing import remove_echo
 
+from fastapi import Depends, File, Form, UploadFile
+from pydantic import BaseModel
+
+
+# Определение модели данных для параметров
+class PostFileRequest(BaseModel):
+    keep_raw: bool = True  # Значение по умолчанию
+    do_echo_clearing: bool = False  # Значение по умолчанию
+    do_dialogue: bool = False  # Значение по умолчанию
+    do_punctuation: bool = False  # Значение по умолчанию
 
 # Функция для извлечения параметров из FormData
 def get_file_request(
-    keep_raw: Annotated[bool, Form()] = True,
-    do_echo_clearing: Annotated[bool, Form()] = False,
-    do_dialogue: Annotated[bool, Form()] = False,
-    do_punctuation: Annotated[bool, Form()] = False,
+    keep_raw: bool = Form(default=True),  # Значение по умолчанию
+    do_echo_clearing: bool = Form(default=False),  # Значение по умолчанию
+    do_dialogue: bool = Form(default=False),  # Значение по умолчанию
+    do_punctuation: bool = Form(default=False),  # Значение по умолчанию
 ) -> PostFileRequest:
     return PostFileRequest(
         keep_raw=keep_raw,
@@ -39,12 +47,11 @@ def get_file_request(
         do_punctuation=do_punctuation,
     )
 
-
 @app.post("/post_file")
 async def receive_file(
-    file: Annotated[UploadFile, File(description="Аудиофайл для обработки")],
-    params: Annotated[PostFileRequest, Depends(get_file_request)]
-    ):
+    file: UploadFile = File(description="Аудиофайл для обработки"),
+    params: PostFileRequest = Depends(get_file_request)
+):
 
     """
     :param file: Файл, который будет обработан.
