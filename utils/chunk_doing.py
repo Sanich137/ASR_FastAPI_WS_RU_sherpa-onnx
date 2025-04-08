@@ -1,4 +1,4 @@
-from ViceActivityDetector.do_vad import SileroVAD
+from VoiceActivityDetector.do_vad import SileroVAD
 from utils.do_logging import logger
 from utils.bytes_to_samples_audio import get_np_array_samples_float32
 
