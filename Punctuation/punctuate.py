@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-
-import argparse
+import asyncio
 import numpy as np
 from transformers import AutoTokenizer
-import onnxruntime as ort
+from Recognizer import ort
+# import onnxruntime as ort
+from pathlib import Path
 
 
 # Прогнозируемые знаки препинания
@@ -73,10 +74,21 @@ def decode_label(label, classes="all"):
 
 
 class SbertPuncCaseOnnx:
-    def __init__(self, onnx_model_path):
-        self.tokenizer = AutoTokenizer.from_pretrained(onnx_model_path, strip_accents=False)
+    def __init__(self, onnx_model_path, use_gpu = False):
+        self.tokenizer = AutoTokenizer.from_pretrained(onnx_model_path,
+                                                       strip_accents=False,
+                                                       )
+        session_options = ort.SessionOptions()
+        session_options.log_severity_level = 3  # Включаем подробный лог
+
+        if use_gpu:
+            providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+        else:
+            providers = ['CPUExecutionProvider']
+
         self.session = ort.InferenceSession(path_or_bytes=f"{onnx_model_path}/model.onnx",
-                                            providers=['CPUExecutionProvider'])
+                                            sess_options=session_options,
+                                            providers=providers)   # CPUExecutionProvider
 
     async def punctuate(self, text):
         text = text.strip().lower()
@@ -122,12 +134,19 @@ class SbertPuncCaseOnnx:
         return capitalized_text
 
 if __name__ == '__main__':
+    from datetime import datetime as dt
+
     # Instead of using argparse, directly define the input and model path:
-    input_text = "channel_1: два\nchannel_2: татьяна добрый день это компания сберправа вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n"
-    model_path = "C://Users//kojevnikov//PycharmProjects//Vosk5_FastAPI_streaming//models//sbert_punc_case_ru_onnx"
+    input_text = "channel_1: два\nchannel_2: татьяна добрый день это компания вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n"
 
+    model_path = str(Path("../models/sbert_punc_case_ru_onnx"))
     print(f"Source text:   {input_text}\n")
-    sbertpunc = SbertPuncCaseOnnx(model_path)
-    punctuated_text = sbertpunc.punctuate(input_text)
-    print(f"Restored text: {punctuated_text}")
+    sbertpunc = SbertPuncCaseOnnx(model_path, use_gpu = True)
 
+    time_start = dt.now()
+    print(
+        asyncio.run(
+                sbertpunc.punctuate(input_text)
+                    )
+        )
+    print((dt.now()-time_start).total_seconds())
