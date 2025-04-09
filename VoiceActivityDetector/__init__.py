@@ -30,3 +30,5 @@ if not paths.get("vad_model_path").exists():
             logger.info("Модель silero_vad.onnx успешно загружена")
         else:
             logger.error(f"Ошибка при скачивании файла. Статус: {response.status_code}")
+else:
+    logger.info("Будет использован VAD silero v5")

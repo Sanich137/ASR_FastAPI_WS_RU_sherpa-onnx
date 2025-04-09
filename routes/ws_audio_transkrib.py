@@ -48,7 +48,8 @@ async def websocket(ws: WebSocket):
             try:
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
-                    audio_format = json_cfg.get("audio_format", 'raw')
+
+                    audio_format = json_cfg.get("audio_format", 'pcm16')
 
                     sample_rate = json_cfg.get('sample_rate')
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
@@ -72,7 +73,7 @@ async def websocket(ws: WebSocket):
                 # Получаем новый чанк с данными
                 chunk = message.get('bytes')
 
-                if audio_format == 'raw':
+                if audio_format == 'pcm16':
                     # Переводим чанк в объект Audiosegment
                     audiosegment_chunk = AudioSegment(
                         chunk,
