@@ -24,9 +24,7 @@ psutil
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
 sherpa-onnx==1.11.3+cuda
 
-onnxruntime~=1.21.0
-onnxruntime-gpu
-
+onnxruntime-gpu==1.17.1
 
 # For punctuation
 transformers~=4.51.0

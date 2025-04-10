@@ -2,8 +2,7 @@
 import asyncio
 import numpy as np
 from transformers import AutoTokenizer
-from Recognizer import ort
-# import onnxruntime as ort
+import onnxruntime as ort
 from pathlib import Path
 
 
@@ -13,7 +12,7 @@ PUNK_MAPPING = {".": "PERIOD", ",": "COMMA", "?": "QUESTION"}
 # Прогнозируемый регистр LOWER - нижний регистр, UPPER - верхний регистр для первого символа,
 # UPPER_TOTAL - верхний регистр для всех символов
 LABELS_CASE = ["LOWER", "UPPER", "UPPER_TOTAL"]
-# Добавим в пунктуацию метку O означающий отсутсвие пунктуации
+# Добавим в пунктуацию метку O означающий отсутствие пунктуации
 LABELS_PUNC = ["O"] + list(PUNK_MAPPING.values())
 
 # Сформируем метки на основе комбинаций регистра и пунктуации
@@ -79,12 +78,15 @@ class SbertPuncCaseOnnx:
                                                        strip_accents=False,
                                                        )
         session_options = ort.SessionOptions()
-        session_options.log_severity_level = 3  # Включаем подробный лог
+        session_options.log_severity_level = 3  # Выключаем подробный лог
 
-        if use_gpu:
-            providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
-        else:
+        if not use_gpu:
             providers = ['CPUExecutionProvider']
+        else:
+            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            # providers = ort.get_available_providers() можно завести на тензор провайдер, на 2хххRTX работает медленно.
+            # https://developer.nvidia.com/nvidia-tensorrt-8x-download#
+            # https://docs.nvidia.com/deeplearning/tensorrt/latest/installing-tensorrt/installing.html#download
 
         self.session = ort.InferenceSession(path_or_bytes=f"{onnx_model_path}/model.onnx",
                                             sess_options=session_options,
@@ -135,7 +137,7 @@ class SbertPuncCaseOnnx:
 
 if __name__ == '__main__':
     from datetime import datetime as dt
-
+    import logging as logger
     # Instead of using argparse, directly define the input and model path:
     input_text = "channel_1: два\nchannel_2: татьяна добрый день это компания вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n"
 
@@ -149,4 +151,4 @@ if __name__ == '__main__':
                 sbertpunc.punctuate(input_text)
                     )
         )
-    print((dt.now()-time_start).total_seconds())
+    print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")

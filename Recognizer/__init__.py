@@ -100,7 +100,3 @@ else:
     )
 
 logger.debug(f"Model {config.MODEL_NAME} ready to start!")
-
-# По неведомой причине, если импорт onnxruntime происходит до старта  recognizer - инициация модели не происходит.
-# Поэтому импорт onnxruntime происходит в этой части кода.
-import onnxruntime as ort

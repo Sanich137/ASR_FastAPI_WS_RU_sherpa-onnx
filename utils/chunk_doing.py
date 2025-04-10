@@ -1,4 +1,3 @@
-from VoiceActivityDetector.do_vad import SileroVAD
 from utils.do_logging import logger
 from utils.bytes_to_samples_audio import get_np_array_samples_float32
 
@@ -6,8 +5,8 @@ from utils.pre_start_init import (audio_overlap,
                                   audio_buffer,
                                   audio_to_asr,
                                   )
-
 from pydub import AudioSegment
+from VoiceActivityDetector import vad
 
 def find_last_speech_position(socket_id, sample_width = 2):
     """
@@ -18,8 +17,6 @@ def find_last_speech_position(socket_id, sample_width = 2):
         4. Остаток, хвост, складываем отдельно как overlap
         5. Если не находит ни одного сегмента без речи, помечаем его как полностью речь и отдаём ра распознавание
     """
-    vad = SileroVAD()
-    vad.set_mode(2)
     frame_rate = audio_buffer[socket_id].frame_rate
 
     # 16000 - битрейт, требуемый силеро VAD.
@@ -45,7 +42,11 @@ def find_last_speech_position(socket_id, sample_width = 2):
 
     # Проверка каждого фрагмента на наличие голоса.
     silence_frames = 0
+    # Ниже переприсвоение стейтов - попытка сохранить стейт, если одновременно поступит несколько запросов.
+    vad.reset_state()
+    vad_state=vad.state
     for i, frame in enumerate(reversed(frames)):
+        vad.state = vad_state
         try:
             if len(frame) < frame_length:
                 # Пропустить последний неполный фрагмент
@@ -55,11 +56,13 @@ def find_last_speech_position(socket_id, sample_width = 2):
                 if not vad.is_speech(frame, sample_rate=frame_rate):
                     # logger.debug(f"Найден не голос на speech_end = {speech_end-(i+1)*frame_length-partial_frame_length}")
                     silence_frames+=1
+                    vad_state = vad.state
                     if silence_frames >= min_silence_frames:
                         break
                 else:
                     silence_frames = 0
                     logger.debug(f"Найден ГОЛОС на speech_end = {speech_end-i*frame_length-partial_frame_length}")
+                    vad_state = vad.state
                     continue
         except Exception as e:
             logger.error(f"Ошибка VAD - {e}"

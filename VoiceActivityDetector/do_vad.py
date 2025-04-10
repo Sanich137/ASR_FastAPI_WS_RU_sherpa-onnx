@@ -1,15 +1,27 @@
 import numpy as np
-from Recognizer import ort
+import onnxruntime as ort
 from pydub import AudioSegment
 from pathlib import Path
-from utils.pre_start_init import paths
 from utils.do_logging import logger
-
+# import logging as logger
 
 class SileroVAD:
-    def __init__(self, onnx_path: Path = paths.get("vad_model_path"), sample_rate: int = 16000):
+    def __init__(self, onnx_path: Path, sample_rate: int = 16000, use_gpu = False):
 
-        self.session = ort.InferenceSession(onnx_path)
+        if use_gpu:
+            providers=['CUDAExecutionProvider', 'CPUExecutionProvider']
+        else:
+            providers = ['CPUExecutionProvider']
+
+        session_options = ort.SessionOptions()
+        session_options.log_severity_level = 3  # Выключаем подробный лог
+        session_options.inter_op_num_threads = 2
+        session_options.intra_op_num_threads = 2
+
+        self.session = ort.InferenceSession(path_or_bytes=onnx_path,
+                                            sess_options=session_options,
+                                            providers=providers
+                                            )
         self.sample_rate = sample_rate
 
         # Инициализация состояния
@@ -59,14 +71,14 @@ class SileroVAD:
         outputs = self.session.run(['output', 'stateN'], inputs)
 
         self.state = outputs[1]  # Обновляем состояние
-
         prob = float(outputs[0][0, 0])
+
         logger.debug(f"probs = {prob}")
         if prob >= self.prob_level:
             logger.debug("Найден голос")
-            return True
+            return True, self.state
         else:
-            return False
+            return False, self.state
 
     def __call__(self, audio_frame: np.ndarray) -> tuple:
         """Обработка аудио-фрейма с выдачей вероятностей.
@@ -81,7 +93,7 @@ class SileroVAD:
         inputs = {
             'input': audio_frame.reshape(1, -1).astype(np.float32),  # [1, 512]
             'state': self.state,
-            'sr': self.sample_rate
+            'sr': np.array(self.sample_rate, dtype=np.int64)  # scalar int64
         }
 
         outputs = self.session.run(['output', 'stateN'], inputs)
@@ -101,7 +113,7 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> n
         audio = audio.set_frame_rate(16000)
     if audio.channels > 1:
         audio = audio.split_to_mono()[0]
-
+    audio = audio*100
     # Нормализация в float32
     samples = np.frombuffer(audio.raw_data, dtype=np.int16)
     samples_float32 = samples.astype(np.float32) / 32768.0
@@ -118,9 +130,11 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> n
 
 
 if __name__ == "__main__":
+    from datetime import datetime as dt
+
     # Инициализация VAD
     print("Инициализация VAD...")
-    vad = SileroVAD("../models/VAD_silero_v5/silero_vad.onnx")
+    vad = SileroVAD(Path("../models/VAD_silero_v5/silero_vad.onnx"), use_gpu=False)
     vad.set_mode(3)
     # Загрузка и подготовка аудио
     audio_file = Path("C:/Users/kojevnikov/PycharmProjects/Sherpa_onnx_vosk_GPU/trash/q.Wav")
@@ -128,14 +142,18 @@ if __name__ == "__main__":
 
     print(f"\nЗагружено {len(audio_frames)} фреймов по {vad.frame_size} сэмплов")
 
+    time_start = dt.now()
     # Обработка каждого фрейма
     for i, frame in enumerate(audio_frames):
-        # print(vad.is_speech(frame))
+        vad.is_speech(frame)
+        if i>10:
+            break
 
-        prob, _ = vad(frame)
-        if prob >= vad.prob_level:
-            print(f"Найден голос на {i * vad.frame_size / 16000}")
-        else:
-            print(f"Не голос на {i * vad.frame_size / 16000}")
+        # prob, _ = vad(frame)
+        # if prob >= vad.prob_level:
+        #     print(f"Найден голос на {i * vad.frame_size / 16000}")
+        # else:
+        #     print(f"Не голос на {i * vad.frame_size / 16000}")
 
         # print(f"Фрейм {i + 1}: Вероятность речи = {prob:.4f}")
+    print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")
