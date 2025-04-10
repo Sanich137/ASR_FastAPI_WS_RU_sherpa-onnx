@@ -133,14 +133,16 @@ sudo systemctl enable vosk_gpu
 - Vosk: Модель доступна по лицензии [Apache 2.0](https://github.com/alphacep/vosk-api?tab=Apache-2.0-1-ov-file).
 - GigaAM: Модель доступна по лицензии [MIT](https://github.com/salute-developers/GigaAM/blob/main/LICENSE).
 - sbert_punc_case_ru: Модель доступна по лицензии [Apache 2.0](https://huggingface.co/kontur-ai/sbert_punc_case_ru).
+- Silero: Модель доступна по лицензии [MIT](https://github.com/snakers4/silero-vad?tab=MIT-1-ov-file).
 
-- Внимание! Проверяйте допустимость коммерческого использования моделей перед их использованием в коммерческих проектах.
+Внимание! Проверяйте допустимость коммерческого использования моделей перед их использованием в коммерческих проектах.
 
 ## Заключение
 - Если у вас возникли вопросы или предложения по улучшению проекта, пожалуйста, 
 свяжитесь со мной через [GitHub Issues](https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx/issues) или [GitHub Discussions](https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx/discussions)
 
 ## Работы
+- 10 апреля 2025 - webrtcvad заменён на Silero v5, пунктуация производится силами GPU.
 - 07 марта 2025 - Реализовано Разделение на предложения и пунктуацию при передаче задания в сокетах. 
 - 06 марта 2025 - Реализована пунктуация в полной мере при работе с целыми файлами.(CPU). Для работы модель для пунктуации скачать обязательно.
 - 03 марта 2025 - Реализована Тестовая страница для демонстрации функционала
@@ -149,4 +151,4 @@ sudo systemctl enable vosk_gpu
 ## Планируемы работы
  
 - реализовать постобработку аудио для улучшения разборчивости аудио человеком.
-
+- [возможно, деноиз от силеро](https://github.com/snakers4/silero-models?tab=readme-ov-file#models)
