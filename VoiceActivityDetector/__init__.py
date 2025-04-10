@@ -1,3 +1,5 @@
+from venv import logger
+
 import config
 from utils.pre_start_init import paths
 from utils.do_logging import logger
@@ -30,8 +32,15 @@ if not paths.get("vad_model_path").exists():
         else:
             logger.error(f"Ошибка при скачивании файла. Статус: {response.status_code}")
 else:
-    logger.info("Будет использован VAD silero v5")
+    logger.info("Будет использован имеющийся файл Silero_VADv5")
+
+if not paths.get("vad_model_path").exists():
+    logger.error("Работа сервиса без VAD невозможна")
+    raise FileExistsError
+else:
+    print("from .do_vad import SileroVAD")
     from .do_vad import SileroVAD
+
     vad=SileroVAD(paths.get("vad_model_path"), use_gpu= config.VAD_WITH_GPU)
     # Нужно наблюдать за результатом работы в многопотоке (если он будет)
     # Если будут сбои, то переводить создание класса в отдельный процесс.
