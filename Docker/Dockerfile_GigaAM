@@ -9,12 +9,20 @@ RUN apt-get update && apt-get install -y \
     python3-pyaudio \
     ffmpeg \
     python3-pip \
+    curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*  # Очистка кеша apt
 
-# Клонирование репозитория и установка моделей
+    # Клонирование репозитория копирование модели Silero
 RUN git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx && \
-    cd ASR_FastAPI_WS_RU_sherpa-onnx && \
+    curl -L https://github.com/snakers4/silero-vad/blob/v5.0/files/silero_vad.onnx?raw=true \
+         -o /ASR_FastAPI_WS_RU_sherpa-onnx/models/VAD_silero_v5/silero_vad.onnx
+
+
+    # установка остальных моделей
+RUN cd ASR_FastAPI_WS_RU_sherpa-onnx && \
     git lfs install && \
+    ls -la /ASR_FastAPI_WS_RU_sherpa-onnx/models/VAD_silero_v5/ && \
     cd models && \
     git clone https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx && \
     git clone https://huggingface.co/Alexanrd/sbert_punc_case_ru_onnx && \

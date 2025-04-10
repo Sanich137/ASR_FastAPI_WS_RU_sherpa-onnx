@@ -38,9 +38,7 @@ if not paths.get("vad_model_path").exists():
     logger.error("Работа сервиса без VAD невозможна")
     raise FileExistsError
 else:
-    print("from .do_vad import SileroVAD")
     from .do_vad import SileroVAD
-
     vad=SileroVAD(paths.get("vad_model_path"), use_gpu= config.VAD_WITH_GPU)
     # Нужно наблюдать за результатом работы в многопотоке (если он будет)
     # Если будут сбои, то переводить создание класса в отдельный процесс.
