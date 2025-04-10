@@ -8,11 +8,10 @@
 RUNTIME_EXCEPTION : Exception during initialization: D:\a\_work\1\s\onnxruntime\core/framework/feeds_fetches_manager.h:
 44 onnxruntime::FeedsFetchesInfo::FeedsFetchesInfo [ONNXRuntimeError] : 1 : FAIL : Error mapping output names: Could not
 find OrtValue with name 'If_0_else_branch__Inline_0__/Squeeze_output_0'
-**в итоге силеро на работало, так как я не правильно передавал название модели....** Но, целессообразность ниже.
-
-В результате. Т.к. на onnxruntime больше 1.17.1 не работает ничего, то есть ли смысл гнаться?
+**в итоге силеро нe работало, так как я не правильно передавал название модели....** Т.е. силеро работает.
+Но, целессообразность использования в проекте указана ниже.
 
 Silero onnxruntime 1.17.1
 CPU Загружено 95999 фреймов по 512 сэмплов Время выполнения 9.571041 и 8.867979 на onnxruntime 1.21.0
 GPU Загружено 95999 фреймов по 512 сэмплов Время выполнения 42.192122 и 37.642282 на onnxruntime 1.21.0
-Результат очевиден.
+Результат очевиден - Silero без батчинга - GPU на ветер.
