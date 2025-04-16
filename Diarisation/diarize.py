@@ -49,9 +49,9 @@ class SileroVAD:
         elif mode == 5:
             self.prob_level = 0.3
 
-    def is_speech(self, audio_frame: np.ndarray, sample_rate=None) -> bool:
+    def is_speech(self, audio_frame: np.ndarray, sample_rate=None) -> tuple[bool, np.ndarray]:
         if len(audio_frame) != self.frame_size:
-            raise ValueError(f"Ожидается фрейм размером {self.frame_size}, получен {len(audio_frame)}")
+            audio_frame = np.pad(audio_frame, (0, self.frame_size - len(audio_frame)), mode='constant')[:self.frame_size]
 
         inputs = {
             'input': audio_frame.reshape(1, -1).astype(np.float32),
@@ -63,64 +63,101 @@ class SileroVAD:
         self.state = outputs[1]
         prob = float(outputs[0][0, 0])
 
-        return prob >= self.prob_level, self.state
+        return prob, self.state
 
     def get_speech_segments(self, audio_frames: np.ndarray, min_duration: float, max_gap: float) -> list[tuple]:
-        sample_rate = self.sample_rate
-        frame_size = self.frame_size
-
         if len(audio_frames.shape) == 2:
             audio_frames = audio_frames.flatten()
 
-        num_samples = len(audio_frames)
-        num_frames = num_samples // frame_size
-        if num_samples % frame_size != 0:
-            padding = frame_size - (num_samples % frame_size)
-            audio_frames = np.pad(audio_frames, (0, padding), mode='constant')
+        audio_length_samples = len(audio_frames)
+        window_size_samples = self.frame_size
+        sample_rate = self.sample_rate
 
-        frames = audio_frames.reshape(-1, frame_size)
+        # Параметры из get_speech_timestamps
+        threshold = self.prob_level
+        neg_threshold = threshold - 0.15
+        min_speech_duration_ms = int(min_duration * 1000)
+        min_silence_duration_ms = int(max_gap * 1000)
+        speech_pad_ms = 30
+        min_speech_samples = sample_rate * min_speech_duration_ms // 1000
+        min_silence_samples = sample_rate * min_silence_duration_ms // 1000
+        speech_pad_samples = sample_rate * speech_pad_ms // 1000
+
+        # Получение вероятностей речи
         self.reset_state()
         speech_probs = []
-
-        for frame in frames:
-            is_speech_flag, new_state = self.is_speech(frame)
+        for current_start in range(0, audio_length_samples, window_size_samples):
+            chunk = audio_frames[current_start:current_start + window_size_samples]
+            if len(chunk) < window_size_samples:
+                chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
+            prob, new_state = self.is_speech(chunk)
             self.state = new_state
-            speech_probs.append(1.0 if is_speech_flag else 0.0)
+            speech_probs.append(prob)
 
-        segments = []
-        start = None
-        for i, prob in enumerate(speech_probs):
-            if prob >= self.prob_level:
-                if start is None:
-                    start = i * frame_size / sample_rate
-            else:
-                if start is not None:
-                    end = i * frame_size / sample_rate
-                    if end - start >= min_duration:
-                        audio_segment = audio_frames[int(start * sample_rate):int(end * sample_rate)]
-                        segments.append((start, end, audio_segment))
-                    start = None
+        # Обработка вероятностей для выделения сегментов
+        triggered = False
+        speeches = []
+        current_speech = {}
+        temp_end = 0
+        prev_end = 0
+        next_start = 0
 
-        if start is not None:
-            end = len(audio_frames) / sample_rate
-            if end - start >= min_duration:
-                audio_segment = audio_frames[int(start * sample_rate):int(end * sample_rate)]
-                segments.append((start, end, audio_segment))
+        for i, speech_prob in enumerate(speech_probs):
+            current_sample = window_size_samples * i
+            if speech_prob >= threshold and temp_end:
+                temp_end = 0
+                if next_start < prev_end:
+                    next_start = current_sample
 
-        merged_segments = []
-        if segments:
-            current_start, current_end, current_audio = segments[0]
-            for next_start, next_end, next_audio in segments[1:]:
-                if next_start - current_end <= max_gap:
-                    current_end = next_end
-                    current_audio = audio_frames[int(current_start * sample_rate):int(current_end * sample_rate)]
+            if speech_prob >= threshold and not triggered:
+                triggered = True
+                current_speech['start'] = current_sample
+                continue
+
+            if speech_prob < neg_threshold and triggered:
+                if not temp_end:
+                    temp_end = current_sample
+                if (current_sample - temp_end) > (sample_rate * 98 // 1000):
+                    prev_end = temp_end
+                if (current_sample - temp_end) < min_silence_samples:
+                    continue
                 else:
-                    merged_segments.append((current_start, current_end, current_audio))
-                    current_start, current_end, current_audio = next_start, next_end, next_audio
-            merged_segments.append((current_start, current_end, current_audio))
+                    current_speech['end'] = temp_end
+                    if (current_speech['end'] - current_speech['start']) > min_speech_samples:
+                        speeches.append(current_speech)
+                    current_speech = {}
+                    prev_end = next_start = temp_end = 0
+                    triggered = False
+                    continue
 
-        return merged_segments
+        if current_speech and (audio_length_samples - current_speech.get('start', 0)) > min_speech_samples:
+            current_speech['end'] = audio_length_samples
+            speeches.append(current_speech)
 
+        # Применение speech_pad и корректировка границ
+        for i, speech in enumerate(speeches):
+            if i == 0:
+                speech['start'] = max(0, speech['start'] - speech_pad_samples)
+            if i != len(speeches) - 1:
+                silence_duration = speeches[i + 1]['start'] - speech['end']
+                if silence_duration < 2 * speech_pad_samples:
+                    speech['end'] += silence_duration // 2
+                    speeches[i + 1]['start'] = max(0, speeches[i + 1]['start'] - silence_duration // 2)
+                else:
+                    speech['end'] = min(audio_length_samples, speech['end'] + speech_pad_samples)
+                    speeches[i + 1]['start'] = max(0, speeches[i + 1]['start'] - speech_pad_samples)
+            else:
+                speech['end'] = min(audio_length_samples, speech['end'] + speech_pad_samples)
+
+        # Формирование результата
+        segments = []
+        for speech in speeches:
+            start = speech['start'] / sample_rate
+            end = speech['end'] / sample_rate
+            audio_segment = audio_frames[int(start * sample_rate):int(end * sample_rate)]
+            segments.append((start, end, audio_segment))
+
+        return segments
 
 class Diarizer:
     def __init__(self, embedding_model_path: str, vad, sample_rate: int = 16000, use_gpu: bool = False):
@@ -268,11 +305,12 @@ class Diarizer:
                                         metric='cosine',
                                         n_neighbors=16,
                                         min_dist=0.05,
-                                        random_state=2023).fit_transform(embeddings)
+                                        random_state=2023,
+                                        n_jobs=1).fit_transform(embeddings)
             labels = hdbscan.HDBSCAN(min_cluster_size=4).fit_predict(umap_embeddings)
 
         if len(np.unique(labels)) > 1:
-            score = silhouette_score(embeddings, labels, metric='cosine')
+            score = silhouette_score(embeddings, labels, metric='cosine', ensure_all_finite=True)
             print(f"Силуэтный коэффициент: {score:.4f}")
         else:
             print("Найден только один кластер, силуэтный коэффициент не вычисляется")
@@ -368,8 +406,8 @@ if __name__ == "__main__":
     batch_size = 16  # Размер батча для извлечения эмбеддингов
 
     # Параметры сегментации (VAD)
-    min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
-    max_gap = 0.25  # Максимальный промежуток между сегментами для их объединения (сек)
+    min_duration = 0.1  # Минимальная длительность речевого сегмента (сек)
+    max_gap = 0.1  # Максимальный промежуток между сегментами для их объединения (сек)
     vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
     use_gpu_vad = False  # По возможности использовать графический процессор для вычислений
 
@@ -389,7 +427,7 @@ if __name__ == "__main__":
 
     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
-    audio_path = "../trash/long.mp3"
+    audio_path = "../trash/orig.wav"
 
     vad = SileroVAD(vad_model_path, sample_rate=sample_rate, use_gpu=use_gpu_vad)
     vad.set_mode(vad_mode)
