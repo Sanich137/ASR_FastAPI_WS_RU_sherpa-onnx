@@ -2,8 +2,8 @@ import numpy as np
 import onnxruntime as ort
 from pydub import AudioSegment
 from pathlib import Path
-from utils.do_logging import logger
-# import logging as logger
+# from utils.do_logging import logger
+import logging as logger
 
 class SileroVAD:
     def __init__(self, onnx_path: Path, sample_rate: int = 16000, use_gpu = False):
@@ -44,11 +44,11 @@ class SileroVAD:
         if mode not in [1, 2, 3]:
             self.prob_level = 0.5
         elif mode == 1:
-            self.prob_level = 0.75
+            self.prob_level = 0.85
         elif mode == 2:
             self.prob_level = 0.5
         elif mode == 3:
-            self.prob_level = 0.25
+            self.prob_level = 0.15
 
     def is_speech(self, audio_frame: np.ndarray, sample_rate = None) -> bool:
         """Обработка аудио-фрейма (миничанка)
@@ -80,30 +80,73 @@ class SileroVAD:
         else:
             return False, self.state
 
-    def __call__(self, audio_frame: np.ndarray) -> tuple:
-        """Обработка аудио-фрейма с выдачей вероятностей.
+    def get_speech_segments(self, audio_frames: np.ndarray, min_duration: float = 0.3, max_gap: float = 0.2) -> list[
+        tuple[float, float, np.ndarray]]:
+        """Получение сегментов речи с сглаживанием
         Args:
-            audio_frame: 1D numpy array размером 512 сэмплов
+            audio_frames: np.ndarray [N, 512] - массив фреймов
+            min_duration: минимальная длительность сегмента в секундах
+            max_gap: максимальный разрыв между сегментами для объединения в секундах
         Returns:
-            tuple: (speech_probability, new_state)
+            list[tuple[float, float, np.ndarray]]: список (start_time, end_time, audio_segment)
         """
-        if len(audio_frame) != self.frame_size:
-            raise ValueError(f"Ожидается фрейм размером {self.frame_size}, получен {len(audio_frame)}")
+        segments = []
+        start_frame = None
+        current_segment = []
 
-        inputs = {
-            'input': audio_frame.reshape(1, -1).astype(np.float32),  # [1, 512]
-            'state': self.state,
-            'sr': np.array(self.sample_rate, dtype=np.int64)  # scalar int64
-        }
+        frame_duration = self.frame_size / self.sample_rate  # Длительность одного фрейма в секундах
+        min_frames = int(min_duration / frame_duration)  # Минимальное число фреймов в сегменте
+        max_gap_frames = int(max_gap / frame_duration)  # Максимальный разрыв в фреймах
 
-        outputs = self.session.run(['output', 'stateN'], inputs)
+        self.reset_state()
 
-        self.state = outputs[1]  # Обновляем состояние
+        for i, frame in enumerate(audio_frames):
+            is_speech, self.state = self.is_speech(frame)
 
-        return float(outputs[0][0, 0]), self.state
+            if is_speech and start_frame is None:
+                start_frame = i
+                current_segment = [frame]
+            elif is_speech and start_frame is not None:
+                current_segment.append(frame)
+            elif not is_speech and start_frame is not None:
+                # Проверяем, не слишком ли короткий разрыв
+                if i < len(audio_frames) - 1:
+                    next_speech = False
+                    for j in range(1, min(max_gap_frames + 1, len(audio_frames) - i)):
+                        next_is_speech, _ = self.is_speech(audio_frames[i + j])
+                        if next_is_speech:
+                            next_speech = True
+                            break
+                    if next_speech:
+                        current_segment.append(frame)  # Добавляем паузу в сегмент
+                        continue
+
+                # Завершаем сегмент
+                end_frame = i - 1
+                segment_frames = end_frame - start_frame + 1
+                if segment_frames >= min_frames:  # Фильтруем короткие сегменты
+                    start_time = start_frame * frame_duration
+                    end_time = (end_frame + 1) * frame_duration
+                    segment_audio = np.concatenate(current_segment, axis=0)
+                    segments.append((start_time, end_time, segment_audio))
+                start_frame = None
+                current_segment = []
+
+        # Завершаем последний сегмент
+        if start_frame is not None:
+            end_frame = len(audio_frames) - 1
+            segment_frames = end_frame - start_frame + 1
+            if segment_frames >= min_frames:
+                start_time = start_frame * frame_duration
+                end_time = (end_frame + 1) * frame_duration
+                segment_audio = np.concatenate(current_segment, axis=0)
+                segments.append((start_time, end_time, segment_audio))
+
+        return segments
 
 
 def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> np.ndarray:
+
     """Загрузка аудио и подготовка фреймов для обработки файла целиком"""
 
     audio = AudioSegment.from_file(file_path)
@@ -113,7 +156,7 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> n
         audio = audio.set_frame_rate(16000)
     if audio.channels > 1:
         audio = audio.split_to_mono()[0]
-    audio = audio*100
+
     # Нормализация в float32
     samples = np.frombuffer(audio.raw_data, dtype=np.int16)
     samples_float32 = samples.astype(np.float32) / 32768.0
@@ -144,16 +187,16 @@ if __name__ == "__main__":
 
     time_start = dt.now()
     # Обработка каждого фрейма
-    for i, frame in enumerate(audio_frames):
-        vad.is_speech(frame)
-        if i>10:
-            break
+    # # -- скорость тестирование
+    # for i, frame in enumerate(audio_frames):
+    #     vad.is_speech(frame)
+    #     if i>10:
+    #         break
 
-        # prob, _ = vad(frame)
-        # if prob >= vad.prob_level:
-        #     print(f"Найден голос на {i * vad.frame_size / 16000}")
-        # else:
-        #     print(f"Не голос на {i * vad.frame_size / 16000}")
+    # Получение фрагментов аудио
+    audio_segments = vad.get_speech_segments(audio_frames, min_duration=0.3, max_gap=0.4)
 
-        # print(f"Фрейм {i + 1}: Вероятность речи = {prob:.4f}")
+    for start, end, audio in audio_segments:
+        print(f"Сегмент: {start:.2f}s - {end:.2f}s, длина аудио: {len(audio)} сэмплов")
+
     print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")
