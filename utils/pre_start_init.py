@@ -31,6 +31,7 @@ paths = {
 
     "punctuation_model_path": BASE_DIR / "models" / "sbert_punc_case_ru_onnx",
     "vad_model_path": BASE_DIR / "models" / "VAD_silero_v5" / "silero_vad.onnx",
+    "speaker_model_path": BASE_DIR / "models" / "Diar_model" / "voxblink2_samresnet100_ft.onnx",
 
     # Diarisation model
     "segmentation_model": BASE_DIR / "models" / "Diar_model" / "model.onnx",

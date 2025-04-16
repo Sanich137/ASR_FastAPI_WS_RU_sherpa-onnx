@@ -29,6 +29,9 @@ VAD_WITH_GPU = os.getenv('VAD_WITH_GPU', False)
 # Punctuate_settings
 PUNCTUATE_WITH_GPU = os.getenv('VAD_WITH_GPU', True)   # Если потребуется onnxruntime > 1.17.1, то изменить на False (ограничения sherpa-onnx)
 
+# Diarisation_settings
+DIAR_WITH_GPU = False
+
 print(f"Using '{LOGGING_LEVEL}' LOGGING_LEVEL")
 
 

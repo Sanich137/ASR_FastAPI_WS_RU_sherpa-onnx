@@ -19,7 +19,7 @@ from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 
 from models.fast_api_models import PostFileRequestDiarize
-from Diarisation.diarize import do_diarization
+from Diarisation.do_diarize import do_diarization
 from Diarisation.diarazed_asr_matching import do_diarized_dialogue
 from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence, simple_recognise
 from Recognizer.engine.sentensizer import do_sensitizing
