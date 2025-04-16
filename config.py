@@ -23,7 +23,7 @@ MAX_OVERLAP_DURATION = 15  # Максимальная продолжительн
 RECOGNITION_ATTEMPTS = 1  # Пока не менять
 
 # Vad_settings
-sensitivity = os.getenv('VAD_SENSE', 2)  # 1 or 2 or 3. Higher - more words.
+VAD_SENSITIVITY = os.getenv('VAD_SENSE', 2)  # 1 or 2 or 3. Higher - more words.
 VAD_WITH_GPU = os.getenv('VAD_WITH_GPU', False)
 
 # Punctuate_settings

@@ -42,4 +42,4 @@ else:
     vad=SileroVAD(paths.get("vad_model_path"), use_gpu= config.VAD_WITH_GPU)
     # Нужно наблюдать за результатом работы в многопотоке (если он будет)
     # Если будут сбои, то переводить создание класса в отдельный процесс.
-    vad.set_mode(2)
+    vad.set_mode(config.VAD_SENSITIVITY)
