@@ -23,11 +23,11 @@ MAX_OVERLAP_DURATION = 15  # Максимальная продолжительн
 RECOGNITION_ATTEMPTS = 1  # Пока не менять
 
 # Vad_settings
-sensitivity = 2  # 1 or 2 or 3. Higher - more words.
-VAD_WITH_GPU = False
+VAD_SENSITIVITY = os.getenv('VAD_SENSE', 2)  # 1 or 2 or 3. Higher - more words.
+VAD_WITH_GPU = os.getenv('VAD_WITH_GPU', False)
 
 # Punctuate_settings
-PUNCTUATE_WITH_GPU = True  # Если потребуется onnxruntime > 1.17.1, то изменить на False (ограничения sherpa-onnx)
+PUNCTUATE_WITH_GPU = os.getenv('VAD_WITH_GPU', True)   # Если потребуется onnxruntime > 1.17.1, то изменить на False (ограничения sherpa-onnx)
 
 print(f"Using '{LOGGING_LEVEL}' LOGGING_LEVEL")
 
