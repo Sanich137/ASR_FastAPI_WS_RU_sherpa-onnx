@@ -324,14 +324,12 @@ class Diarizer:
 
     def diarize(self, audio_frames: np.ndarray,
                 num_speakers: int,
-                cluster_threshold: float,
                 min_duration: float,
                 max_gap: float,
                 winlen: float,
                 winstep: float,
                 num_mel_bins: int,
                 nfft: int,
-                merge_cluster_threshold: float,
                 filter_cutoff: float,
                 filter_order: int,
                 batch_size: int,
@@ -467,15 +465,15 @@ class Diarizer:
 
         return merged
 
-    def diarize_and_merge(self, audio_frames: np.ndarray, num_speakers: int, cluster_threshold: float,
-                          min_duration: float, max_gap: float, max_phrase_gap: float,
+    def diarize_and_merge(self, audio_frames: np.ndarray, num_speakers: int, min_duration: float, max_gap: float,
+                          max_phrase_gap: float,
                           winlen: float, winstep: float, num_mel_bins: int, nfft: int,
-                          merge_cluster_threshold: float, filter_cutoff: float, filter_order: int,
+                          filter_cutoff: float, filter_order: int,
                           batch_size: int = 1, cpu_workers: int = 2) -> list[dict]:
         start_time = time.perf_counter()
 
-        raw_result = self.diarize(audio_frames, num_speakers, cluster_threshold, min_duration, max_gap,
-                                  winlen, winstep, num_mel_bins, nfft, merge_cluster_threshold,
+        raw_result = self.diarize(audio_frames, num_speakers, min_duration, max_gap,
+                                  winlen, winstep, num_mel_bins, nfft,
                                   filter_cutoff, filter_order, batch_size, cpu_workers)
         merged_result = self.merge_segments(raw_result, max_phrase_gap)
 
@@ -508,17 +506,18 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int, sample_rat
 if __name__ == "__main__":
     # Параметры диаризации и кластеризации
     num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
-    cluster_threshold = 0.7  # Порог расстояния для кластеризации
 
-    max_phrase_gap = 0.5  # Уменьшено для разделения фраз
-    merge_cluster_threshold = 0.4  # Порог сходства для объединения кластеров в постобработке
+    # Параметры извлечения ембеддингов
+    max_phrase_gap = 0.5  # расстояние между фразами для объединения в один кластер.
     use_gpu_diar = False  # По возможности использовать графический процессор для вычислений
+
+    # Настройки работы GPU/CPU
     if use_gpu_diar:
-        batch_size = 32  # Размер батча для извлечения эмбеддингов 1 если CPU. до 12 если GPU.
+        batch_size = 32  # Размер батча для извлечения эмбеддингов
         max_cpu_workers = 1  # Количество потоков для извлечения эмбедингов.
     else:
-        batch_size = 1  # Размер батча для извлечения эмбеддингов 1 если CPU. до 12 если GPU.
-        max_cpu_workers = os.cpu_count()-1  # 8  # Количество потоков для извлечения эмбедингов.
+        batch_size = 1  # Размер батча для извлечения эмбеддингов
+        max_cpu_workers = os.cpu_count()-1  # Количество потоков для извлечения эмбедингов.
 
 
     # Параметры сегментации (VAD)
@@ -531,7 +530,9 @@ if __name__ == "__main__":
     filter_cutoff = 100.0  # Частота среза высокопроходного фильтра (Гц)
     filter_order = 10  # Порядок фильтра
 
-    # Параметры обработки признаков (fbank)
+    # Параметры обработки признаков (fbank) НЕ МЕНЯТЬ!
+    # Вынесены сюда чтобы имень возможность подстроить под, возможно, другие модели.
+
     winlen = 0.025  # Длина окна для fbank (сек)
     winstep = 0.01  # Шаг окна для fbank (сек)
     num_mel_bins = 80  # Количество мел-фильтров
@@ -539,7 +540,7 @@ if __name__ == "__main__":
 
     # Параметры аудио
     sample_rate = 16000  # Частота дискретизации (Гц)
-    target_frame_size = 512  # Размер фрейма для обработки аудио
+    target_frame_size = 512  # Размер фрейма для обработки аудио, требование Silero VAD
 
     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
@@ -556,7 +557,6 @@ if __name__ == "__main__":
     result = diarizer.diarize_and_merge(
         audio_frames,
         num_speakers=num_speakers,
-        cluster_threshold=cluster_threshold,
         min_duration=min_duration,
         max_gap=max_gap,
         max_phrase_gap=max_phrase_gap,
@@ -564,7 +564,6 @@ if __name__ == "__main__":
         winstep=winstep,
         num_mel_bins=num_mel_bins,
         nfft=nfft,
-        merge_cluster_threshold=merge_cluster_threshold,
         filter_cutoff=filter_cutoff,
         filter_order=filter_order,
         batch_size=batch_size,
