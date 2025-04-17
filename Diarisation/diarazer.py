@@ -1,4 +1,34 @@
 # from intervaltree import IntervalTree
+from Diarisation import diarizer
+from VoiceActivityDetector import vad
+from Diarisation.do_diarize import load_and_preprocess_audio
+from utils.pre_start_init import posted_and_downloaded_audio
+
+async def do_diarizing(
+        file_id:str = None,
+        num_speakers:int = -1,
+        filter_cutoff:int = 100,
+        filter_order:int = 10,
+        ):
+    # Предобработка аудио.
+    audio_frames = load_and_preprocess_audio(posted_and_downloaded_audio[file_id])
+
+    # Непосредственно получение временных меток речи
+    vad.set_mode(5)
+    result = diarizer.diarize_and_merge(
+        audio_frames,
+        num_speakers=num_speakers,
+        filter_cutoff=filter_cutoff,
+        filter_order=filter_order,
+    )
+
+    for r in result:
+        print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
+
+    # Построение структуры аналогично raw_data для дальнейшего построения диалога.
+
+
+
 
 async def do_diarized_dialogue(asr_data: list, diarized_data: list):
     """

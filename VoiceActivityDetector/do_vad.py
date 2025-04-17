@@ -18,7 +18,7 @@ class SileroVAD:
         self.set_mode(3)
         # Параметры сегментации (VAD)
         self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
-        self.max_gap = 0.25  # Максимальный промежуток между сегментами для их объединения (сек)
+        self.max_vad_gap = 1  # Максимальный промежуток между сегментами для их объединения (сек)
 
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 3
@@ -83,7 +83,7 @@ class SileroVAD:
         threshold = self.prob_level
         neg_threshold = threshold - 0.15
         min_speech_duration_ms = int(self.min_duration * 1000)
-        min_silence_duration_ms = int(self.max_gap * 1000)
+        min_silence_duration_ms = int(self.max_vad_gap * 1000)
         speech_pad_ms = 30
         min_speech_samples = sample_rate * min_speech_duration_ms // 1000
         min_silence_samples = sample_rate * min_silence_duration_ms // 1000

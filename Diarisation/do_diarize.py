@@ -12,6 +12,7 @@ from sklearn.cluster import AgglomerativeClustering
 import time
 from umap import UMAP
 from hdbscan import HDBSCAN
+from utils.do_logging import logger
 
 
 # Здесь SileroVAD остаётся только для тестов Диаризации на бою используется класс из do_vad
@@ -28,7 +29,7 @@ class SileroVAD:
         self.set_mode(3)
         # Параметры сегментации (VAD)
         self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
-        self.max_gap = 0.25  # Максимальный промежуток между сегментами для их объединения (сек)
+        self.max_vad_gap = 1  # Максимальный промежуток между сегментами для их объединения (сек)
 
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 3
@@ -57,6 +58,14 @@ class SileroVAD:
             self.prob_level = 0.3
 
     def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
+        """Обработка аудио-фрейма (миничанка)
+                Args:
+                    :param audio_frame: 1D numpy array размером 512 сэмплов
+                    :param sample_rate:
+                Returns:
+                    float: вероятность, что чанк это речь
+                    state: ntreott состояние модели.
+                """
         if len(audio_frame) != self.frame_size:
             audio_frame = np.pad(audio_frame, (0, self.frame_size - len(audio_frame)), mode='constant')[
                           :self.frame_size]
@@ -85,7 +94,7 @@ class SileroVAD:
         threshold = self.prob_level
         neg_threshold = threshold - 0.15
         min_speech_duration_ms = int(self.min_duration * 1000)
-        min_silence_duration_ms = int(self.max_gap * 1000)
+        min_silence_duration_ms = int(self.max_vad_gap * 1000)
         speech_pad_ms = 30
         min_speech_samples = sample_rate * min_speech_duration_ms // 1000
         min_silence_samples = sample_rate * min_silence_duration_ms // 1000
@@ -167,7 +176,6 @@ class SileroVAD:
 
         return segments
 
-
 class Diarizer:
     def __init__(self, embedding_model_path: str,
                  vad,
@@ -177,8 +185,8 @@ class Diarizer:
                  min_duration: float = 0.15,
                  filter_cutoff: int = 100,
                  filter_order: int = 10,
-                 batch_size=1,
-                 cpu_workers=0):
+                 batch_size: int = 1,
+                 cpu_workers: int = 0):
 
         # Параметры VAD
         self.vad = vad
@@ -212,6 +220,7 @@ class Diarizer:
             providers = ['CPUExecutionProvider']
 
         so = ort.SessionOptions()
+        so.log_severity_level = 4
         so.inter_op_num_threads = 0  # Можно увеличить до 4-6
         so.intra_op_num_threads = 0
         so.enable_profiling = False
@@ -220,7 +229,7 @@ class Diarizer:
                                                       sess_options=so,
                                                       providers=providers)
         self.table = {}  # Словарь для хранения эмбеддингов спикеров
-        print(self.embedding_session.get_providers())
+        logger.debug(f"Используемые для диаризации провайдеры {self.embedding_session.get_providers()}")
 
     # Todo - реализовать определение спикеров:
     # def extract_embedding(self, audio_path: str, winlen: float = 0.025, winstep: float = 0.01,
@@ -356,6 +365,7 @@ class Diarizer:
             if current_label is None:
                 current_start, current_end, current_label = start, end, label
             elif label == current_label and start - current_end <= self.max_phrase_gap:
+                logger.debug(f"Объединяем подсегменты: {current_end:.2f} -> {start:.2f}, пауза: {start - current_end:.2f} сек")
                 current_end = end
             else:
                 merged.append({"start": current_start, "end": current_end, "speaker": current_label})
@@ -372,19 +382,19 @@ class Diarizer:
         start_time = time.perf_counter()
 
         # 1. Сегментация VAD
-        print("Начало сегментации...")
+        logger.debug("Начало сегментации...")
         seg_start = time.perf_counter()
         segments = self.vad.get_speech_segments(audio_frames)
         seg_time = time.perf_counter() - seg_start
-        print(f"Процедура: Сегментация (get_speech_segments) - {seg_time:.4f} сек")
+        logger.debug(f"Процедура: Сегментация (get_speech_segments) - {seg_time:.4f} сек")
 
         if not segments:
-            print("Речь не обнаружена")
+            logger.debug("Речь не обнаружена")
             return []
 
         segments = [seg for seg in segments if seg[1] - seg[0] >= self.min_duration]
         if not segments:
-            print("После фильтрации сегментов не осталось")
+            logger.debug("После фильтрации сегментов не осталось")
             return []
 
         # 2. Разделение на подсегменты
@@ -403,23 +413,23 @@ class Diarizer:
             subseg_audios.extend(tmp_subseg_fbanks)
 
         # 3. Извлечение эмбеддингов
-        print("Начало извлечения эмбеддингов...")
+        logger.debug("Начало извлечения эмбеддингов...")
         emb_start = time.perf_counter()
         embeddings = self.extract_embeddings(subseg_audios, subseg_cmn=True)
         emb_time = time.perf_counter() - emb_start
-        print(f"Процедура: Извлечение эмбеддингов (extract_embeddings) - {emb_time:.4f} сек")
+        logger.debug(f"Процедура: Извлечение эмбеддингов (extract_embeddings) - {emb_time:.4f} сек")
 
         if len(embeddings) == 0:
-            print("Не удалось извлечь валидные эмбеддинги")
+            logger.debug("Не удалось извлечь валидные эмбеддинги")
             return []
 
-        print(f"Количество эмбеддингов: {len(embeddings)}")
+        logger.debug(f"Количество эмбеддингов: {len(embeddings)}")
 
         # 4. Нормализация эмбеддингов
         embeddings = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
 
         # 5. Кластеризация
-        print("Начало кластеризации...")
+        logger.debug("Начало кластеризации...")
         clust_start = time.perf_counter()
         if len(embeddings) <= 2:
             labels = [0] * len(embeddings)
@@ -436,39 +446,39 @@ class Diarizer:
                 # Используем Agglomerative Clustering с заданным числом спикеров
                 clustering = AgglomerativeClustering(n_clusters=num_speakers, metric='cosine', linkage='average')
                 labels = clustering.fit_predict(umap_embeddings)
-                print(f"Использовано {num_speakers} спикеров (Agglomerative Clustering)")
+                logger.debug(f"Использовано {num_speakers} спикеров (Agglomerative Clustering)")
             else:
                 # Текущая логика с HDBSCAN
                 labels = HDBSCAN(min_cluster_size=3).fit_predict(umap_embeddings)
-                print(f"Всего labels: {len(labels)}")
+                logger.debug(f"Всего labels: {len(labels)}")
                 if np.all(labels == -1):
-                    print("Все точки помечены как шум, предполагается один спикер")
+                    logger.debug("Все точки помечены как шум, предполагается один спикер")
                     labels = np.zeros_like(labels)
                 else:
                     unique_labels = np.unique(labels)
                     if len(unique_labels) > 1:
                         score = silhouette_score(embeddings, labels, metric='cosine')
-                        print(f"Силуэтный коэффициент: {score:.4f}")
+                        logger.debug(f"Силуэтный коэффициент: {score:.4f}")
                         if score < 0.1:
-                            print("Низкий силуэтный коэффициент, предполагается один спикер")
+                            logger.debug("Низкий силуэтный коэффициент, предполагается один спикер")
                             labels = np.zeros_like(labels)
                     else:
-                        print("Найден только один кластер, силуэтный коэффициент не вычисляется")
+                        logger.debug("Найден только один кластер, силуэтный коэффициент не вычисляется")
 
         clust_time = time.perf_counter() - clust_start
-        print(f"Процедура: Кластеризация - {clust_time:.4f} сек")
-        print(f"Число кластеров: {len(np.unique(labels))}")
+        logger.debug(f"Процедура: Кластеризация - {clust_time:.4f} сек")
+        logger.debug(f"Число кластеров: {len(np.unique(labels))}")
 
         # 6. Объединение подсегментов
-        print("Начало объединения подсегментов...")
+        logger.debug("Начало объединения подсегментов...")
         merge_start = time.perf_counter()
         merged_segments = self.merge_subsegments(subsegs, labels)
         merged_segments = [seg for seg in merged_segments if seg["end"] - seg["start"] >= self.min_duration]
         merge_time = time.perf_counter() - merge_start
-        print(f"Процедура: Объединение подсегментов - {merge_time:.4f} сек")
+        logger.debug(f"Процедура: Объединение подсегментов - {merge_time:.4f} сек")
 
         total_diarize_time = time.perf_counter() - start_time
-        print(f"Процедура: Общая диаризация (diarize) - {total_diarize_time:.4f} сек")
+        logger.debug(f"Процедура: Общая диаризация (diarize) - {total_diarize_time:.4f} сек")
 
         return merged_segments
 
@@ -496,7 +506,7 @@ class Diarizer:
             merged.append(current_phrase)
 
         merge_time = time.perf_counter() - start_time
-        print(f"Процедура: Объединение сегментов (merge_segments) - {merge_time:.4f} сек")
+        logger.debug(f"Процедура: Объединение сегментов (merge_segments) - {merge_time:.4f} сек")
 
         return merged
 
@@ -509,20 +519,20 @@ class Diarizer:
         merged_result = self.merge_segments(raw_result)
 
         total_time = time.perf_counter() - start_time
-        print(f"Процедура: Полная диаризация и объединение (diarize_and_merge) - {total_time:.4f} сек")
+        logger.debug(f"Процедура: Полная диаризация и объединение (diarize_and_merge) - {total_time:.4f} сек")
 
         return merged_result
 
 
-def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512, sample_rate: int = 16000) -> np.ndarray:
+def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int = 512, sample_rate: int = 16000) -> np.ndarray:
     """
-    :param target_frame_size: int = 512 требования для работа SILERO VAD
-    :param sample_rate: int = 16000 требования для работа SILERO VAD
+    :param audio: AudioSegment аудио данные
+    :param target_frame_size: int = 512 требования для работы SILERO VAD
+    :param sample_rate: int = 16000 требования для работы SILERO VAD
     """
 
     start_time = time.perf_counter()
 
-    audio = AudioSegment.from_file(file_path)
     if audio.frame_rate != sample_rate:
         audio = audio.set_frame_rate(sample_rate)
     if audio.channels > 1:
@@ -533,8 +543,8 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512, samp
     frames = samples_float32[:num_frames * target_frame_size].reshape(num_frames, target_frame_size)
 
     load_time = time.perf_counter() - start_time
-    print(f"В работу принято аудио продолжительностью {audio.duration_seconds} сек")
-    print(f"Процедура: Загрузка и предобработка аудио (load_and_preprocess_audio) - {load_time:.4f} сек")
+    logger.debug(f"В работу принято аудио продолжительностью {audio.duration_seconds} сек")
+    logger.debug(f"Процедура: Загрузка и предобработка аудио (load_and_preprocess_audio) - {load_time:.4f} сек")
 
     return frames
 
@@ -550,19 +560,20 @@ if __name__ == "__main__":
     max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
 
     # # Параметры сегментации (VAD)
-    vad_mode = 3  # Режим чувствительности VAD (1, 2, 3, 4, 5)
+    vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
     use_gpu_vad = False  # По возможности использовать графический процессор для вычислений
 
     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
 
-    audio_path = "../trash/long.mp3"
+    audio_path = "../trash/q.wav"
 
     vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
     vad.set_mode(vad_mode)
 
 
-    audio_frames = load_and_preprocess_audio(audio_path)
+    audio = AudioSegment.from_file(audio_path)
+    audio_frames = load_and_preprocess_audio(audio)
     #Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
 
     diarizer = Diarizer(embedding_model_path=str(speaker_model_path),

@@ -5,7 +5,8 @@ import asyncio
 from Punctuation import sbertpunc
 
 # is_async=False, task_id=None, raw_recognition=None):
-async def do_sensitizing(input_asr_json, do_punctuation, is_async = False):
+async def do_sensitizing(input_asr_json:str, do_punctuation: bool = False,
+                         is_async = False):
     """
     :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
     :param is_async: Ранее был реализован сервис постановки задачи на распознавание в работу. И, как следствие,
