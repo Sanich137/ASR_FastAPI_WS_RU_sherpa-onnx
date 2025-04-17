@@ -6,11 +6,19 @@ from pathlib import Path
 import logging as logger
 
 class SileroVAD:
-    def __init__(self, onnx_path: Path, sample_rate: int = 16000, use_gpu=False):
+    def __init__(self, onnx_path: Path, use_gpu=False):
         if use_gpu:
             providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         else:
             providers = ['CPUExecutionProvider']
+        self.sample_rate = 16000
+        self.state = np.zeros((2, 1, 128), dtype=np.float32)
+        self.frame_size = 512
+        self.prob_level = 0.5
+        self.set_mode(3)
+        # Параметры сегментации (VAD)
+        self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
+        self.max_gap = 0.25  # Максимальный промежуток между сегментами для их объединения (сек)
 
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 3
@@ -20,11 +28,6 @@ class SileroVAD:
         self.session = ort.InferenceSession(path_or_bytes=onnx_path,
                                             sess_options=session_options,
                                             providers=providers)
-        self.sample_rate = sample_rate
-        self.state = np.zeros((2, 1, 128), dtype=np.float32)
-        self.frame_size = 512
-        self.prob_level = 0.5
-        self.set_mode(3)
 
     def reset_state(self):
         self.state = np.zeros((2, 1, 128), dtype=np.float32)
@@ -43,45 +46,32 @@ class SileroVAD:
         elif mode == 5:
             self.prob_level = 0.3
 
-    def is_speech(self, audio_frame: np.ndarray, sample_rate = None) -> bool:
+    def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
         """Обработка аудио-фрейма (миничанка)
-        Args:
-            :param audio_frame: 1D numpy array размером 512 сэмплов
-            :param sample_rate:
-        Returns:
-            bool: is_speech or not not speech
-        """
-
+                Args:
+                    :param audio_frame: 1D numpy array размером 512 сэмплов
+                    :param sample_rate:
+                Returns:
+                    float: вероятность, что чанк это речь
+                    state: ntreott состояние модели.
+                """
         if len(audio_frame) != self.frame_size:
-            audio_frame = np.pad(audio_frame, (0, self.frame_size - len(audio_frame)), mode='constant')[:self.frame_size]
+            audio_frame = np.pad(audio_frame, (0, self.frame_size - len(audio_frame)), mode='constant')[
+                          :self.frame_size]
 
         inputs = {
-            'input': audio_frame.reshape(1, -1).astype(np.float32),  # [1, 512]
+            'input': audio_frame.reshape(1, -1).astype(np.float32),
             'state': self.state,
-            'sr': np.array(self.sample_rate, dtype=np.int64)  # scalar int64
+            'sr': np.array(16000, dtype=np.int64)
         }
 
         outputs = self.session.run(['output', 'stateN'], inputs)
-
-        self.state = outputs[1]  # Обновляем состояние
+        self.state = outputs[1]
         prob = float(outputs[0][0, 0])
 
-        logger.debug(f"probs = {prob}")
-        if prob >= self.prob_level:
-            logger.debug("Найден голос")
-            return True, self.state
-        else:
-            return False, self.state
+        return prob, self.state
 
-    def get_speech_segments(self, audio_frames: np.ndarray, min_duration: float, max_gap: float) -> list[tuple]:
-        """Получение сегментов речи с сглаживанием
-        Args:
-            audio_frames: np.ndarray [N, 512] - массив фреймов
-            min_duration: минимальная длительность сегмента в секундах
-            max_gap: максимальный разрыв между сегментами для объединения в секундах
-        Returns:
-            list[tuple[float, float, np.ndarray]]: список (start_time, end_time, audio_segment)
-        """
+    def get_speech_segments(self, audio_frames: np.ndarray) -> list[tuple]:
         if len(audio_frames.shape) == 2:
             audio_frames = audio_frames.flatten()
 
@@ -92,8 +82,8 @@ class SileroVAD:
         # Параметры из get_speech_timestamps
         threshold = self.prob_level
         neg_threshold = threshold - 0.15
-        min_speech_duration_ms = int(min_duration * 1000)
-        min_silence_duration_ms = int(max_gap * 1000)
+        min_speech_duration_ms = int(self.min_duration * 1000)
+        min_silence_duration_ms = int(self.max_gap * 1000)
         speech_pad_ms = 30
         min_speech_samples = sample_rate * min_speech_duration_ms // 1000
         min_silence_samples = sample_rate * min_silence_duration_ms // 1000

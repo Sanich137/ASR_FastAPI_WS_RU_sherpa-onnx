@@ -53,9 +53,9 @@ def find_last_speech_position(socket_id, sample_width = 2):
                 partial_frame_length = len(frame)
                 continue
             else:
-                is_speech, vad_state = vad.is_speech(frame, sample_rate=frame_rate)
-                if not is_speech:
-                    # logger.debug(f"Найден не голос на speech_end = {speech_end-(i+1)*frame_length-partial_frame_length}")
+                speech_prob, vad_state = vad.is_speech(frame)
+                if speech_prob < vad.prob_level:
+                    logger.debug(f"Найден не голос на speech_end = {speech_end-(i+1)*frame_length-partial_frame_length}")
                     silence_frames+=1
                     if silence_frames >= min_silence_frames:
                         break
