@@ -50,10 +50,11 @@ tar xvf cudnn-linux-x86_64-8.9.7.29_cuda12-archive.tar.xz --strip-components=1 -
 ```bash
 source activate-cuda-12.4.sh
 ```
-### Загрузка модели Vosk
-! Из-за конфлика sherpa-onnx и onnx-runtime в проекте, актуальная версия 0.54 не работает. Обновлять не стоит. 
+### Загрузка модели Vosk 0.52. До перехода sherpa-onnx на более новую версию onnxruntime использовать в этом проекте Vosk 0.54 невозможно.
 ```bash
-cd models && git clone https://huggingface.co/alphacep/vosk-model-ru && cd ..
+git clone --filter=blob:none --no-checkout https://huggingface.co/alphacep/vosk-model-ru && \
+cd vosk-model-ru && \
+git checkout 0b81d4985ca88ccf8463cb222f9e284bb0ea06bb
 ```
 ### Загрузка модели GigaAM
 ```bash 
