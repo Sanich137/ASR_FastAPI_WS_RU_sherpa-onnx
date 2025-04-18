@@ -77,7 +77,7 @@ async def receive_file(
 
     # Приводим Файл в моно, если получен параметр "диаризация"
     if params.do_diarization:
-        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_channels(1)
+        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1]
 
     # Приводим фреймрейт к фреймрейту модели
     if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
@@ -135,7 +135,7 @@ async def receive_file(
             res = False
     if params.do_diarization:
         try:
-            result["diarized_data"] = await do_diarizing(post_id)
+            result["diarized_data"] = await do_diarizing(post_id, result['raw_data'])
         except Exception as e:
             logger.error(f"await do_diarizing - {e}")
             error_description = f"do_diarizing - {e}"

@@ -494,13 +494,13 @@ class Diarizer:
 
         for segment in diarized_segments:
             if current_phrase is None:
-                current_phrase = {"start": segment["start"], "end": segment["end"], "speaker": segment["speaker"]}
+                current_phrase = {"start": segment["start"], "end": segment["end"], "speaker": str(segment["speaker"])}
             elif (segment["start"] - current_phrase["end"] <= self.max_phrase_gap and
                   segment["speaker"] == current_phrase["speaker"]):
                 current_phrase["end"] = segment["end"]
             else:
                 merged.append(current_phrase)
-                current_phrase = {"start": segment["start"], "end": segment["end"], "speaker": segment["speaker"]}
+                current_phrase = {"start": segment["start"], "end": segment["end"], "speaker": str(segment["speaker"])}
 
         if current_phrase is not None:
             merged.append(current_phrase)
