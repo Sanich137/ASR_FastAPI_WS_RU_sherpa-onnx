@@ -274,7 +274,7 @@ async def do_diarizing(
     )
 
     for r in diar_result:
-        logger.info(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
+        logger.debug(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
 
 
     # Построение структуры аналогично raw_data для дальнейшего построения диалога и вывод результата

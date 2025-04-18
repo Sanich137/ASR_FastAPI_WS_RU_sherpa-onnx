@@ -78,8 +78,8 @@ async def receive_file(
         return result
 
     # Приводим Файл в моно, если получен параметр "диаризация"
-    if params.do_diarization:
-        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1][0:60000]
+    if params.do_diarization:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
+        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_channels(1) # [1]  # [0:60000]
 
     # Приводим фреймрейт к фреймрейту модели
     if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
@@ -129,6 +129,7 @@ async def receive_file(
         del audio_duration[post_id]
 
     if params.do_echo_clearing:
+        # Todo - Придумать как совместить удаление эха и диаризацию.
         try:
             result["raw_data"] = await remove_echo(result["raw_data"])
         except Exception as e:
@@ -167,6 +168,9 @@ async def receive_file(
     result['success'] = res
 
     del posted_and_downloaded_audio[post_id]
+
+
+    print(result)
 
     return result
 
