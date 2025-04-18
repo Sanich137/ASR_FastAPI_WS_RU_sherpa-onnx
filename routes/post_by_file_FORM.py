@@ -31,7 +31,7 @@ class PostFileRequest(BaseModel):
     do_dialogue: bool = False  # Значение по умолчанию
     do_punctuation: bool = False  # Значение по умолчанию
     do_diarization: bool = False  # Значение по умолчанию
-    diar_vad_sensity: int = 3 # Чувствительность VAD для диаризации
+    diar_vad_sensity: int = 4 # Чувствительность VAD для диаризации
 
 # Функция для извлечения параметров из FormData
 def get_file_request(
@@ -79,7 +79,8 @@ async def receive_file(
 
     # Приводим Файл в моно, если получен параметр "диаризация"
     if params.do_diarization:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
-        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_channels(1) # [1]  # [0:60000]
+        if posted_and_downloaded_audio[post_id].channels > 1:
+            posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1] # [1]  # [0:60000]
 
     # Приводим фреймрейт к фреймрейту модели
     if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
@@ -87,7 +88,9 @@ async def receive_file(
             config.BASE_SAMPLE_RATE)
 
     # Обрабатываем чанки с аудио по 15 секунд.
-    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
+    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono() if
+                                          posted_and_downloaded_audio[post_id].channels > 1
+                                          else [posted_and_downloaded_audio[post_id]]):
 
         audio_buffer[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
         audio_overlap[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)

@@ -26,7 +26,7 @@ class SileroVAD:
         self.state = np.zeros((2, 1, 128), dtype=np.float32)
         self.frame_size = 512
         self.prob_level = 0.5
-        self.set_mode(5)
+        self.set_mode(3)
         # Параметры сегментации (VAD)
         self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
         self.max_vad_gap = 1  # Максимальный промежуток между сегментами для их объединения (сек)
@@ -175,6 +175,7 @@ class SileroVAD:
             segments.append((start, end, audio_segment))
 
         return segments
+
 
 class Diarizer:
     def __init__(self, embedding_model_path: str,
@@ -381,6 +382,7 @@ class Diarizer:
                 filter_order: int,
                 vad_sensity: int
                 ) -> list[dict]:
+        self.vad.reset_state()
         self.vad.set_mode(vad_sensity)
         start_time = time.perf_counter()
         # 1. Сегментация VAD
@@ -407,7 +409,7 @@ class Diarizer:
         subsegs = []
         subseg_audios = []
         for start, end, audio in segments:
-            audio = self.highpass_filter(audio, cutoff=filter_cutoff, filter_order=filter_order)
+            audio = self.highpass_filter(audio, cutoff=self.filter_cutoff, filter_order=self.filter_order)
             seg_id = f"{start:.3f}-{end:.3f}"
             fbank_feats = self.extract_fbank(audio)
             tmp_subsegs, tmp_subseg_fbanks = self.subsegment(fbank_feats, seg_id, window_fs, period_fs, frame_shift)
@@ -425,7 +427,8 @@ class Diarizer:
             logger.debug("Не удалось извлечь валидные эмбеддинги")
             return []
 
-        logger.debug(f"Количество эмбеддингов: {len(embeddings)}")
+        logger.info(f"Количество эмбеддингов: {len(embeddings)}")
+        print(f"Количество эмбеддингов: {len(embeddings)}")
 
         # 4. Нормализация эмбеддингов
         embeddings = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
@@ -513,7 +516,7 @@ class Diarizer:
         return merged
 
     def diarize_and_merge(self, audio_frames: np.ndarray, num_speakers: int,
-                          filter_cutoff: int = 100, filter_order: int = 10,
+                          filter_cutoff: int = 50, filter_order: int = 10,
                           vad_sensity: int = 3
                           ) -> list[dict]:
         start_time = time.perf_counter()
@@ -569,7 +572,7 @@ if __name__ == "__main__":
     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
 
-    audio_path = "../trash/long.mp3"
+    audio_path = "../trash/Роман.mp3"
 
     vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
     vad.set_mode(vad_mode)

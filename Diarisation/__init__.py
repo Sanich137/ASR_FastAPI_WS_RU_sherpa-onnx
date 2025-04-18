@@ -13,8 +13,8 @@ else:
 
     diarizer = Diarizer(embedding_model_path=paths.get("diar_speaker_model_path"),
                         vad=vad,
-                        max_phrase_gap=5,
-                        batch_size=1,
+                        max_phrase_gap=1,
+                        batch_size=32,
                         cpu_workers=0,
                         use_gpu=False)
 

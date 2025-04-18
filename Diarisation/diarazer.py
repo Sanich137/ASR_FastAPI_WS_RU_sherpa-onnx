@@ -257,7 +257,7 @@ async def do_diarizing(
         file_id:str,
         asr_raw_data,
         num_speakers:int = -1,
-        filter_cutoff:int = 100,
+        filter_cutoff:int = 50,
         filter_order:int = 10,
         diar_vad_sensity: int = 3
         ):
