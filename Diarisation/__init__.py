@@ -1,35 +1,21 @@
-import sherpa_onnx
+import config
 from utils.pre_start_init import paths
+from utils.do_logging import logger
+from VoiceActivityDetector import vad
 
-async def init_speaker_diarization(num_speakers: int = -1,
-                                   cluster_threshold: float = 0.3):
+if not paths.get("diar_speaker_model_path").exists():
+    logger.info("Модель Для диаризации отсутствует. "
+                "\nСкачайте её 'https://wenet.org.cn/downloads?models=wespeaker&version=voxblink2_samresnet100_ft.onnx' "
+                "и поместите файл в папку ./models/Diar_model")
+    raise FileExistsError
+else:
+    from .do_diarize import Diarizer
 
-    segmentation_model = str(paths.get("segmentation_model"))
-    embedding_extractor_model = str(paths.get("embedding_extractor_model"))
+    diarizer = Diarizer(embedding_model_path=paths.get("diar_speaker_model_path"),
+                        vad=vad,
+                        max_phrase_gap=1,
+                        batch_size=32,
+                        cpu_workers=0,
+                        use_gpu=False)
 
-    diarization_model_config = sherpa_onnx.OfflineSpeakerDiarizationConfig(
-        segmentation=sherpa_onnx.OfflineSpeakerSegmentationModelConfig(
-            pyannote=sherpa_onnx.OfflineSpeakerSegmentationPyannoteModelConfig(
-                    model=segmentation_model,
-                    ),
-            provider= 'cuda',  # Похоже пока всегда cpu
-            num_threads = 1, # Похоже пока всегда в 1 поток
-            debug = True
-            ),
-        embedding=sherpa_onnx.SpeakerEmbeddingExtractorConfig(
-            model=embedding_extractor_model
-            ),
-        clustering=sherpa_onnx.FastClusteringConfig(
-            num_clusters=num_speakers,
-            threshold= cluster_threshold
-            ),
-        min_duration_on=0.2,
-        min_duration_off=0.4,
-        )
-
-    if not diarization_model_config.validate():
-        raise RuntimeError(
-            "Please check your config and make sure all required files exist"
-        )
-
-    return sherpa_onnx.OfflineSpeakerDiarization(diarization_model_config)
+    logger.info(f"Успешно загружена модель Диаризации")

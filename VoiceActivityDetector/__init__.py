@@ -1,17 +1,8 @@
-from venv import logger
-
 import config
 from utils.pre_start_init import paths
 from utils.do_logging import logger
 import requests
 
-#
-# try:
-#     vad = SileroVAD("silero_v5__vad_orig.onnx")
-# except Exception as e:
-#     logger.error(f'Модель для vad не загружена. Работа не возможна.')
-# else:
-#     logger.info(f"загружена VAD модель ")
 
 if not paths.get("vad_model_path").exists():
     logger.info("Модель silero_vad.onnx отсутствует. Предпринимаем попытку скачать её.")

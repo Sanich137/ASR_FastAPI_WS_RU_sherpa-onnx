@@ -1,11 +1,8 @@
 from pydub import AudioSegment
-import io
 import config
 
 import uuid
 from utils.tokens_to_Result import process_asr_json, process_gigaam_asr
-
-from typing import Annotated
 from utils.pre_start_init import (app,
                                   posted_and_downloaded_audio,
                                   audio_buffer,
@@ -25,6 +22,7 @@ from Recognizer.engine.echoe_clearing import remove_echo
 from fastapi import Depends, File, Form, UploadFile
 from pydantic import BaseModel
 
+from Diarisation.diarazer import do_diarizing
 
 # Определение модели данных для параметров
 class PostFileRequest(BaseModel):
@@ -32,19 +30,25 @@ class PostFileRequest(BaseModel):
     do_echo_clearing: bool = False  # Значение по умолчанию
     do_dialogue: bool = False  # Значение по умолчанию
     do_punctuation: bool = False  # Значение по умолчанию
+    do_diarization: bool = False  # Значение по умолчанию
+    diar_vad_sensity: int = 4 # Чувствительность VAD для диаризации
 
 # Функция для извлечения параметров из FormData
 def get_file_request(
-    keep_raw: bool = Form(default=True),  # Значение по умолчанию
-    do_echo_clearing: bool = Form(default=False),  # Значение по умолчанию
-    do_dialogue: bool = Form(default=False),  # Значение по умолчанию
-    do_punctuation: bool = Form(default=False),  # Значение по умолчанию
+    keep_raw: bool = Form(default=True, description="Если используются дополнительные параметры, то сохранять или нет в выводе сырые данные."),  # Значение по умолчанию
+    do_echo_clearing: bool = Form(default=False, description="Пытаться ли убирать межканальное эхо на основе повторяющихся или близких слов."),  # Значение по умолчанию
+    do_dialogue: bool = Form(default=False, description="Строить ли диалог/разбивать ли на фразы при выводе текста."),  # Значение по умолчанию
+    do_punctuation: bool = Form(default=False, description="Восстанавливать ли пунктуацию."),  # Значение по умолчанию
+    do_diarization: bool = Form(default=False, description="Разделять ли речь на спикеров по голосу. Затраты времени где-то  1 к 10 в зависимости от количества ядер CPU"),  # Значение по умолчанию
+    diar_vad_sensity: int = Form(default=3, description="Чувствительность VAD для диаризации. Для шумного или быстрого диалога рекомендуется повысить до 4"),  # Значение по умолчанию
 ) -> PostFileRequest:
     return PostFileRequest(
         keep_raw=keep_raw,
         do_echo_clearing=do_echo_clearing,
         do_dialogue=do_dialogue,
         do_punctuation=do_punctuation,
+        do_diarization=do_diarization,
+        diar_vad_sensity = diar_vad_sensity
     )
 
 @app.post("/post_file")
@@ -52,14 +56,8 @@ async def receive_file(
     file: UploadFile = File(description="Аудиофайл для обработки"),
     params: PostFileRequest = Depends(get_file_request)
 ):
-
-    """
-    :param file: Файл, который будет обработан.
-    :param params:
-    :return:
-
-    """
     res = False
+    diarized = False
     error_description = str()
     result = {
         "success":res,
@@ -67,6 +65,7 @@ async def receive_file(
         "raw_data": dict(),
         "sentenced_data": dict(),
     }
+
     post_id = uuid.uuid4()
     logger.debug(f'Принят новый "post_file"  id = {post_id}')
 
@@ -78,13 +77,20 @@ async def receive_file(
 
         return result
 
+    # Приводим Файл в моно, если получен параметр "диаризация"
+    if params.do_diarization:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
+        if posted_and_downloaded_audio[post_id].channels > 1:
+            posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1] # [1]  # [0:60000]
+
     # Приводим фреймрейт к фреймрейту модели
     if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
         posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_frame_rate(
             config.BASE_SAMPLE_RATE)
 
     # Обрабатываем чанки с аудио по 15 секунд.
-    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
+    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono() if
+                                          posted_and_downloaded_audio[post_id].channels > 1
+                                          else [posted_and_downloaded_audio[post_id]]):
 
         audio_buffer[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
         audio_overlap[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
@@ -126,16 +132,31 @@ async def receive_file(
         del audio_duration[post_id]
 
     if params.do_echo_clearing:
+        # Todo - Придумать как совместить удаление эха и диаризацию.
         try:
             result["raw_data"] = await remove_echo(result["raw_data"])
         except Exception as e:
             logger.error(f"Error echo clearing - {e}")
             error_description = f"Error echo clearing - {e}"
             res = False
+    if params.do_diarization:
+        try:
+            result["diarized_data"] = await do_diarizing(post_id, result['raw_data'],
+                                                         diar_vad_sensity = params.diar_vad_sensity)
+        except Exception as e:
+            logger.error(f"await do_diarizing - {e}")
+            error_description = f"do_diarizing - {e}"
+            res = False
+        else:
+            diarized = True
+
 
     if params.do_dialogue:
+        data_to_do_sensitizing = result["diarized_data"] if diarized else result["raw_data"]
+
         try:
-            result["sentenced_data"] = await do_sensitizing(result["raw_data"], params.do_punctuation)
+            result["sentenced_data"] = await do_sensitizing(data_to_do_sensitizing,
+                                                            do_punctuation=params.do_punctuation)
         except Exception as e:
             logger.error(f"await do_sensitizing - {e}")
             error_description = f"do_sensitizing - {e}"
@@ -150,6 +171,9 @@ async def receive_file(
     result['success'] = res
 
     del posted_and_downloaded_audio[post_id]
+
+
+    print(result)
 
     return result
 
