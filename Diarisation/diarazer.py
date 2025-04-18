@@ -1,10 +1,13 @@
-from Diarisation import diarizer
+import config
 from Diarisation.do_diarize import load_and_preprocess_audio
 from utils.pre_start_init import posted_and_downloaded_audio
 from utils.do_logging import logger
 from collections import defaultdict
 
 from collections import defaultdict
+
+if config.CAN_DIAR:
+    from Diarisation import diarizer
 
 
 def match_asr_with_diarization(asr_data, diarization_data, min_overlap_ratio=0.5,

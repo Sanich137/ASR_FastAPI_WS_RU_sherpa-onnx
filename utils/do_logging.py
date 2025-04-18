@@ -4,7 +4,7 @@ from fastapi.logger import logging
 
 logger = logging.getLogger(__name__)
 
-if config.IS_PROD == 1:
+if config.IS_PROD:
     logging.basicConfig(
         filename=config.FILENAME,
         filemode=config.FILEMODE,

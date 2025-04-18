@@ -4,6 +4,7 @@ from utils.do_logging import logger
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
+import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 paths = {
@@ -31,7 +32,7 @@ paths = {
 
     "punctuation_model_path": BASE_DIR / "models" / "sbert_punc_case_ru_onnx",
     "vad_model_path": BASE_DIR / "models" / "VAD_silero_v5" / "silero_vad.onnx",
-    "diar_speaker_model_path": BASE_DIR / "models" / "Diar_model" / "voxblink2_samresnet100_ft.onnx",
+    "diar_speaker_model_path": BASE_DIR / "models" / "DIARISATION_model" / f"{config.DIAR_MODEL_NAME}.onnx",
 
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'111.wav',

@@ -51,6 +51,7 @@ def get_file_request(
         diar_vad_sensity = diar_vad_sensity
     )
 
+
 @app.post("/post_file")
 async def receive_file(
     file: UploadFile = File(description="Аудиофайл для обработки"),
@@ -59,6 +60,7 @@ async def receive_file(
     res = False
     diarized = False
     error_description = str()
+
     result = {
         "success":res,
         "error_description": error_description,
@@ -72,15 +74,20 @@ async def receive_file(
     if "audio" in file.content_type:
         posted_and_downloaded_audio[post_id] = AudioSegment.from_file(file.file)
     else:
-        result["success"] = False
-        result["error_description"] = "Not audio file received"
+        res = False
+        error_description += "Not audio file received"
 
         return result
 
     # Приводим Файл в моно, если получен параметр "диаризация"
-    if params.do_diarization:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
+    if params.do_diarization and config.CAN_DIAR:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
         if posted_and_downloaded_audio[post_id].channels > 1:
             posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1] # [1]  # [0:60000]
+    elif params.do_diarization and not config.CAN_DIAR:
+        params.do_diarization = False
+        error_description += "Diarization is not available\n"
+        logger.error("Запрошена диаризация, но она не доступна.")
+
 
     # Приводим фреймрейт к фреймрейту модели
     if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
@@ -173,7 +180,7 @@ async def receive_file(
     del posted_and_downloaded_audio[post_id]
 
 
-    print(result)
+    logger.debug(result)
 
     return result
 

@@ -16,7 +16,7 @@ LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
 LOGGING_FORMAT = os.getenv('LOGGING_FORMAT', u'#%(levelname)-8s %(filename)s [LINE:%(lineno)d] [%(asctime)s]  %(message)s')
 FILENAME = os.getenv('FILENAME', f'logs/ASR-{datetime.datetime.now().date()}.log')
 FILEMODE = os.getenv('FILEMODE', 'a')
-IS_PROD = int(os.getenv('IS_PROD', 1))
+IS_PROD = True if int(os.getenv('IS_PROD', 1))==1 else False
 
 # Recognition_settings
 MAX_OVERLAP_DURATION = 15  # Максимальная продолжительность буфера аудио (зависит от модели) приемлемый диапазон 10-15 сек.
@@ -30,8 +30,12 @@ VAD_WITH_GPU = os.getenv('VAD_WITH_GPU', False)
 PUNCTUATE_WITH_GPU = os.getenv('VAD_WITH_GPU', True)   # Если потребуется onnxruntime > 1.17.1, то изменить на False (ограничения sherpa-onnx)
 
 # Diarisation_settings
+CAN_DIAR = True if int(os.getenv('CAN_DIAR', 0)) == 1 else False
+DIAR_MODEL_NAME = os.getenv('DIAR_MODEL_NAME', "voxblink2_samresnet100_ft")
 DIAR_WITH_GPU = os.getenv('DIAR_WITH_GPU', False)
 CPU_WORKERS = int(os.getenv('CPU_WORKERS', 0)) # Для значений меньше 1 будут использованы все доступные ядра -1. При больше 1  - указанное число ядер CPU. Работает только при GPU True
+
+
 
 print(f"Using '{LOGGING_LEVEL}' LOGGING_LEVEL")
 

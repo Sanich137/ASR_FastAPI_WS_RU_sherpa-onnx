@@ -30,8 +30,15 @@ onnxruntime-gpu==1.17.1
 transformers~=4.51.0
 
 # For diarisation
-scikit-learn
+scikit-learn==1.5.2  # Понижен, чтоыбы избегать варнингов
+python_speech_features
+umap-learn
+hdbscan
 
+
+# for VAD
+requests~=2.32.3
+
+# For monitoring
 pynvml~=12.0.0
 nvidia-ml-py~=12.570.86
-requests~=2.32.3

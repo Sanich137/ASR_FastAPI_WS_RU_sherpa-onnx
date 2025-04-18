@@ -12,8 +12,8 @@ from sklearn.cluster import AgglomerativeClustering
 import time
 from umap import UMAP
 from hdbscan import HDBSCAN
-# from utils.do_logging import logger
-import logging as logger
+from utils.do_logging import logger
+# import logging as logger
 
 # Здесь SileroVAD остаётся только для тестов Диаризации на бою используется класс из do_vad
 class SileroVAD:
@@ -427,8 +427,7 @@ class Diarizer:
             logger.debug("Не удалось извлечь валидные эмбеддинги")
             return []
 
-        logger.info(f"Количество эмбеддингов: {len(embeddings)}")
-        print(f"Количество эмбеддингов: {len(embeddings)}")
+        logger.debug(f"Количество эмбеддингов: {len(embeddings)}")
 
         # 4. Нормализация эмбеддингов
         embeddings = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
