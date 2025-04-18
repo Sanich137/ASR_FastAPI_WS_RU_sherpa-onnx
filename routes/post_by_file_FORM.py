@@ -31,6 +31,7 @@ class PostFileRequest(BaseModel):
     do_dialogue: bool = False  # Значение по умолчанию
     do_punctuation: bool = False  # Значение по умолчанию
     do_diarization: bool = False  # Значение по умолчанию
+    diar_vad_sensity: int = 3 # Чувствительность VAD для диаризации
 
 # Функция для извлечения параметров из FormData
 def get_file_request(
@@ -39,14 +40,15 @@ def get_file_request(
     do_dialogue: bool = Form(default=False, description="Строить ли диалог/разбивать ли на фразы при выводе текста."),  # Значение по умолчанию
     do_punctuation: bool = Form(default=False, description="Восстанавливать ли пунктуацию."),  # Значение по умолчанию
     do_diarization: bool = Form(default=False, description="Разделять ли речь на спикеров по голосу. Затраты времени где-то  1 к 10 в зависимости от количества ядер CPU"),  # Значение по умолчанию
-
+    diar_vad_sensity: int = Form(default=3, description="Чувствительность VAD для диаризации. Для шумного или быстрого диалога рекомендуется повысить до 4"),  # Значение по умолчанию
 ) -> PostFileRequest:
     return PostFileRequest(
         keep_raw=keep_raw,
         do_echo_clearing=do_echo_clearing,
         do_dialogue=do_dialogue,
         do_punctuation=do_punctuation,
-        do_diarization=do_diarization
+        do_diarization=do_diarization,
+        diar_vad_sensity = diar_vad_sensity
     )
 
 @app.post("/post_file")
@@ -77,7 +79,7 @@ async def receive_file(
 
     # Приводим Файл в моно, если получен параметр "диаризация"
     if params.do_diarization:
-        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1]
+        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1][0:60000]
 
     # Приводим фреймрейт к фреймрейту модели
     if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
@@ -135,7 +137,8 @@ async def receive_file(
             res = False
     if params.do_diarization:
         try:
-            result["diarized_data"] = await do_diarizing(post_id, result['raw_data'])
+            result["diarized_data"] = await do_diarizing(post_id, result['raw_data'],
+                                                         diar_vad_sensity = params.diar_vad_sensity)
         except Exception as e:
             logger.error(f"await do_diarizing - {e}")
             error_description = f"do_diarizing - {e}"

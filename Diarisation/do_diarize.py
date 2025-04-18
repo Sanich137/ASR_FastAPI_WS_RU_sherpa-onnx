@@ -12,8 +12,8 @@ from sklearn.cluster import AgglomerativeClustering
 import time
 from umap import UMAP
 from hdbscan import HDBSCAN
-from utils.do_logging import logger
-
+# from utils.do_logging import logger
+import logging as logger
 
 # Здесь SileroVAD остаётся только для тестов Диаризации на бою используется класс из do_vad
 class SileroVAD:
@@ -26,15 +26,15 @@ class SileroVAD:
         self.state = np.zeros((2, 1, 128), dtype=np.float32)
         self.frame_size = 512
         self.prob_level = 0.5
-        self.set_mode(3)
+        self.set_mode(5)
         # Параметры сегментации (VAD)
         self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
         self.max_vad_gap = 1  # Максимальный промежуток между сегментами для их объединения (сек)
 
         session_options = ort.SessionOptions()
-        session_options.log_severity_level = 3
-        session_options.inter_op_num_threads = 4
-        session_options.intra_op_num_threads = 4
+        session_options.log_severity_level = 4
+        session_options.inter_op_num_threads = 0
+        session_options.intra_op_num_threads = 0
 
         self.session = ort.InferenceSession(path_or_bytes=onnx_path,
                                             sess_options=session_options,
@@ -53,9 +53,9 @@ class SileroVAD:
         elif mode == 3:
             self.prob_level = 0.5
         elif mode == 4:
-            self.prob_level = 0.4
-        elif mode == 5:
             self.prob_level = 0.3
+        elif mode == 5:
+            self.prob_level = 0.15
 
     def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
         """Обработка аудио-фрейма (миничанка)
@@ -374,13 +374,15 @@ class Diarizer:
             merged.append({"start": current_start, "end": current_end, "speaker": current_label})
         return merged
 
+
     def diarize(self, audio_frames: np.ndarray,
                 num_speakers: int,
                 filter_cutoff: float,
                 filter_order: int,
+                vad_sensity: int
                 ) -> list[dict]:
+        self.vad.set_mode(vad_sensity)
         start_time = time.perf_counter()
-
         # 1. Сегментация VAD
         logger.debug("Начало сегментации...")
         seg_start = time.perf_counter()
@@ -511,11 +513,12 @@ class Diarizer:
         return merged
 
     def diarize_and_merge(self, audio_frames: np.ndarray, num_speakers: int,
-                          filter_cutoff: int = 100, filter_order: int = 10
+                          filter_cutoff: int = 100, filter_order: int = 10,
+                          vad_sensity: int = 3
                           ) -> list[dict]:
         start_time = time.perf_counter()
 
-        raw_result = self.diarize(audio_frames, num_speakers, filter_cutoff, filter_order)
+        raw_result = self.diarize(audio_frames, num_speakers, filter_cutoff, filter_order, vad_sensity)
         merged_result = self.merge_segments(raw_result)
 
         total_time = time.perf_counter() - start_time
@@ -536,7 +539,7 @@ def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int = 512,
     if audio.frame_rate != sample_rate:
         audio = audio.set_frame_rate(sample_rate)
     if audio.channels > 1:
-        audio = audio.split_to_mono()[1][0:180000]
+        audio = audio.split_to_mono()[1][0:60000]
     samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
     samples_float32 = samples.astype(np.float32) / 32768.0
     num_frames = len(samples_float32) // target_frame_size
@@ -554,7 +557,7 @@ if __name__ == "__main__":
     num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
 
     # Параметры извлечения ембеддингов
-    max_phrase_gap = 0.5  # расстояние между фразами для объединения в один кластер.
+    max_phrase_gap = 1  # расстояние между фразами для объединения в один кластер.
     use_gpu_diar = False  # По возможности использовать графический процессор для вычислений
     batch_size = 32  # Размер батча для извлечения эмбеддингов при работе GPU
     max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
@@ -566,7 +569,7 @@ if __name__ == "__main__":
     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
 
-    audio_path = "../trash/q.wav"
+    audio_path = "../trash/long.mp3"
 
     vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
     vad.set_mode(vad_mode)
@@ -587,8 +590,9 @@ if __name__ == "__main__":
     result = diarizer.diarize_and_merge(
         audio_frames,
         num_speakers=num_speakers,
-        filter_cutoff=100,
+        filter_cutoff=50,
         filter_order=10,
+        vad_sensity=vad_mode
     )
 
     for r in result:

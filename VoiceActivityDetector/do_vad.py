@@ -17,13 +17,13 @@ class SileroVAD:
         self.prob_level = 0.5
         self.set_mode(3)
         # Параметры сегментации (VAD)
-        self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
+        self.min_duration = 0.1  # Минимальная длительность речевого сегмента (сек)
         self.max_vad_gap = 1  # Максимальный промежуток между сегментами для их объединения (сек)
 
         session_options = ort.SessionOptions()
-        session_options.log_severity_level = 3
-        session_options.inter_op_num_threads = 4
-        session_options.intra_op_num_threads = 4
+        session_options.log_severity_level = 4
+        session_options.inter_op_num_threads = 0
+        session_options.intra_op_num_threads = 0
 
         self.session = ort.InferenceSession(path_or_bytes=onnx_path,
                                             sess_options=session_options,
@@ -42,9 +42,9 @@ class SileroVAD:
         elif mode == 3:
             self.prob_level = 0.5
         elif mode == 4:
-            self.prob_level = 0.4
-        elif mode == 5:
             self.prob_level = 0.3
+        elif mode == 5:
+            self.prob_level = 0.15
 
     def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
         """Обработка аудио-фрейма (миничанка)
