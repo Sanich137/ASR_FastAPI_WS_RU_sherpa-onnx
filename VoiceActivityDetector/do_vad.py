@@ -29,7 +29,7 @@ class SileroVAD:
                                             sess_options=session_options,
                                             providers=providers)
 
-    def reset_state(self):
+    async def reset_state(self):
         self.state = np.zeros((2, 1, 128), dtype=np.float32)
 
     def set_mode(self, mode: int):
@@ -46,7 +46,7 @@ class SileroVAD:
         elif mode == 5:
             self.prob_level = 0.15
 
-    def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
+    async def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
         """Обработка аудио-фрейма (миничанка)
                 Args:
                     :param audio_frame: 1D numpy array размером 512 сэмплов
@@ -71,7 +71,7 @@ class SileroVAD:
 
         return prob, self.state
 
-    def get_speech_segments(self, audio_frames: np.ndarray) -> list[tuple]:
+    async def get_speech_segments(self, audio_frames: np.ndarray) -> list[tuple]:
         if len(audio_frames.shape) == 2:
             audio_frames = audio_frames.flatten()
 
@@ -90,13 +90,13 @@ class SileroVAD:
         speech_pad_samples = sample_rate * speech_pad_ms // 1000
 
         # Получение вероятностей речи
-        self.reset_state()
+        await self.reset_state()
         speech_probs = []
         for current_start in range(0, audio_length_samples, window_size_samples):
             chunk = audio_frames[current_start:current_start + window_size_samples]
             if len(chunk) < window_size_samples:
                 chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
-            prob, new_state = self.is_speech(chunk)
+            prob, new_state = await self.is_speech(chunk)
             self.state = new_state
             speech_probs.append(prob)
 
@@ -168,7 +168,7 @@ class SileroVAD:
 
 def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> np.ndarray:
 
-    """Загрузка аудио и подготовка фреймов для обработки файла целиком"""
+    """Тестовая Загрузка аудио и подготовка фреймов для обработки файла целиком"""
 
     audio = AudioSegment.from_file(file_path)
 
@@ -193,31 +193,32 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> n
     return np.array(frames)
 
 
-if __name__ == "__main__":
-    from datetime import datetime as dt
-
-    # Инициализация VAD
-    print("Инициализация VAD...")
-    vad = SileroVAD(Path("../models/VAD_silero_v5/silero_vad.onnx"), use_gpu=False)
-    vad.set_mode(3)
-    # Загрузка и подготовка аудио
-    audio_file = Path("C:/Users/kojevnikov/PycharmProjects/Sherpa_onnx_vosk_GPU/trash/q.Wav")
-    audio_frames = load_and_preprocess_audio(audio_file)
-
-    print(f"\nЗагружено {len(audio_frames)} фреймов по {vad.frame_size} сэмплов")
-
-    time_start = dt.now()
-    # Обработка каждого фрейма
-    # # -- скорость тестирование
-    # for i, frame in enumerate(audio_frames):
-    #     vad.is_speech(frame)
-    #     if i>10:
-    #         break
-
-    # Получение фрагментов аудио
-    audio_segments = vad.get_speech_segments(audio_frames, min_duration=0.3, max_gap=0.4)
-
-    for start, end, audio in audio_segments:
-        print(f"Сегмент: {start:.2f}s - {end:.2f}s, длина аудио: {len(audio)} сэмплов")
-
-    print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")
+# if __name__ == "__main__":
+    # Todo - перевести тест на работу в асинхронном режиме.
+    # from datetime import datetime as dt
+    #
+    # # Инициализация VAD
+    # print("Инициализация VAD...")
+    # vad = SileroVAD(Path("../models/VAD_silero_v5/silero_vad.onnx"), use_gpu=False)
+    # vad.set_mode(3)
+    # # Загрузка и подготовка аудио
+    # audio_file = Path("C:/Users/kojevnikov/PycharmProjects/Sherpa_onnx_vosk_GPU/trash/q.Wav")
+    # audio_frames = load_and_preprocess_audio(audio_file)
+    #
+    # print(f"\nЗагружено {len(audio_frames)} фреймов по {vad.frame_size} сэмплов")
+    #
+    # time_start = dt.now()
+    # # Обработка каждого фрейма
+    # # # -- скорость тестирование
+    # # for i, frame in enumerate(audio_frames):
+    # #     vad.is_speech(frame)
+    # #     if i>10:
+    # #         break
+    #
+    # # Получение фрагментов аудио
+    # audio_segments = await vad.get_speech_segments(audio_frames, min_duration=0.3, max_gap=0.4)
+    #
+    # for start, end, audio in audio_segments:
+    #     print(f"Сегмент: {start:.2f}s - {end:.2f}s, длина аудио: {len(audio)} сэмплов")
+    #
+    # print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")

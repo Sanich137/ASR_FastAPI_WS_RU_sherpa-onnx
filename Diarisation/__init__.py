@@ -2,12 +2,13 @@ import config
 from utils.pre_start_init import paths
 from utils.do_logging import logger
 from VoiceActivityDetector import vad
+from collections import defaultdict
 import requests
 
 
 if config.CAN_DIAR:
     if not paths.get("diar_speaker_model_path").exists():
-        logger.error(f"Модель для диаризации не найдена. Предпринимаются попытки скачать {config.DIAR_MODEL_NAME}.onnx")
+        logger.error(f"Модель для диаризации не найдена. Предпринимаются попытки скачать {config.DIAR_MODEL_NAME}")
         output_path = paths.get("diar_speaker_model_path")
         api_url = "https://modelscope.cn/api/v1/datasets/wenet/wespeaker_pretrained_models/oss/tree"
 
@@ -16,11 +17,22 @@ if config.CAN_DIAR:
             response = requests.get(api_url, headers={"User-Agent": "Mozilla/5.0"})
             response.raise_for_status()
             # 2. Ищем нужный файл
-            target_file = "voxblink2_samresnet100_ft.onnx"
+            target_file = config.DIAR_MODEL_NAME
             file_data = next((item for item in response.json()["Data"] if item["Key"] == target_file), None)
 
             if not file_data:
-                raise Exception("Файл не найден в API") # Todo - указать тут список доступных моделей из response.json()["Data"]
+                logger.error(f"Модели с именем {config.DIAR_MODEL_NAME} в списке возможных для загрузки нет.")
+                # Получаем список всех ONNX-моделей
+                onnx_models_with_size = [
+                    (item['Key'].split(".")[0], item['Size'] // (1024 * 1024))
+                    for item in response.json()["Data"]
+                    if item['Key'].endswith('.onnx')
+                ]
+                logger.info("Доступны для скачивания следующие модели:")
+                for name, size in sorted(onnx_models_with_size):
+                    logger.info(f"{name} - {size} MB")
+
+                raise Exception("Файл не найден в API")
 
             # 3. Скачиваем по прямой ссылке
             download_url = file_data["Url"]
@@ -36,7 +48,7 @@ if config.CAN_DIAR:
             logger.info(f"Модель успешно загружена : {output_path}")
 
     else:
-        logger.info(f"Будет использован имеющийся файл {config.DIAR_MODEL_NAME}")
+        logger.debug(f"Будет использован имеющийся файл {config.DIAR_MODEL_NAME}")
 
 
     if not paths.get("diar_speaker_model_path").exists():

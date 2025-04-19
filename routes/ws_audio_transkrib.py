@@ -109,7 +109,7 @@ async def websocket(ws: WebSocket):
                 if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds >= config.MAX_OVERLAP_DURATION:
 
                     # Проверяем новый чанк перед объединением (там же режем хвост и добавляем его при необходимости)
-                    find_last_speech_position(client_id)
+                    await find_last_speech_position(client_id)
 
                 else:
                     continue
@@ -127,7 +127,7 @@ async def websocket(ws: WebSocket):
                         # Копим ответы для пунктуации
                         ws_collected_asr_res[client_id][f"channel_{1}"].append(asr_result_words)
                     else:
-                        asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
+                        asr_result_w_conf = await recognise_w_calculate_confidence(audio_to_asr[client_id],
                                                                              num_trials=config.RECOGNITION_ATTEMPTS)
 
                         asr_result_words = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
@@ -207,7 +207,7 @@ async def websocket(ws: WebSocket):
                 ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
                 logger.debug(last_result)
             else:
-                asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[client_id],
+                asr_result_w_conf = await recognise_w_calculate_confidence(audio_to_asr[client_id],
                                                                      num_trials=config.RECOGNITION_ATTEMPTS)
                 last_result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
                 audio_duration[client_id] += audio_to_asr[client_id].duration_seconds

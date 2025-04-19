@@ -111,7 +111,7 @@ async def receive_file(
                 overlap+=AudioSegment.silent(3000, frame_rate=config.BASE_SAMPLE_RATE)
 
             audio_buffer[post_id] = overlap  # Кривизна вызвана особенностями реализации буфера в сокетах
-            find_last_speech_position(post_id)
+            await find_last_speech_position(post_id)
 
             # Обрабатываем основной массив данных
             try:

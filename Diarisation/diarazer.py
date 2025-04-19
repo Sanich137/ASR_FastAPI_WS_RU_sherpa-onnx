@@ -9,6 +9,37 @@ from collections import defaultdict
 if config.CAN_DIAR:
     from Diarisation import diarizer
 
+async def do_diarizing(
+        file_id:str,
+        asr_raw_data,
+        num_speakers:int = -1,
+        filter_cutoff:int = 50,
+        filter_order:int = 10,
+        diar_vad_sensity: int = 3
+        ):
+    # Предобработка аудио.
+    audio_frames = await load_and_preprocess_audio(posted_and_downloaded_audio[file_id])
+
+    # Непосредственно получение временных меток речи
+    diar_result = await diarizer.diarize_and_merge(
+        audio_frames,
+        num_speakers=num_speakers,
+        filter_cutoff=filter_cutoff,
+        filter_order=filter_order,
+        vad_sensity=diar_vad_sensity
+    )
+
+    for r in diar_result:
+        logger.debug(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
+
+
+    # Построение структуры аналогично raw_data для дальнейшего построения диалога и вывод результата
+#     return merge_asr_diarisation(asr_raw_data, diar_result)
+    return match_asr_with_diarization(asr_raw_data, diar_result)
+
+
+
+
 
 def match_asr_with_diarization(asr_data, diarization_data, min_overlap_ratio=0.5,
                                max_pause=2.0, group_unmatched_words=True):
@@ -161,84 +192,6 @@ def match_asr_with_diarization(asr_data, diarization_data, min_overlap_ratio=0.5
 
     return dict(result)
 
-
-
-def merge_asr_diarisation(asr_data, diarisation_data):
-    def intersection(start1, end1, start2, end2):
-        return max(0, min(end1, end2) - max(start1, start2))
-
-    # Извлекаем все слова из asr_data
-    words = []
-    for block in asr_data["channel_1"]:
-        for word_info in block["data"]["result"]:
-            words.append({
-                "start": word_info["start"],
-                "end": word_info["end"],
-                "word": word_info["word"],
-                "conf": word_info["conf"]
-            })
-
-    # Присваиваем спикеров словам
-    speaker_words = {}
-    for word in words:
-        assigned_speaker = "Unknown"
-        for dia_block in diarisation_data:
-            # Проверяем, попадает ли слово в интервал блока диаризации
-            if dia_block["start"] <= word["start"] <= dia_block["end"] or \
-                    dia_block["start"] <= word["end"] <= dia_block["end"] or \
-                    intersection(word["start"], word["end"], dia_block["start"], dia_block["end"]) > 0:
-                assigned_speaker = dia_block["speaker"]
-                break
-        if assigned_speaker not in speaker_words:
-            speaker_words[assigned_speaker] = []
-        speaker_words[assigned_speaker].append(word)
-
-    # Группируем слова в блоки для каждого спикера
-    speaker_blocks = {}
-    for speaker, words in speaker_words.items():
-        groups = group_words(words)
-        speaker_blocks[speaker] = []
-        for group in groups:
-            text = " ".join([w["word"] for w in group])
-            speaker_blocks[speaker].append({
-                "data": {
-                    "result": group,
-                    "text": text
-                }
-            })
-
-    # Обрабатываем блоки diarisation_data без слов
-    for dia_block in diarisation_data:
-        speaker = dia_block["speaker"]
-        start = dia_block["start"]
-        end = dia_block["end"]
-        has_words = False
-        for word in words:
-            if intersection(start, end, word["start"], word["end"]) > 0 or \
-                    (start <= word["start"] <= end) or (start <= word["end"] <= end):
-                has_words = True
-                break
-        if not has_words:
-            if speaker not in speaker_blocks:
-                speaker_blocks[speaker] = []
-            speaker_blocks[speaker].append({
-                "data": {
-                    "result": [{
-                        "start": start,
-                        "end": end,
-                        "word": "...не разборчиво..."
-                    }],
-                    "text": "...не разборчиво..."
-                }
-            })
-
-    # Сортируем блоки по времени начала
-    for speaker in speaker_blocks:
-        speaker_blocks[speaker].sort(key=lambda x: x["data"]["result"][0]["start"])
-
-    return speaker_blocks
-
-
 def group_words(words):
     if not words:
         return []
@@ -256,186 +209,13 @@ def group_words(words):
     return groups
 
 
-async def do_diarizing(
-        file_id:str,
-        asr_raw_data,
-        num_speakers:int = -1,
-        filter_cutoff:int = 50,
-        filter_order:int = 10,
-        diar_vad_sensity: int = 3
-        ):
-    # Предобработка аудио.
-    audio_frames = load_and_preprocess_audio(posted_and_downloaded_audio[file_id])
-
-    # Непосредственно получение временных меток речи
-    diar_result = diarizer.diarize_and_merge(
-        audio_frames,
-        num_speakers=num_speakers,
-        filter_cutoff=filter_cutoff,
-        filter_order=filter_order,
-        vad_sensity=diar_vad_sensity
-    )
-
-    for r in diar_result:
-        logger.debug(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
-
-
-    # Построение структуры аналогично raw_data для дальнейшего построения диалога и вывод результата
-#     return merge_asr_diarisation(asr_raw_data, diar_result)
-    return match_asr_with_diarization(asr_raw_data, diar_result)
-
-
-
-
 if __name__ == "__main__":
-    asr_raw_data = {
-      "channel_1": [
-        {
-          "data": {
-            "result": [
-              {
-                "conf": 1.0,
-                "start": 2.08,
-                "end": 2.28,
-                "word": "алло"
-              }
-            ],
-            "text": "алло"
-          }
-        },
-        {
-          "data": {
-            "result": [
-              {
-                "conf": 1.0,
-                "start": 19.84,
-                "end": 19.88,
-                "word": "ну"
-              },
-              {
-                "conf": 1.0,
-                "start": 20.48,
-                "end": 20.72,
-                "word": "давай"
-              },
-              {
-                "conf": 1.0,
-                "start": 20.92,
-                "end": 20.96,
-                "word": "да"
-              },
-              {
-                "conf": 1.0,
-                "start": 21.2,
-                "end": 21.56,
-                "word": "проверим"
-              },
-              {
-                "conf": 1.0,
-                "start": 21.72,
-                "end": 21.84,
-                "word": "вот"
-              },
-              {
-                "conf": 1.0,
-                "start": 21.96,
-                "end": 21.96,
-                "word": "я"
-              },
-              {
-                "conf": 1.0,
-                "start": 22.08,
-                "end": 22.16,
-                "word": "что"
-              },
-              {
-                "conf": 1.0,
-                "start": 22.32,
-                "end": 22.36,
-                "word": "то"
-              },
-              {
-                "conf": 1.0,
-                "start": 22.48,
-                "end": 22.56,
-                "word": "там"
-              },
-              {
-                "conf": 1.0,
-                "start": 22.72,
-                "end": 22.88,
-                "word": "тебе"
-              },
-              {
-                "conf": 1.0,
-                "start": 23.0,
-                "end": 23.48,
-                "word": "поговорил"
-              },
-              {
-                "conf": 1.0,
-                "start": 24.12,
-                "end": 24.32,
-                "word": "этого"
-              },
-              {
-                "conf": 1.0,
-                "start": 24.56,
-                "end": 25.04,
-                "word": "достаточно"
-              }
-            ],
-            "text": "ну давай да проверим вот я что то там тебе поговорил этого достаточно"
-          }
-        },
-        {
-          "data": {
-            "result": [
-              {
-                "conf": 1.0,
-                "start": 29.056,
-                "end": 29.216,
-                "word": "раз"
-              },
-              {
-                "conf": 1.0,
-                "start": 29.416,
-                "end": 29.536,
-                "word": "два"
-              },
-              {
-                "conf": 1.0,
-                "start": 29.696,
-                "end": 29.816,
-                "word": "три"
-              }
-            ],
-            "text": "раз два три"
-          }
-        }
-      ]
-    }
-    diar_result = [
-      {
-        "start": 1.25,
-        "end": 2.48,
-        "speaker": 0
-      },
-      {
-        "start": 16.706,
-        "end": 16.976,
-        "speaker": 0
-      },
-      {
-        "start": 19.618,
-        "end": 25.137999999999998,
-        "speaker": 0
-      },
-      {
-        "start": 28.994,
-        "end": 30.674,
-        "speaker": 0
-      }
-    ]
-    print(merge_asr_diarisation(asr_raw_data, diar_result))
-
+    asr_raw_data = {'channel_1': [{'data': {'result': [{'conf': 1.0, 'end': 3.0, 'start': 2.4, 'word': 'здравствуйте'}, {'conf': 1.0, 'end': 3.72, 'start': 3.68, 'word': 'вы'}, {'conf': 1.0, 'end': 4.28, 'start': 3.84, 'word': 'позвонили'}, {'conf': 1.0, 'end': 4.36, 'start': 4.36, 'word': 'в'}, {'conf': 1.0, 'end': 4.96, 'start': 4.52, 'word': 'амулекс'}, {'conf': 1.0, 'end': 5.36, 'start': 5.12, 'word': 'точка'}, {'conf': 1.0, 'end': 5.56, 'start': 5.48, 'word': 'ру'}, {'conf': 1.0, 'end': 6.2, 'start': 5.96, 'word': 'ваша'}, {'conf': 1.0, 'end': 6.68, 'start': 6.32, 'word': 'команда'}, {'conf': 1.0, 'end': 7.24, 'start': 6.8, 'word': 'юристов'}, {'conf': 1.0, 'end': 7.8, 'start': 7.8, 'word': 'в'}, {'conf': 1.0, 'end': 8.16, 'start': 7.92, 'word': 'целях'}, {'conf': 1.0, 'end': 8.76, 'start': 8.32, 'word': 'повышения'}, {'conf': 1.0, 'end': 9.24, 'start': 8.88, 'word': 'качества'}, {'conf': 1.0, 'end': 10.0, 'start': 9.4, 'word': 'обслуживания'}, {'conf': 1.0, 'end': 10.24, 'start': 10.12, 'word': 'все'}, {'conf': 1.0, 'end': 10.84, 'start': 10.4, 'word': 'разговоры'}, {'conf': 1.0, 'end': 11.68, 'start': 11.0, 'word': 'записываются'}], 'text': 'здравствуйте вы позвонили в амулекс точка ру ваша команда юристов в целях повышения качества обслуживания все разговоры записываются'}}, {'data': {'result': [{'conf': 1.0, 'end': 20.88, 'start': 20.36, 'word': 'амлекс'}, {'conf': 1.0, 'end': 21.2, 'start': 21.0, 'word': 'точка'}, {'conf': 1.0, 'end': 21.36, 'start': 21.32, 'word': 'ру'}, {'conf': 1.0, 'end': 22.0, 'start': 21.52, 'word': 'екатерина'}, {'conf': 1.0, 'end': 22.72, 'start': 22.12, 'word': 'здравствуйте'}], 'text': 'амлекс точка ру екатерина здравствуйте'}}, {'data': {'result': [{'conf': 1.0, 'end': 34.24, 'start': 33.72, 'word': 'аскажите'}, {'conf': 1.0, 'end': 34.8, 'start': 34.36, 'word': 'пожалуйста'}, {'conf': 1.0, 'end': 35.0, 'start': 34.92, 'word': 'как'}, {'conf': 1.0, 'end': 35.36, 'start': 35.16, 'word': 'можно'}, {'conf': 1.0, 'end': 35.44, 'start': 35.44, 'word': 'к'}, {'conf': 1.0, 'end': 35.68, 'start': 35.6, 'word': 'вам'}, {'conf': 1.0, 'end': 36.32, 'start': 35.84, 'word': 'обращаться'}, {'conf': 1.0, 'end': 38.84, 'start': 38.84, 'word': 'а'}, {'conf': 1.0, 'end': 39.48, 'start': 39.0, 'word': 'полностью'}, {'conf': 1.0, 'end': 39.88, 'start': 39.68, 'word': 'можно'}, {'conf': 1.0, 'end': 42.56, 'start': 42.2, 'word': 'хорошо'}, {'conf': 1.0, 'end': 42.96, 'start': 42.72, 'word': 'денис'}, {'conf': 1.0, 'end': 43.72, 'start': 43.08, 'word': 'владимирович'}], 'text': 'аскажите пожалуйста как можно к вам обращаться а полностью можно хорошо денис владимирович'}}, {'data': {'result': [{'conf': 1.0, 'end': 44.976, 'start': 44.656, 'word': 'сейчас'}, {'conf': 1.0, 'end': 45.456, 'start': 45.176, 'word': 'минуту'}, {'conf': 1.0, 'end': 46.056, 'start': 45.616, 'word': 'пожалуйста'}, {'conf': 1.0, 'end': 55.496, 'start': 54.976, 'word': 'оставайтесь'}, {'conf': 1.0, 'end': 55.656, 'start': 55.616, 'word': 'на'}, {'conf': 1.0, 'end': 56.096, 'start': 55.816, 'word': 'линии'}, {'conf': 1.0, 'end': 56.256, 'start': 56.256, 'word': 'я'}, {'conf': 1.0, 'end': 56.416, 'start': 56.336, 'word': 'вас'}, {'conf': 1.0, 'end': 56.896, 'start': 56.576, 'word': 'соединю'}, {'conf': 1.0, 'end': 57.056, 'start': 57.056, 'word': 'с'}, {'conf': 1.0, 'end': 57.696, 'start': 57.176, 'word': 'юридическим'}, {'conf': 1.0, 'end': 58.376, 'start': 57.816, 'word': 'департаментом'}, {'conf': 1.0, 'end': 58.616, 'start': 58.576, 'word': 'не'}, {'conf': 1.0, 'end': 59.416, 'start': 58.776, 'word': 'отключайтесь'}], 'text': 'сейчас минуту пожалуйста оставайтесь на линии я вас соединю с юридическим департаментом не отключайтесь'}}]}
+    diar_result = [{'end': 11.862, 'speaker': '0', 'start': 2.53}, {'end': 21.14, 'speaker': '1', 'start': 20.77}, {'end': 45.368, 'speaker': '1', 'start': 34.466}, {'end': 59.96, 'speaker': '1', 'start': 55.01}]
+    print(match_asr_with_diarization(
+        asr_raw_data,
+        diar_result,
+        min_overlap_ratio=0.5,
+        max_pause=1.5,
+        group_unmatched_words=True  # Включить группировку несопоставленных слов
+    ) )

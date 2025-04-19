@@ -32,7 +32,7 @@ paths = {
 
     "punctuation_model_path": BASE_DIR / "models" / "sbert_punc_case_ru_onnx",
     "vad_model_path": BASE_DIR / "models" / "VAD_silero_v5" / "silero_vad.onnx",
-    "diar_speaker_model_path": BASE_DIR / "models" / "DIARISATION_model" / f"{config.DIAR_MODEL_NAME}.onnx",
+    "diar_speaker_model_path": BASE_DIR / "models" / "DIARISATION_model" / f"{config.DIAR_MODEL_NAME}",
 
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'111.wav',

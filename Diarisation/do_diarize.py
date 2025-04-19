@@ -1,9 +1,11 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import asyncio
 import os
 import numpy as np
 from pydub import AudioSegment
 from pathlib import Path
 import onnxruntime as ort
+
 from python_speech_features import fbank
 from scipy.signal import butter, sosfilt
 from sklearn.metrics.pairwise import cosine_similarity
@@ -13,6 +15,8 @@ import time
 from umap import UMAP
 from hdbscan import HDBSCAN
 from utils.do_logging import logger
+from utils.pre_start_init import paths
+
 # import logging as logger
 
 # Здесь SileroVAD остаётся только для тестов Диаризации на бою используется класс из do_vad
@@ -177,6 +181,15 @@ class SileroVAD:
         return segments
 
 
+def process_batch_sync(batch):
+    """Синхронная функция для обработки батча в отдельном процессе."""
+    session = ort.InferenceSession(
+        path_or_bytes=paths.get("diar_speaker_model_path"),  # Укажи актуальный путь к модели
+        providers=['CPUExecutionProvider'],
+        sess_options=ort.SessionOptions()
+    )
+    return session.run(output_names=['embs'], input_feed={'feats': batch})[0].squeeze()
+
 class Diarizer:
     def __init__(self, embedding_model_path: str,
                  vad,
@@ -188,136 +201,50 @@ class Diarizer:
                  filter_order: int = 10,
                  batch_size: int = 1,
                  cpu_workers: int = 0):
-
-        # Параметры VAD
         self.vad = vad
         self.sample_rate = sample_rate
-
-        # Параметры обработки признаков (fbank) НЕ МЕНЯТЬ!
-        self.winlen = 0.025  # Длина окна для fbank (сек)
-        self.winstep = 0.01  # Шаг окна для fbank (сек)
-        self.num_mel_bins = 80  # Количество мел-фильтров
-        self.nfft = 512  # Размер FFT
-
-        # Параметры высокопроходного фильтра
-        self.filter_cutoff = filter_cutoff  # Частота среза высокопроходного фильтра (Гц)
-        self.filter_order = filter_order  # Порядок фильтра
-
-        # Параметры постобработки
+        self.winlen = 0.025
+        self.winstep = 0.01
+        self.num_mel_bins = 80
+        self.nfft = 512
+        self.filter_cutoff = filter_cutoff
+        self.filter_order = filter_order
         self.max_phrase_gap = max_phrase_gap
         self.min_duration = min_duration
 
-        # Настройки работы GPU/CPU
         if use_gpu:
-            self.batch_size = batch_size  # Размер батча для извлечения эмбеддингов
-            self.max_cpu_workers = 1  # Количество потоков для извлечения эмбедингов.
+            self.batch_size = batch_size
+            self.max_cpu_workers = 1
         else:
-            self.batch_size = 1  # Размер батча для извлечения эмбеддингов
-            self.max_cpu_workers = os.cpu_count() - 1 if cpu_workers < 1 else cpu_workers  # Количество потоков для извлечения эмбедингов.
+            self.batch_size = 1
+            self.max_cpu_workers = os.cpu_count() - 1 if cpu_workers < 1 else cpu_workers
 
-        if use_gpu:
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-        else:
-            providers = ['CPUExecutionProvider']
-
+        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
         so = ort.SessionOptions()
         so.log_severity_level = 4
-        so.inter_op_num_threads = 0  # Можно увеличить до 4-6
+        so.inter_op_num_threads = 0
         so.intra_op_num_threads = 0
         so.enable_profiling = False
         so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        self.embedding_session = ort.InferenceSession(embedding_model_path,
-                                                      sess_options=so,
-                                                      providers=providers)
-        self.table = {}  # Словарь для хранения эмбеддингов спикеров
+        self.embedding_session = ort.InferenceSession(
+            embedding_model_path,
+            sess_options=so,
+            providers=providers
+        )
+        self.table = {}
         logger.debug(f"Используемые для диаризации провайдеры {self.embedding_session.get_providers()}")
 
-    # Todo - реализовать определение спикеров:
-    # def extract_embedding(self, audio_path: str, winlen: float = 0.025, winstep: float = 0.01,
-    #                       num_mel_bins: int = 80, nfft: int = 512, filter_cutoff: float = 100.0,
-    #                       filter_order: int = 10) -> np.ndarray:
-    #     """
-    #     Извлечение эмбеддинга из аудиофайла.
-    #     """
-    #     # Загрузка и предобработка аудио
-    #     audio = AudioSegment.from_file(audio_path)
-    #     if audio.frame_rate != self.sample_rate:
-    #         audio = audio.set_frame_rate(self.sample_rate)
-    #     if audio.channels > 1:
-    #         audio = audio.split_to_mono()[0]
-    #     samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
-    #     samples_float32 = samples.astype(np.float32) / 32768.0
-    #
-    #     # Применение высокопроходного фильтра
-    #     audio_filtered = self.highpass_filter(samples_float32, cutoff=filter_cutoff, filter_order=filter_order)
-    #
-    #     # Извлечение фреймов mel-спектрограммы
-    #     fbank_feats = self.extract_fbank(audio_filtered, winlen, winstep, num_mel_bins, nfft)
-    #
-    #     # Разделение на подсегменты (аналогично diarize)
-    #     frame_shift = int(winstep * 1000)
-    #     window_fs = int(1.5 * 1000) // frame_shift
-    #     period_fs = int(0.75 * 1000) // frame_shift
-    #     seg_id = "0.000-999.000"  # Фиктивный ID
-    #     subsegs, subseg_fbanks = self.subsegment(fbank_feats, seg_id, window_fs, period_fs, frame_shift)
-    #
-    #     # Извлечение эмбеддингов
-    #     embeddings = self.extract_embeddings(subseg_fbanks, batch_size=16, subseg_cmn=True)
-    #
-    #     # Усреднение эмбеддингов для получения одного вектора
-    #     embedding = np.mean(embeddings, axis=0)
-    #     embedding = embedding / (np.linalg.norm(embedding) + 1e-8)  # Нормализация
-    #     return embedding
-    #
-    # def register(self, name: str, audio_path: str, winlen: float = 0.025, winstep: float = 0.01,
-    #              num_mel_bins: int = 80, nfft: int = 512, filter_cutoff: float = 100.0,
-    #              filter_order: int = 10):
-    #     """
-    #     Регистрация спикера по имени и аудиофайлу.
-    #     """
-    #     if name in self.table:
-    #         print(f'Speaker {name} already registered, ignore')
-    #     else:
-    #         embedding = self.extract_embedding(audio_path, winlen, winstep, num_mel_bins, nfft,
-    #                                            filter_cutoff, filter_order)
-    #         self.table[name] = embedding
-    #         print(f'Speaker {name} registered successfully')
-    #
-    # def recognize(self, audio_path: str, winlen: float = 0.025, winstep: float = 0.01,
-    #               num_mel_bins: int = 80, nfft: int = 512, filter_cutoff: float = 100.0,
-    #               filter_order: int = 10) -> dict:
-    #     """
-    #     Распознавание спикера по аудиофайлу.
-    #     """
-    #     if not self.table:
-    #         print("No speakers registered")
-    #         return {'name': '', 'confidence': 0.0}
-    #
-    #     query_embedding = self.extract_embedding(audio_path, winlen, winstep, num_mel_bins, nfft,
-    #                                              filter_cutoff, filter_order)
-    #
-    #     best_score = -1.0
-    #     best_name = ''
-    #     for name, enrolled_embedding in self.table.items():
-    #         score = cosine_similarity(query_embedding.reshape(1, -1),
-    #                                   enrolled_embedding.reshape(1, -1))[0][0]
-    #         if score > best_score:
-    #             best_score = score
-    #             best_name = name
-    #
-    #     return {'name': best_name, 'confidence': float(best_score)}
-
-    def highpass_filter(self, signal: np.ndarray, cutoff: float, filter_order: int) -> np.ndarray:
+    async def highpass_filter(self, signal: np.ndarray, cutoff: float, filter_order: int) -> np.ndarray:
         sos = butter(filter_order, cutoff, btype='high', fs=self.sample_rate, output='sos')
         return sosfilt(sos, signal)
 
-    def extract_fbank(self, audio):
+    async def extract_fbank(self, audio):
         feats, _ = fbank(audio, samplerate=self.sample_rate, winlen=self.winlen, winstep=self.winstep,
                          nfilt=self.num_mel_bins, nfft=self.nfft, winfunc=np.hamming)
         feats = np.log(np.maximum(feats, 1e-8)).astype(np.float32)
         return feats
 
-    def subsegment(self, fbank, seg_id, window_fs, period_fs, frame_shift):
+    async def subsegment(self, fbank, seg_id, window_fs, period_fs, frame_shift):
         subsegs = []
         subseg_fbanks = []
         num_frames, feat_dim = fbank.shape
@@ -337,26 +264,30 @@ class Diarizer:
                 subseg_fbanks.append(subseg_fbank)
         return subsegs, subseg_fbanks
 
-    def extract_embeddings(self, fbanks, subseg_cmn):
+    async def extract_embeddings(self, fbanks, subseg_cmn):
         fbanks_array = np.stack(fbanks)
         if subseg_cmn:
             fbanks_array = fbanks_array - np.mean(fbanks_array, axis=1, keepdims=True)
 
-        def process_batch(batch):
-            return self.embedding_session.run(output_names=['embs'], input_feed={'feats': batch})[0].squeeze()
+        async def process_batch(batch):
+            return await asyncio.to_thread(
+                self.embedding_session.run,
+                output_names=['embs'],
+                input_feed={'feats': batch}
+            )
 
         embeddings = []
-        with ThreadPoolExecutor(max_workers=self.max_cpu_workers) as executor:  # os.cpu_count()-1
-            futures = [
-                executor.submit(process_batch, fbanks_array[i:i + self.batch_size])
+        with ThreadPoolExecutor(max_workers=self.max_cpu_workers) as executor:
+            tasks = [
+                process_batch(fbanks_array[i:i + self.batch_size])
                 for i in range(0, fbanks_array.shape[0], self.batch_size)
             ]
-            for future in futures:
-                embeddings.append(future.result())
+            for task in await asyncio.gather(*tasks):
+                embeddings.append(task[0].squeeze())
 
         return np.vstack(embeddings)
 
-    def merge_subsegments(self, subsegs, labels):
+    async def merge_subsegments(self, subsegs, labels):
         merged = []
         current_start, current_end, current_label = None, None, None
         for subseg, label in zip(subsegs, labels):
@@ -375,20 +306,18 @@ class Diarizer:
             merged.append({"start": current_start, "end": current_end, "speaker": current_label})
         return merged
 
-
-    def diarize(self, audio_frames: np.ndarray,
-                num_speakers: int,
-                filter_cutoff: float,
-                filter_order: int,
-                vad_sensity: int
-                ) -> list[dict]:
-        self.vad.reset_state()
+    async def diarize(self, audio_frames: np.ndarray,
+                      num_speakers: int,
+                      filter_cutoff: float,
+                      filter_order: int,
+                      vad_sensity: int) -> list[dict]:
+        await self.vad.reset_state()
         self.vad.set_mode(vad_sensity)
         start_time = time.perf_counter()
-        # 1. Сегментация VAD
+
         logger.debug("Начало сегментации...")
         seg_start = time.perf_counter()
-        segments = self.vad.get_speech_segments(audio_frames)
+        segments = await self.vad.get_speech_segments(audio_frames)
         seg_time = time.perf_counter() - seg_start
         logger.debug(f"Процедура: Сегментация (get_speech_segments) - {seg_time:.4f} сек")
 
@@ -401,25 +330,23 @@ class Diarizer:
             logger.debug("После фильтрации сегментов не осталось")
             return []
 
-        # 2. Разделение на подсегменты
-        frame_shift = int(self.winstep * 1000)  # в мс
-        window_fs = int(1.5 * 1000) // frame_shift  # окно 1.5 сек
-        period_fs = int(0.75 * 1000) // frame_shift  # шаг 0.75 сек
+        frame_shift = int(self.winstep * 1000)
+        window_fs = int(1.5 * 1000) // frame_shift
+        period_fs = int(0.75 * 1000) // frame_shift
 
         subsegs = []
         subseg_audios = []
         for start, end, audio in segments:
-            audio = self.highpass_filter(audio, cutoff=self.filter_cutoff, filter_order=self.filter_order)
+            audio = await self.highpass_filter(audio, cutoff=self.filter_cutoff, filter_order=self.filter_order)
             seg_id = f"{start:.3f}-{end:.3f}"
-            fbank_feats = self.extract_fbank(audio)
-            tmp_subsegs, tmp_subseg_fbanks = self.subsegment(fbank_feats, seg_id, window_fs, period_fs, frame_shift)
+            fbank_feats = await self.extract_fbank(audio)
+            tmp_subsegs, tmp_subseg_fbanks = await self.subsegment(fbank_feats, seg_id, window_fs, period_fs, frame_shift)
             subsegs.extend(tmp_subsegs)
             subseg_audios.extend(tmp_subseg_fbanks)
 
-        # 3. Извлечение эмбеддингов
         logger.debug("Начало извлечения эмбеддингов...")
         emb_start = time.perf_counter()
-        embeddings = self.extract_embeddings(subseg_audios, subseg_cmn=True)
+        embeddings = await self.extract_embeddings(subseg_audios, subseg_cmn=True)
         emb_time = time.perf_counter() - emb_start
         logger.debug(f"Процедура: Извлечение эмбеддингов (extract_embeddings) - {emb_time:.4f} сек")
 
@@ -429,30 +356,28 @@ class Diarizer:
 
         logger.debug(f"Количество эмбеддингов: {len(embeddings)}")
 
-        # 4. Нормализация эмбеддингов
         embeddings = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
 
-        # 5. Кластеризация
         logger.debug("Начало кластеризации...")
         clust_start = time.perf_counter()
         if len(embeddings) <= 2:
             labels = [0] * len(embeddings)
         else:
             n_neighbors = min(5, len(embeddings) - 1)
-            umap_embeddings = UMAP(n_components=min(32, len(embeddings) - 2),
-                                   metric='cosine',
-                                   n_neighbors=n_neighbors,
-                                   min_dist=0.1,
-                                   random_state=2023,
-                                   n_jobs=1).fit_transform(embeddings)
+            umap_embeddings = UMAP(
+                n_components=min(32, len(embeddings) - 2),
+                metric='cosine',
+                n_neighbors=n_neighbors,
+                min_dist=0.1,
+                random_state=2023,
+                n_jobs=1
+            ).fit_transform(embeddings)
 
             if num_speakers >= 2:
-                # Используем Agglomerative Clustering с заданным числом спикеров
                 clustering = AgglomerativeClustering(n_clusters=num_speakers, metric='cosine', linkage='average')
                 labels = clustering.fit_predict(umap_embeddings)
                 logger.debug(f"Использовано {num_speakers} спикеров (Agglomerative Clustering)")
             else:
-                # Текущая логика с HDBSCAN
                 labels = HDBSCAN(min_cluster_size=3).fit_predict(umap_embeddings)
                 logger.debug(f"Всего labels: {len(labels)}")
                 if np.all(labels == -1):
@@ -473,10 +398,9 @@ class Diarizer:
         logger.debug(f"Процедура: Кластеризация - {clust_time:.4f} сек")
         logger.debug(f"Число кластеров: {len(np.unique(labels))}")
 
-        # 6. Объединение подсегментов
         logger.debug("Начало объединения подсегментов...")
         merge_start = time.perf_counter()
-        merged_segments = self.merge_subsegments(subsegs, labels)
+        merged_segments = await self.merge_subsegments(subsegs, labels)
         merged_segments = [seg for seg in merged_segments if seg["end"] - seg["start"] >= self.min_duration]
         merge_time = time.perf_counter() - merge_start
         logger.debug(f"Процедура: Объединение подсегментов - {merge_time:.4f} сек")
@@ -486,7 +410,7 @@ class Diarizer:
 
         return merged_segments
 
-    def merge_segments(self, diarized_segments: list[dict]) -> list[dict]:
+    async def merge_segments(self, diarized_segments: list[dict]) -> list[dict]:
         start_time = time.perf_counter()
 
         if not diarized_segments:
@@ -514,22 +438,20 @@ class Diarizer:
 
         return merged
 
-    def diarize_and_merge(self, audio_frames: np.ndarray, num_speakers: int,
-                          filter_cutoff: int = 50, filter_order: int = 10,
-                          vad_sensity: int = 3
-                          ) -> list[dict]:
+    async def diarize_and_merge(self, audio_frames: np.ndarray, num_speakers: int,
+                                filter_cutoff: int = 50, filter_order: int = 10,
+                                vad_sensity: int = 3) -> list[dict]:
         start_time = time.perf_counter()
 
-        raw_result = self.diarize(audio_frames, num_speakers, filter_cutoff, filter_order, vad_sensity)
-        merged_result = self.merge_segments(raw_result)
+        raw_result = await self.diarize(audio_frames, num_speakers, filter_cutoff, filter_order, vad_sensity)
+        merged_result = await self.merge_segments(raw_result)
 
         total_time = time.perf_counter() - start_time
         logger.debug(f"Процедура: Полная диаризация и объединение (diarize_and_merge) - {total_time:.4f} сек")
 
         return merged_result
 
-
-def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int = 512, sample_rate: int = 16000) -> np.ndarray:
+async def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int = 512, sample_rate: int = 16000) -> np.ndarray:
     """
     :param audio: AudioSegment аудио данные
     :param target_frame_size: int = 512 требования для работы SILERO VAD
@@ -554,48 +476,50 @@ def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int = 512,
     return frames
 
 
-if __name__ == "__main__":
-    # Параметры диаризации и кластеризации
-    num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
-
-    # Параметры извлечения ембеддингов
-    max_phrase_gap = 1  # расстояние между фразами для объединения в один кластер.
-    use_gpu_diar = False  # По возможности использовать графический процессор для вычислений
-    batch_size = 32  # Размер батча для извлечения эмбеддингов при работе GPU
-    max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
-
-    # # Параметры сегментации (VAD)
-    vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
-    use_gpu_vad = False  # По возможности использовать графический процессор для вычислений
-
-    vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
-    speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
-
-    audio_path = "../trash/Роман.mp3"
-
-    vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
-    vad.set_mode(vad_mode)
-
-
-    audio = AudioSegment.from_file(audio_path)
-    audio_frames = load_and_preprocess_audio(audio)
-    #Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
-
-    diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
-                        vad=vad,
-                        max_phrase_gap=max_phrase_gap,
-                        batch_size=batch_size,
-                        cpu_workers=max_cpu_workers,
-                        use_gpu=use_gpu_diar,
-                        )
-
-    result = diarizer.diarize_and_merge(
-        audio_frames,
-        num_speakers=num_speakers,
-        filter_cutoff=50,
-        filter_order=10,
-        vad_sensity=vad_mode
-    )
-
-    for r in result:
-        print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
+# if __name__ == "__main__":
+#     # Todo - перевести тест в async
+#
+#     # Параметры диаризации и кластеризации
+#     num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
+#
+#     # Параметры извлечения ембеддингов
+#     max_phrase_gap = 1  # расстояние между фразами для объединения в один кластер.
+#     use_gpu_diar = False  # По возможности использовать графический процессор для вычислений
+#     batch_size = 32  # Размер батча для извлечения эмбеддингов при работе GPU
+#     max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
+#
+#     # # Параметры сегментации (VAD)
+#     vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
+#     use_gpu_vad = False  # По возможности использовать графический процессор для вычислений
+#
+#     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
+#     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
+#
+#     audio_path = "../trash/Роман.mp3"
+#
+#     vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
+#     vad.set_mode(vad_mode)
+#
+#
+#     audio = AudioSegment.from_file(audio_path)
+#     audio_frames = await load_and_preprocess_audio(audio)
+#     #Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
+#
+#     diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
+#                         vad=vad,
+#                         max_phrase_gap=max_phrase_gap,
+#                         batch_size=batch_size,
+#                         cpu_workers=max_cpu_workers,
+#                         use_gpu=use_gpu_diar,
+#                         )
+#
+#     result = await diarizer.diarize_and_merge(
+#         audio_frames,
+#         num_speakers=num_speakers,
+#         filter_cutoff=50,
+#         filter_order=10,
+#         vad_sensity=vad_mode
+#     )
+#
+#     for r in result:
+#         print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")

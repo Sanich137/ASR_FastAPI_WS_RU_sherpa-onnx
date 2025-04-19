@@ -76,7 +76,7 @@ async def post(params:SyncASRRequest):
                 audio_buffer[post_id] = overlap  # Кривизна вызвана особенностями реализации буфера в сокетах
                 # Если кусок меньше заданного в конфиге, то это последние секунды аудио. И его нужно обработать полностью.
                 if overlap.duration_seconds == config.MAX_OVERLAP_DURATION:
-                    find_last_speech_position(post_id)
+                    await find_last_speech_position(post_id)
                 else:
                     # По этому на распознавание подаём хвост от предыдущего + текущий кусок. В надежде, что суммарная
                     # продолжительность не превысит максимальную? Самонадёянно, конечно.
@@ -93,7 +93,7 @@ async def post(params:SyncASRRequest):
                         logger.debug(asr_result)
 
                     else:
-                        asr_result_w_conf = recognise_w_calculate_confidence(audio_to_asr[post_id],
+                        asr_result_w_conf = await recognise_w_calculate_confidence(audio_to_asr[post_id],
                                                                              num_trials=config.RECOGNITION_ATTEMPTS)
                         asr_result = await process_asr_json(asr_result_w_conf, audio_duration[post_id])
                         audio_duration[post_id] += audio_to_asr[post_id].duration_seconds

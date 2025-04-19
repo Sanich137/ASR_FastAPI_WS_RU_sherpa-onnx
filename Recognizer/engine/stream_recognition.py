@@ -10,7 +10,7 @@ from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from pydub import AudioSegment
 
 
-def recognise_w_calculate_confidence(audio_data,
+async def recognise_w_calculate_confidence(audio_data,
                                      num_trials = 1,
                                      time_tolerance: float = 0.5) -> dict:
     """
@@ -32,7 +32,7 @@ def recognise_w_calculate_confidence(audio_data,
         stream = recognizer.create_stream()
 
         # перевод в семплы для распознавания.
-        samples = get_np_array_samples_float32(audio_data.raw_data, 2)
+        samples = await get_np_array_samples_float32(audio_data.raw_data, 2)
 
         # передали аудиофрагмент на распознавание
 
@@ -123,7 +123,7 @@ async def simple_recognise(audio_data, ) -> dict:
 
     stream = recognizer.create_stream()
     # перевод в семплы для распознавания.
-    samples = get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
+    samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
 
     # передали аудиофрагмент на распознавание
 

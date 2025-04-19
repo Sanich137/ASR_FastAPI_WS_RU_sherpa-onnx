@@ -8,7 +8,7 @@ from utils.pre_start_init import (audio_overlap,
 from pydub import AudioSegment
 from VoiceActivityDetector import vad
 
-def find_last_speech_position(socket_id, sample_width = 2):
+async def find_last_speech_position(socket_id, sample_width = 2):
     """
         1. Берём собранное аудио, добавляем в начало overlap
         2. Конвертируем его в np.int16
@@ -29,7 +29,7 @@ def find_last_speech_position(socket_id, sample_width = 2):
     logger.debug(f"Получено из буфера на обработку аудио продолжительностью {audio_buffer[socket_id].duration_seconds} ")
 
     # Переводим в float32 для vad
-    audio = get_np_array_samples_float32(audio_for_vad.raw_data)
+    audio = await get_np_array_samples_float32(audio_for_vad.raw_data)
 
     # Входные данные для деления фреймов
     speech_end = len(audio)
@@ -43,7 +43,7 @@ def find_last_speech_position(socket_id, sample_width = 2):
     # Проверка каждого фрагмента на наличие голоса.
     silence_frames = 0
     # Ниже переприсвоение стейтов - попытка сохранить стейт, если одновременно поступит несколько запросов.
-    vad.reset_state()
+    await vad.reset_state()
     vad_state=vad.state
     for i, frame in enumerate(reversed(frames)):
         vad.state = vad_state
@@ -53,7 +53,7 @@ def find_last_speech_position(socket_id, sample_width = 2):
                 partial_frame_length = len(frame)
                 continue
             else:
-                speech_prob, vad_state = vad.is_speech(frame)
+                speech_prob, vad_state = await vad.is_speech(frame)
                 if speech_prob < vad.prob_level:
                     logger.debug(f"Найден не голос на speech_end = {speech_end-(i+1)*frame_length-partial_frame_length}")
                     silence_frames+=1

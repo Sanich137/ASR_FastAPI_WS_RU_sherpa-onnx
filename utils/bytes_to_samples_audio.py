@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def get_np_array_samples_float32(audio_bytes: bytes, sample_width: int = 2) -> np.ndarray:
+async def get_np_array_samples_float32(audio_bytes: bytes, sample_width: int = 2) -> np.ndarray:
     """
     Преобразует аудио в байтах в массив float32.
     :param audio_bytes: Аудиоданные в байтах.
@@ -18,7 +18,7 @@ def get_np_array_samples_float32(audio_bytes: bytes, sample_width: int = 2) -> n
 
     return samples_float32
 
-def get_np_array_samples_int16(audio_bytes: bytes, sample_width: int = 2) -> np.ndarray:
+async def get_np_array_samples_int16(audio_bytes: bytes, sample_width: int = 2) -> np.ndarray:
     """
     Преобразует аудио в байтах в массив float32.
     :param audio_bytes: Аудиоданные в байтах.
