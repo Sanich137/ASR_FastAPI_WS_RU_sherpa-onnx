@@ -62,9 +62,9 @@ if config.CAN_DIAR:
         diarizer = Diarizer(embedding_model_path=paths.get("diar_speaker_model_path"),
                             vad=vad,
                             max_phrase_gap=1,
-                            batch_size=32,
+                            batch_size=4,
                             cpu_workers=0,
-                            use_gpu=False)
+                            use_gpu=config.DIAR_WITH_GPU)
 
         logger.info(f"Успешно загружена модель Диаризации")
 else:
