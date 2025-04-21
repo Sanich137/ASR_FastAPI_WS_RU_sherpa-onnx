@@ -1,13 +1,10 @@
-import logging
-
 import ujson
 from collections import defaultdict
 
 import config
 from Recognizer import recognizer
-# from utils.pre_start_init import recognizer
 from utils.bytes_to_samples_audio import get_np_array_samples_float32
-from pydub import AudioSegment
+from utils.resamppling import resample_audiosegment
 
 
 async def recognise_w_calculate_confidence(audio_data,
@@ -118,7 +115,7 @@ async def simple_recognise(audio_data, ) -> dict:
 
     # Приводим фреймрейт к фреймрейту модели
     if audio_data.frame_rate != config.BASE_SAMPLE_RATE:
-        audio_data = audio_data.set_frame_rate(config.BASE_SAMPLE_RATE)
+        audio_data = await resample_audiosegment(audio_data, config.BASE_SAMPLE_RATE)
 
 
     stream = recognizer.create_stream()

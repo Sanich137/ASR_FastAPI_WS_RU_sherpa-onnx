@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import asyncio
 from pathlib import Path
 import websockets
@@ -39,7 +38,13 @@ class ASRStreamingClient:
         sound = AudioSegment.from_file(str(file_path))
         if sound.frame_rate != self.frame_rate:
             logging.warning(f"Конвертация FR {sound.frame_rate} → {self.frame_rate}")
-            sound = sound.set_frame_rate(self.frame_rate)
+            sound = (sound.
+
+
+
+
+
+                     set_frame_rate(self.frame_rate))
         return sound.set_channels(1)
 
     async def _send_config(self, websocket, sample_rate, wait_null_answers):
@@ -111,6 +116,7 @@ class ASRStreamingClient:
 
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--uri", default="ws://localhost:49153/ws")
     parser.add_argument("--file", required=True)

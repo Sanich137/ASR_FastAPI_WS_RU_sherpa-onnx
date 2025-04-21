@@ -12,6 +12,7 @@ from utils.pre_start_init import (app,
 
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
+from utils.resamppling import resample_audiosegment
 
 from models.fast_api_models import PostFileRequest
 
@@ -91,14 +92,11 @@ async def receive_file(
 
     # Приводим фреймрейт к фреймрейту модели
     if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
-        posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_frame_rate(
-            config.BASE_SAMPLE_RATE)
+        posted_and_downloaded_audio[post_id] = await resample_audiosegment(audio_data=posted_and_downloaded_audio[post_id],
+                                                                     target_sample_rate=config.BASE_SAMPLE_RATE)
 
     # Обрабатываем чанки с аудио по 15 секунд.
-    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono() if
-                                          posted_and_downloaded_audio[post_id].channels > 1
-                                          else [posted_and_downloaded_audio[post_id]]):
-
+    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
         audio_buffer[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
         audio_overlap[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
         audio_duration[post_id] = 0

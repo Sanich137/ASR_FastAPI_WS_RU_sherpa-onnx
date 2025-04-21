@@ -78,7 +78,7 @@ class SbertPuncCaseOnnx:
                                                        strip_accents=False,
                                                        )
         session_options = ort.SessionOptions()
-        session_options.log_severity_level = 3  # Выключаем подробный лог
+        session_options.log_severity_level = 4  # Выключаем подробный лог
 
         if not use_gpu:
             providers = ['CPUExecutionProvider']

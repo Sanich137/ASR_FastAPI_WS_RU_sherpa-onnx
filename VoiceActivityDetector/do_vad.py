@@ -2,6 +2,8 @@ import numpy as np
 import onnxruntime as ort
 from pydub import AudioSegment
 from pathlib import Path
+from utils.resamppling import resample_audiosegment
+
 # from utils.do_logging import logger
 import logging as logger
 
@@ -174,7 +176,7 @@ def load_and_preprocess_audio(file_path: str, target_frame_size: int = 512) -> n
 
     # Конвертируем в моно 16kHz если нужно
     if audio.frame_rate != 16000:
-        audio = audio.set_frame_rate(16000)
+        audio = resample_audiosegment(audio,16000)
     if audio.channels > 1:
         audio = audio.split_to_mono()[0]
 

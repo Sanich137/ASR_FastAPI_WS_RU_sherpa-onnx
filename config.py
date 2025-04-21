@@ -19,7 +19,7 @@ FILEMODE = os.getenv('FILEMODE', 'a')
 IS_PROD = True if int(os.getenv('IS_PROD', 1))==1 else False
 
 # Recognition_settings
-MAX_OVERLAP_DURATION = 15  # Максимальная продолжительность буфера аудио (зависит от модели) приемлемый диапазон 10-15 сек.
+MAX_OVERLAP_DURATION = int(os.getenv('MAX_OVERLAP_DURATION', 30))  # Максимальная продолжительность буфера аудио (зависит от модели) приемлемый диапазон 10-15 сек.
 RECOGNITION_ATTEMPTS = 1  # Пока не менять
 
 # Vad_settings

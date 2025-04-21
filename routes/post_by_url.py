@@ -14,6 +14,7 @@ from utils.pre_start_init import (app,
 from utils.do_logging import logger
 from utils.get_audio_file import getting_audiofile, open_default_audiofile
 from utils.chunk_doing import find_last_speech_position
+from utils.resamppling import resample_audiosegment
 
 from models.fast_api_models import SyncASRRequest
 
@@ -60,7 +61,8 @@ async def post(params:SyncASRRequest):
 
         # Приводим фреймрейт к фреймрейту модели
         if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
-            posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].set_frame_rate(config.BASE_SAMPLE_RATE)
+            posted_and_downloaded_audio[post_id] = await resample_audiosegment(posted_and_downloaded_audio[post_id],
+                                                                         config.BASE_SAMPLE_RATE)
 
         # Обрабатываем чанки с аудио по 15 секунд.
         for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
