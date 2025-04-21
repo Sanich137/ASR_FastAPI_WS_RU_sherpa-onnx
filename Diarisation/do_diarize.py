@@ -222,10 +222,9 @@ class Diarizer:
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
         so = ort.SessionOptions()
         so.log_severity_level = 4
+        so.enable_profiling = False
         so.inter_op_num_threads = 0
         so.intra_op_num_threads = 0
-        so.enable_profiling = False
-        so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         self.embedding_session = ort.InferenceSession(
             embedding_model_path,
             sess_options=so,

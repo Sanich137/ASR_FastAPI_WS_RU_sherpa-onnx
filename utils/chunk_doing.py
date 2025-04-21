@@ -54,9 +54,9 @@ async def find_last_speech_position(socket_id, sample_width=2):
         raise ValueError("Некорректные значения в audio")
 
     # Входные данные для деления фреймов
-    duration_seconds = 0.3
+    duration_seconds = 0.5
     # Длина фрейма для Silero VAD: 256 семплов для 8 кГц, 512 семплов для 16 кГц
-    frame_length = 256 if frame_rate == 8000 else 512 if frame_rate == 16000 else None
+    frame_length = 256 if audio_for_vad.frame_rate == 8000 else 512 if audio_for_vad.frame_rate == 16000 else None
 
     if frame_length is None:
         raise ValueError("для VAD Поддерживаются только фреймрейты 8000 или 16000 Гц")
