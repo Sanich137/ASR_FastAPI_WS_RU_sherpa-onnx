@@ -18,7 +18,8 @@ async def do_diarizing(
         diar_vad_sensity: int = 3
         ):
     # Предобработка аудио.
-    audio_frames = await load_and_preprocess_audio(posted_and_downloaded_audio[file_id])
+    # ВАЖНЫЙ момент. Мы диаризируем только последний канал.
+    audio_frames = await load_and_preprocess_audio(posted_and_downloaded_audio[file_id].split_to_mono()[-1])
 
     # Непосредственно получение временных меток речи
     diar_result = await diarizer.diarize_and_merge(

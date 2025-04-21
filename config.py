@@ -31,8 +31,8 @@ PUNCTUATE_WITH_GPU = os.getenv('VAD_WITH_GPU', True)   # Если потребу
 
 # Diarisation_settings
 CAN_DIAR = True if int(os.getenv('CAN_DIAR', 0)) == 1 else False
-DIAR_MODEL_NAME = str(os.getenv('DIAR_MODEL_NAME', "voxblink2_samresnet100_ft")+".onnx")
-DIAR_WITH_GPU = os.getenv('DIAR_WITH_GPU', False)
+DIAR_MODEL_NAME = str(os.getenv('DIAR_MODEL_NAME', "voxceleb_resnet34_LM")+".onnx")
+DIAR_WITH_GPU = os.getenv('DIAR_WITH_GPU', True)
 CPU_WORKERS = int(os.getenv('CPU_WORKERS', 0)) # Для значений меньше 1 будут использованы все доступные ядра -1.
 # При больше 1 - указанное число ядер CPU. Работает только при GPU True
 

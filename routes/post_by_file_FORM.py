@@ -81,10 +81,9 @@ async def receive_file(
         return result
 
     # Приводим Файл в моно, если получен параметр "диаризация"
-    if params.do_diarization and config.CAN_DIAR:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
-        if posted_and_downloaded_audio[post_id].channels > 1:
-            posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[1] # [1]  # [0:60000]
-    elif params.do_diarization and not config.CAN_DIAR:
+    # if params.do_diarization and config.CAN_DIAR:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
+    #     posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[-1] # [1]  # [0:60000]
+    if params.do_diarization and not config.CAN_DIAR:
         params.do_diarization = False
         error_description += "Diarization is not available\n"
         logger.error("Запрошена диаризация, но она не доступна.")
@@ -145,6 +144,7 @@ async def receive_file(
             logger.error(f"Error echo clearing - {e}")
             error_description = f"Error echo clearing - {e}"
             res = False
+
     if params.do_diarization:
         try:
             result["diarized_data"] = await do_diarizing(post_id, result['raw_data'],
