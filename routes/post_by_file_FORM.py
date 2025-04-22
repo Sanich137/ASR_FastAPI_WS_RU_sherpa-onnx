@@ -1,6 +1,6 @@
 from pydub import AudioSegment
 import config
-
+import asyncio
 import uuid
 from utils.tokens_to_Result import process_asr_json, process_gigaam_asr
 from utils.pre_start_init import (app,
@@ -73,16 +73,24 @@ async def receive_file(
     logger.debug(f'Принят новый "post_file"  id = {post_id}')
 
     if "audio" in file.content_type:
-        posted_and_downloaded_audio[post_id] = AudioSegment.from_file(file.file)
+        def load_audio_in_thread(file_obj):
+            return AudioSegment.from_file(file_obj)
+        try:
+            posted_and_downloaded_audio[post_id] = await asyncio.to_thread(load_audio_in_thread, file.file)
+        except Exception as e:
+            res = False
+            error_description += f"Error loading audio file: {e}"
+            logger.error(f"Error loading audio file: {e}")
+            return result
     else:
         res = False
         error_description += "Not audio file received"
-
         return result
 
     # Приводим Файл в моно, если получен параметр "диаризация"
     # if params.do_diarization and config.CAN_DIAR:  # Todo - добавить в реквест выбор канала для диаризации. Совместить с удалением эха.
     #     posted_and_downloaded_audio[post_id] = posted_and_downloaded_audio[post_id].split_to_mono()[-1] # [1]  # [0:60000]
+
     if params.do_diarization and not config.CAN_DIAR:
         params.do_diarization = False
         error_description += "Diarization is not available\n"
