@@ -19,7 +19,7 @@ FILEMODE = os.getenv('FILEMODE', 'a')
 IS_PROD = True if int(os.getenv('IS_PROD', 1))==1 else False
 
 # Recognition_settings
-MAX_OVERLAP_DURATION = int(os.getenv('MAX_OVERLAP_DURATION', 18))  # Максимальная продолжительность буфера аудио (зависит от модели) приемлемый диапазон 10-15 сек. Для Vosk, для Гига СТС можно больше.
+MAX_OVERLAP_DURATION = int(os.getenv('MAX_OVERLAP_DURATION', 30))  # Максимальная продолжительность буфера аудио (зависит от модели) приемлемый диапазон 10-15 сек. Для Vosk, для Гига СТС можно больше.
 RECOGNITION_ATTEMPTS = 1  # Пока не менять
 
 # Vad_settings
@@ -38,7 +38,7 @@ CPU_WORKERS = int(os.getenv('CPU_WORKERS', 0)) # Для значений мен�
 
 # Разных моделей для диаризации много.
 # Если voxblink2_samresnet100_ft работает на вашей мощности не достаточно быстро, выберите модель меньшего размера:
-# voxblink2_samresnet34_ft тоже вполне норм.
+# voxblink2_samresnet34_ft тоже вполне норм и должна помещаться в 8Gb GPU.
 # [('cnceleb_resnet34', 25), ('cnceleb_resnet34_LM', 25), ('voxblink2_samresnet100', 191), ('voxblink2_samresnet100_ft', 191),
 # ('voxblink2_samresnet34', 96), ('voxblink2_samresnet34_ft', 96), ('voxceleb_CAM++', 27), ('voxceleb_CAM++_LM', 27),
 # ('voxceleb_ECAPA1024', 56), ('voxceleb_ECAPA1024_LM', 56), ('voxceleb_ECAPA512', 23), ('voxceleb_ECAPA512_LM', 23),

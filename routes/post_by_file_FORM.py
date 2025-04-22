@@ -179,7 +179,7 @@ async def receive_file(
     del posted_and_downloaded_audio[post_id]
 
 
-    logger.debug(result)
+    logger.info(result)
 
     return result
 
