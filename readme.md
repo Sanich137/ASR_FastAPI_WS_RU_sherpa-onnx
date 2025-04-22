@@ -71,14 +71,48 @@ cd models && git clone https://huggingface.co/Alexanrd/sbert_punc_case_ru_onnx &
 ### Конфигурация
 - Переменные в окружении:
 ```
-LOGGING_LEVEL="INFO"   # доступные значения: INFO, DEBUG
-NUM_THREADS=4          # Желательно не менее 2
+# server
 HOST="0.0.0.0"
 PORT=49153
+
+# ASR settings
 MODEL_NAME=Gigaam      # доступные значения: Vosk5 и Gigaam. 
-BASE_SAMPLE_RATE=8000  # для Gigaam лучше 8000, для Vosk5 - 16000 
+BASE_SAMPLE_RATE=16000 # Частота дискретизации модели. К этой частоте будут приведены получаемые аудио. 
 PROVIDER=CUDA          # доступные значения: CUDA и CPU 
+NUM_THREADS=4          # Желательно не менее 2
+MAX_OVERLAP_DURATION = 30 # Размер отправляемого на распознавание чанка. Для vosk < 18, для Gigaam 16-30.
+
+# Logger settings
+LOGGING_LEVEL="INFO"   # доступные значения: INFO, DEBUG
 IS_PROD=1              # Влияет на логирование. Если 1, то логи пишем в файл. Если 0, то выводим в консоль.
+
+# Vad settings
+VAD_SENSITIVITY = 3 # Чувствительгность VAD при разделении аудио на чанки.
+VAD_WITH_GPU = 0 # 1 - Использование GPU для работы VAD. Существенного прироста нет.
+
+# Punctuate_settings
+PUNCTUATE_WITH_GPU = 1 # Использование GPU для расстановки пунктуации.
+
+# Diarisation_settings
+CAN_DIAR = 0 # Включение и выключение возможности диаризации.
+DIAR_MODEL_NAME = "voxceleb_resnet34_LM"  # Выбор модели для диаризации (скачает сам).
+DIAR_WITH_GPU = 0 # 0 - использование для диаризации CPU, 1 - GPU
+CPU_WORKERS = 0  # Количество CPU воркеров для диаризаии. 0 - решает onnxruntime (max).
+```
+
+### Список доступных моделей для диаризации:
+```commandline
+В скобках указан размер модели.
+Для работы на 8Gb GPU используйте модель размером не более 25 Мб, например, voxceleb_resnet34_LM. 
+Лучшие результаты показывает voxblink2_samresnet100_ft, но в 8Gb карту вместе с ASR не поместится. 
+Работать будет, но на GPU очень медленно.
+
+('cnceleb_resnet34', 25), ('cnceleb_resnet34_LM', 25), ('voxblink2_samresnet100', 191), ('voxblink2_samresnet100_ft', 191),
+('voxblink2_samresnet34', 96), ('voxblink2_samresnet34_ft', 96), ('voxceleb_CAM++', 27), ('voxceleb_CAM++_LM', 27),
+('voxceleb_ECAPA1024', 56), ('voxceleb_ECAPA1024_LM', 56), ('voxceleb_ECAPA512', 23), ('voxceleb_ECAPA512_LM', 23),
+('voxceleb_gemini_dfresnet114_LM', 24), ('voxceleb_resnet152_LM', 75), ('voxceleb_resnet221_LM', 90),
+('voxceleb_resnet293_LM', 109), ('voxceleb_resnet34', 25), ('voxceleb_resnet34_LM', 25)
+
 ```
 
 
@@ -100,8 +134,6 @@ http://127.0.0.1:49153/docs#/
 ```html
 http://127.0.0.1:49153/demo
 ```
-
-
 
 ## Запуск как сервис в Ubuntu
 - Для запуска приложения как сервиса в Ubuntu используйте пример файла [vosk_gpu.service](vosk_gpu.service). 
@@ -144,6 +176,8 @@ sudo systemctl enable vosk_gpu
 свяжитесь со мной через [GitHub Issues](https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx/issues) или [GitHub Discussions](https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx/discussions)
 
 ## Работы
+- 22 апреля 2025 - внедрена диаризация. Выбрать можно из [множества](https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md) моделей wespeaker. (соблюдайте лицензии).
+Использование опционально, возможна работа как на CPU так и на GPU.
 - 10 апреля 2025 - webrtcvad заменён на Silero v5, пунктуация производится силами GPU.
 - 07 марта 2025 - Реализовано Разделение на предложения и пунктуацию при передаче задания в сокетах. 
 - 06 марта 2025 - Реализована пунктуация в полной мере при работе с целыми файлами.(CPU). Для работы модель для пунктуации скачать обязательно.
