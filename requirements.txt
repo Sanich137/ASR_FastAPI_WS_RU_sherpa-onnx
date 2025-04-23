@@ -23,8 +23,8 @@ psutil
 # For ASR
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
 sherpa-onnx==1.11.3+cuda
-
 onnxruntime-gpu==1.17.1
+librosa
 
 # For punctuation
 transformers~=4.51.0
