@@ -27,7 +27,10 @@
 pip install -r requirements.txt
 sudo apt install -y ffmpeg
 sudo apt-get install git-lfs
+sudo apt-get install libbz2-dev  # Если эти библиотеки не были установлены, придётся переустновить python после этих команд.
+sudo apt-get install liblzma-dev  # Если эти библиотеки не были установлены, придётся переустновить python после этих команд.
 ``` 
+
 #### Установка CUDA и cuDNN (для GPU)
 
 ```bash
