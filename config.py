@@ -9,7 +9,7 @@ PORT = int(os.getenv('PORT', 49153))
 MODEL_NAME = os.getenv('MODEL_NAME', "Gigaam")  ## Vosk5SmallStreaming  Vosk5 Gigaam Whisper
 BASE_SAMPLE_RATE = int(os.getenv('BASE_SAMPLE_RATE', 16000))  # Стрим из астериска отдаёт только 8к
 PROVIDER = os.getenv('PROVIDER',"CUDA")
-NUM_THREADS = int(os.getenv('NUM_THREADS', 4))
+NUM_THREADS = int(os.getenv('NUM_THREADS', 0))
 
 # Logger settings
 LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
@@ -27,7 +27,7 @@ VAD_SENSITIVITY = int(os.getenv('VAD_SENSE', 3))  # 1 to 5 Higher - more words.
 VAD_WITH_GPU = True if int(os.getenv('VAD_WITH_GPU', 0)) == 1 else False
 
 # Punctuate_settings
-PUNCTUATE_WITH_GPU = True if int(os.getenv('VAD_WITH_GPU', 0)) == 1 else False
+PUNCTUATE_WITH_GPU = True if int(os.getenv('PUNCTUATE_WITH_GPU', 0)) == 1 else False
 
 # Diarisation_settings
 CAN_DIAR = True if int(os.getenv('CAN_DIAR', 0)) == 1 else False
