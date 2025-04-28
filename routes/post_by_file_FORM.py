@@ -208,6 +208,16 @@ async def async_receive_file(
     file: UploadFile = File(description="Аудиофайл для обработки"),
     params: PostFileRequest = Depends(get_file_request),
 ):
+    res = True
+    error_description = str()
+
+    result = {
+        "success": res,
+        "error_description": error_description,
+        "raw_data": dict(),
+        "sentenced_data": dict(),
+    }
+
     # Сохраняем файл на диск асинхронно
     async with aiofiles.tempfile.NamedTemporaryFile("wb", delete=False) as tmp:
         await tmp.write(await file.read())
@@ -216,8 +226,10 @@ async def async_receive_file(
     try:
         # Запускаем обработку в потоке
         result = await asyncio.to_thread(receive_file, tmp_path, params)
+    except Exception as e:
+        logger.error(f"Ошибка обработки asyncio.to_thread - {e}")
+        result['error_description'] = str(e)
     finally:
         # Удаляем временный файл
         os.unlink(tmp_path)
-
-    return result
+        return result
