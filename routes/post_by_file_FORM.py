@@ -80,7 +80,7 @@ def sync_do_diarizing(post_id, raw_data, diar_vad_sensity):  # Перепиши�
 def sync_do_sensitizing(data, do_punctuation):  # Перепишите как синхронную
     return asyncio.run(do_sensitizing(data, do_punctuation=do_punctuation))
 
-def receive_file(tmp_path, params):
+def process_file(tmp_path, params):
     res = False
     diarized = False
     error_description = str()
@@ -225,7 +225,7 @@ async def async_receive_file(
 
     try:
         # Запускаем обработку в потоке
-        result = await asyncio.to_thread(receive_file, tmp_path, params)
+        result = await asyncio.to_thread(process_file, tmp_path, params)
     except Exception as e:
         logger.error(f"Ошибка обработки asyncio.to_thread - {e}")
         result['error_description'] = str(e)
