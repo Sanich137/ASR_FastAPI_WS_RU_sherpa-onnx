@@ -224,6 +224,11 @@ async def async_receive_file(
         tmp_path = tmp.name
 
     try:
+        logger.debug(f"Получен и сохранён файл {file.filename}")
+    except Exception as e:
+        pass
+
+    try:
         # Запускаем обработку в потоке
         result = await asyncio.to_thread(process_file, tmp_path, params)
     except Exception as e:
