@@ -191,3 +191,5 @@ sudo systemctl enable vosk_gpu
  
 - реализовать постобработку аудио для улучшения разборчивости аудио человеком.
 - [возможно, деноиз от силеро](https://github.com/snakers4/silero-models?tab=readme-ov-file#models)
+- уйти от VAD в Диаризации
+
