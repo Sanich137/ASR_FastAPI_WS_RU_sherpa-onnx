@@ -22,7 +22,7 @@ psutil
 
 # For ASR
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
-sherpa-onnx==1.11.3+cuda
+sherpa-onnx==1.12.0+cuda
 onnxruntime-gpu==1.17.1
 librosa
 
