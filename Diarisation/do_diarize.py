@@ -13,11 +13,11 @@ from sklearn.cluster import AgglomerativeClustering
 import time
 from umap import UMAP
 from hdbscan import HDBSCAN
-from utils.do_logging import logger
+# from utils.do_logging import logger
 from utils.pre_start_init import paths
 from utils.resamppling import resample_audiosegment
 
-# import logging as logger
+import logging as logger
 
 # Здесь SileroVAD остаётся только для тестов Диаризации на бою используется класс из do_vad
 class SileroVAD:
@@ -44,7 +44,7 @@ class SileroVAD:
                                             sess_options=session_options,
                                             providers=providers)
 
-    def reset_state(self):
+    async def reset_state(self):
         self.state = np.zeros((2, 1, 128), dtype=np.float32)
 
     def set_mode(self, mode: int):
@@ -86,7 +86,7 @@ class SileroVAD:
 
         return prob, self.state
 
-    def get_speech_segments(self, audio_frames: np.ndarray) -> list[tuple]:
+    async def get_speech_segments(self, audio_frames: np.ndarray) -> list[tuple]:
         if len(audio_frames.shape) == 2:
             audio_frames = audio_frames.flatten()
 
@@ -105,7 +105,6 @@ class SileroVAD:
         speech_pad_samples = sample_rate * speech_pad_ms // 1000
 
         # Получение вероятностей речи
-        self.reset_state()
         speech_probs = []
         for current_start in range(0, audio_length_samples, window_size_samples):
             chunk = audio_frames[current_start:current_start + window_size_samples]
@@ -475,50 +474,52 @@ async def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int 
     return frames
 
 
-# if __name__ == "__main__":
-#     # Todo - перевести тест в async
-#
-#     # Параметры диаризации и кластеризации
-#     num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
-#
-#     # Параметры извлечения ембеддингов
-#     max_phrase_gap = 1  # расстояние между фразами для объединения в один кластер.
-#     use_gpu_diar = False  # По возможности использовать графический процессор для вычислений
-#     batch_size = 32  # Размер батча для извлечения эмбеддингов при работе GPU
-#     max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
-#
-#     # # Параметры сегментации (VAD)
-#     vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
-#     use_gpu_vad = False  # По возможности использовать графический процессор для вычислений
-#
-#     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
-#     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
-#
-#     audio_path = "../trash/Роман.mp3"
-#
-#     vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
-#     vad.set_mode(vad_mode)
-#
-#
-#     audio = AudioSegment.from_file(audio_path)
-#     audio_frames = await load_and_preprocess_audio(audio)
-#     #Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
-#
-#     diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
-#                         vad=vad,
-#                         max_phrase_gap=max_phrase_gap,
-#                         batch_size=batch_size,
-#                         cpu_workers=max_cpu_workers,
-#                         use_gpu=use_gpu_diar,
-#                         )
-#
-#     result = await diarizer.diarize_and_merge(
-#         audio_frames,
-#         num_speakers=num_speakers,
-#         filter_cutoff=50,
-#         filter_order=10,
-#         vad_sensity=vad_mode
-#     )
-#
-#     for r in result:
-#         print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
+async def main():
+    # Параметры диаризации и кластеризации
+    num_speakers = 2  # Количество спикеров (-1 для автоматического определения)
+
+    # Параметры извлечения ембеддингов
+    max_phrase_gap = 0.1  # расстояние между фразами для объединения в один кластер.
+    use_gpu_diar = True  # По возможности использовать графический процессор для вычислений
+    batch_size = 1  # Размер батча для извлечения эмбеддингов при работе GPU
+    max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
+
+    # # Параметры сегментации (VAD)
+    vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
+    use_gpu_vad = True  # По возможности использовать графический процессор для вычислений
+
+    vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
+    speaker_model_path = Path("../models/DIARISATION_model/wespeaker_en_voxceleb_resnet293_LM.onnx")
+
+    audio_path = "../trash/q.wav"
+
+    vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
+    vad.set_mode(vad_mode)
+
+    audio = AudioSegment.from_file(audio_path)
+    audio_frames = await load_and_preprocess_audio(audio)
+    # Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
+
+    diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
+                        vad=vad,
+                        max_phrase_gap=max_phrase_gap,
+                        batch_size=batch_size,
+                        cpu_workers=max_cpu_workers,
+                        use_gpu=use_gpu_diar,
+                        )
+
+    result = await diarizer.diarize_and_merge(
+        audio_frames,
+        num_speakers=num_speakers,
+        filter_cutoff=50,
+        filter_order=10,
+        vad_sensity=vad_mode
+    )
+
+    for r in result:
+        print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
+
+
+if __name__ == "__main__":
+    # Todo - перевести тест в async
+    asyncio.run(main())
