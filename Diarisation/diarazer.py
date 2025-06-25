@@ -15,7 +15,7 @@ async def do_diarizing(
         num_speakers:int = -1,
         filter_cutoff:int = 50,
         filter_order:int = 10,
-        diar_vad_sensity: int = 3
+
         ):
     # Предобработка аудио.
     # ВАЖНЫЙ момент. Мы диаризируем только последний канал.
@@ -27,7 +27,7 @@ async def do_diarizing(
         num_speakers=num_speakers,
         filter_cutoff=filter_cutoff,
         filter_order=filter_order,
-        vad_sensity=diar_vad_sensity
+        asr_results=asr_raw_data
     )
 
     for r in diar_result:

@@ -55,29 +55,28 @@ def get_file_request(
         diar_vad_sensity=diar_vad_sensity,
     )
 
-# Синхронные версии функций (заглушки, нужно переписать)
-def sync_simple_recognise(audio_data):  # Перепишите как синхронную
+def sync_simple_recognise(audio_data):
     return asyncio.run(simple_recognise(audio_data))
 
-def sync_resample_audiosegment(audio_data, target_sample_rate):  # Перепишите как синхронную
+def sync_resample_audiosegment(audio_data, target_sample_rate):
     return asyncio.run(resample_audiosegment(audio_data, target_sample_rate))
 
-def sync_find_last_speech_position(post_id):  # Перепишите как синхронную
+def sync_find_last_speech_position(post_id):
     return asyncio.run(find_last_speech_position(post_id))
 
-def sync_process_gigaam_asr(asr_result, duration):  # Перепишите как синхронную
+def sync_process_gigaam_asr(asr_result, duration):
     return asyncio.run(process_gigaam_asr(asr_result, duration))
 
-def sync_process_asr_json(asr_result, duration):  # Перепишите как синхронную
+def sync_process_asr_json(asr_result, duration):
     return asyncio.run(process_asr_json(asr_result, duration))
 
-def sync_remove_echo(raw_data):  # Перепишите как синхронную
+def sync_remove_echo(raw_data):
     return asyncio.run(remove_echo(raw_data))
 
-def sync_do_diarizing(post_id, raw_data, diar_vad_sensity):  # Перепишите как синхронную
-    return asyncio.run(do_diarizing(post_id, raw_data, diar_vad_sensity=diar_vad_sensity))
+def sync_do_diarizing(post_id, raw_data):
+    return asyncio.run(do_diarizing(post_id, raw_data))
 
-def sync_do_sensitizing(data, do_punctuation):  # Перепишите как синхронную
+def sync_do_sensitizing(data, do_punctuation):
     return asyncio.run(do_sensitizing(data, do_punctuation=do_punctuation))
 
 def process_file(tmp_path, params):
@@ -169,7 +168,7 @@ def process_file(tmp_path, params):
     if params.do_diarization:
         try:
             result["diarized_data"] = sync_do_diarizing(
-                post_id, result["raw_data"], diar_vad_sensity=params.diar_vad_sensity
+                post_id, result["raw_data"],
             )
         except Exception as e:
             logger.error(f"do_diarizing - {e}")

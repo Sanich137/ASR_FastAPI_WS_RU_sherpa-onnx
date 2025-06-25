@@ -1,11 +1,10 @@
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 import asyncio
 import os
 import numpy as np
 from pydub import AudioSegment
 from pathlib import Path
 import onnxruntime as ort
-
 from python_speech_features import fbank
 from scipy.signal import butter, sosfilt
 from sklearn.metrics import silhouette_score
@@ -13,185 +12,10 @@ from sklearn.cluster import AgglomerativeClustering
 import time
 from umap import UMAP
 from hdbscan import HDBSCAN
-# from utils.do_logging import logger
-from utils.pre_start_init import paths
-from utils.resamppling import resample_audiosegment
-
 import logging as logger
-
-# Здесь SileroVAD остаётся только для тестов Диаризации на бою используется класс из do_vad
-class SileroVAD:
-    def __init__(self, onnx_path: Path, use_gpu=False):
-        if use_gpu:
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-        else:
-            providers = ['CPUExecutionProvider']
-        self.sample_rate = 16000
-        self.state = np.zeros((2, 1, 128), dtype=np.float32)
-        self.frame_size = 512
-        self.prob_level = 0.5
-        self.set_mode(3)
-        # Параметры сегментации (VAD)
-        self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
-        self.max_vad_gap = 1  # Максимальный промежуток между сегментами для их объединения (сек)
-
-        session_options = ort.SessionOptions()
-        session_options.log_severity_level = 4
-        session_options.inter_op_num_threads = 0
-        session_options.intra_op_num_threads = 0
-
-        self.session = ort.InferenceSession(path_or_bytes=onnx_path,
-                                            sess_options=session_options,
-                                            providers=providers)
-
-    async def reset_state(self):
-        self.state = np.zeros((2, 1, 128), dtype=np.float32)
-
-    def set_mode(self, mode: int):
-        if mode not in [1, 2, 3, 4, 5]:
-            self.prob_level = 0.5
-        elif mode == 1:
-            self.prob_level = 0.7
-        elif mode == 2:
-            self.prob_level = 0.6
-        elif mode == 3:
-            self.prob_level = 0.5
-        elif mode == 4:
-            self.prob_level = 0.3
-        elif mode == 5:
-            self.prob_level = 0.15
-
-    def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
-        """Обработка аудио-фрейма (миничанка)
-                Args:
-                    :param audio_frame: 1D numpy array размером 512 сэмплов
-                    :param sample_rate:
-                Returns:
-                    float: вероятность, что чанк это речь
-                    state: ntreott состояние модели.
-                """
-        if len(audio_frame) != self.frame_size:
-            audio_frame = np.pad(audio_frame, (0, self.frame_size - len(audio_frame)), mode='constant')[
-                          :self.frame_size]
-
-        inputs = {
-            'input': audio_frame.reshape(1, -1).astype(np.float32),
-            'state': self.state,
-            'sr': np.array(16000, dtype=np.int64)
-        }
-
-        outputs = self.session.run(['output', 'stateN'], inputs)
-        self.state = outputs[1]
-        prob = float(outputs[0][0, 0])
-
-        return prob, self.state
-
-    async def get_speech_segments(self, audio_frames: np.ndarray) -> list[tuple]:
-        if len(audio_frames.shape) == 2:
-            audio_frames = audio_frames.flatten()
-
-        audio_length_samples = len(audio_frames)
-        window_size_samples = self.frame_size
-        sample_rate = self.sample_rate
-
-        # Параметры из get_speech_timestamps
-        threshold = self.prob_level
-        neg_threshold = threshold - 0.15
-        min_speech_duration_ms = int(self.min_duration * 1000)
-        min_silence_duration_ms = int(self.max_vad_gap * 1000)
-        speech_pad_ms = 30
-        min_speech_samples = sample_rate * min_speech_duration_ms // 1000
-        min_silence_samples = sample_rate * min_silence_duration_ms // 1000
-        speech_pad_samples = sample_rate * speech_pad_ms // 1000
-
-        # Получение вероятностей речи
-        speech_probs = []
-        for current_start in range(0, audio_length_samples, window_size_samples):
-            chunk = audio_frames[current_start:current_start + window_size_samples]
-            if len(chunk) < window_size_samples:
-                chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
-            prob, new_state = self.is_speech(chunk)
-            self.state = new_state
-            speech_probs.append(prob)
-
-        # Обработка вероятностей для выделения сегментов
-        triggered = False
-        speeches = []
-        current_speech = {}
-        temp_end = 0
-        prev_end = 0
-        next_start = 0
-
-        for i, speech_prob in enumerate(speech_probs):
-            current_sample = window_size_samples * i
-            if speech_prob >= threshold and temp_end:
-                temp_end = 0
-                if next_start < prev_end:
-                    next_start = current_sample
-
-            if speech_prob >= threshold and not triggered:
-                triggered = True
-                current_speech['start'] = current_sample
-                continue
-
-            if speech_prob < neg_threshold and triggered:
-                if not temp_end:
-                    temp_end = current_sample
-                if (current_sample - temp_end) > (sample_rate * 98 // 1000):
-                    prev_end = temp_end
-                if (current_sample - temp_end) < min_silence_samples:
-                    continue
-                else:
-                    current_speech['end'] = temp_end
-                    if (current_speech['end'] - current_speech['start']) > min_speech_samples:
-                        speeches.append(current_speech)
-                    current_speech = {}
-                    prev_end = next_start = temp_end = 0
-                    triggered = False
-                    continue
-
-        if current_speech and (audio_length_samples - current_speech.get('start', 0)) > min_speech_samples:
-            current_speech['end'] = audio_length_samples
-            speeches.append(current_speech)
-
-        # Применение speech_pad и корректировка границ
-        for i, speech in enumerate(speeches):
-            if i == 0:
-                speech['start'] = max(0, speech['start'] - speech_pad_samples)
-            if i != len(speeches) - 1:
-                silence_duration = speeches[i + 1]['start'] - speech['end']
-                if silence_duration < 2 * speech_pad_samples:
-                    speech['end'] += silence_duration // 2
-                    speeches[i + 1]['start'] = max(0, speeches[i + 1]['start'] - silence_duration // 2)
-                else:
-                    speech['end'] = min(audio_length_samples, speech['end'] + speech_pad_samples)
-                    speeches[i + 1]['start'] = max(0, speeches[i + 1]['start'] - speech_pad_samples)
-            else:
-                speech['end'] = min(audio_length_samples, speech['end'] + speech_pad_samples)
-
-        # Формирование результата
-        segments = []
-        for speech in speeches:
-            start = speech['start'] / sample_rate
-            end = speech['end'] / sample_rate
-            audio_segment = audio_frames[int(start * sample_rate):int(end * sample_rate)]
-            segments.append((start, end, audio_segment))
-
-        return segments
-
-
-def process_batch_sync(batch):
-    """Синхронная функция для обработки батча в отдельном процессе."""
-    session = ort.InferenceSession(
-        path_or_bytes=paths.get("diar_speaker_model_path"),  # Укажи актуальный путь к модели
-        providers=['CPUExecutionProvider'],
-        sess_options=ort.SessionOptions()
-    )
-    return session.run(output_names=['embs'], input_feed={'feats': batch})[0].squeeze()
 
 class Diarizer:
     def __init__(self, embedding_model_path: str,
-                 vad,
                  sample_rate: int = 16000,
                  use_gpu: bool = False,
                  max_phrase_gap: float = 0.5,
@@ -200,7 +24,6 @@ class Diarizer:
                  filter_order: int = 10,
                  batch_size: int = 1,
                  cpu_workers: int = 0):
-        self.vad = vad
         self.sample_rate = sample_rate
         self.winlen = 0.025
         self.winstep = 0.01
@@ -229,7 +52,6 @@ class Diarizer:
             sess_options=so,
             providers=providers
         )
-        self.table = {}
         logger.debug(f"Используемые для диаризации провайдеры {self.embedding_session.get_providers()}")
 
     async def highpass_filter(self, signal: np.ndarray, cutoff: float, filter_order: int) -> np.ndarray:
@@ -304,28 +126,30 @@ class Diarizer:
             merged.append({"start": current_start, "end": current_end, "speaker": current_label})
         return merged
 
-    async def diarize(self, audio_frames: np.ndarray,
-                      num_speakers: int,
-                      filter_cutoff: float,
-                      filter_order: int,
-                      vad_sensity: int) -> list[dict]:
-        await self.vad.reset_state()
-        self.vad.set_mode(vad_sensity)
+    async def diarize(self, audio_frames: np.ndarray, asr_results: list, num_speakers: int,
+                      filter_cutoff: float, filter_order: int) -> list[dict]:
         start_time = time.perf_counter()
 
-        logger.debug("Начало сегментации...")
+        logger.debug("Начало обработки ASR сегментов...")
         seg_start = time.perf_counter()
-        segments = await self.vad.get_speech_segments(audio_frames)
+        segments = []
+
+        for channel in asr_results.get(f"channel_{len(asr_results.keys())}", []):
+            for result in channel["data"]["result"]:
+                start = result["start"]
+                end = result["end"]
+                if end - start >= self.min_duration:
+                    audio_segment = audio_frames[int(start * self.sample_rate):int(end * self.sample_rate)]
+                    segments.append((start, end, audio_segment))
+                else:
+                    audio_segment = audio_frames[int((start-0.05) * self.sample_rate):int((end+0.05) * self.sample_rate)]
+                    segments.append((start, end, audio_segment))
+
         seg_time = time.perf_counter() - seg_start
-        logger.debug(f"Процедура: Сегментация (get_speech_segments) - {seg_time:.4f} сек")
+        logger.debug(f"Процедура: Обработка ASR сегментов - {seg_time:.4f} сек")
 
         if not segments:
-            logger.debug("Речь не обнаружена")
-            return []
-
-        segments = [seg for seg in segments if seg[1] - seg[0] >= self.min_duration]
-        if not segments:
-            logger.debug("После фильтрации сегментов не осталось")
+            logger.debug("Сегменты не найдены")
             return []
 
         frame_shift = int(self.winstep * 1000)
@@ -346,7 +170,7 @@ class Diarizer:
         emb_start = time.perf_counter()
         embeddings = await self.extract_embeddings(subseg_audios, subseg_cmn=True)
         emb_time = time.perf_counter() - emb_start
-        logger.debug(f"Процедура: Извлечение эмбеддингов (extract_embeddings) - {emb_time:.4f} сек")
+        logger.debug(f"Процедура: Извлечение эмбеддингов - {emb_time:.4f} сек")
 
         if len(embeddings) == 0:
             logger.debug("Не удалось извлечь валидные эмбеддинги")
@@ -367,12 +191,12 @@ class Diarizer:
                 metric='cosine',
                 n_neighbors=n_neighbors,
                 min_dist=0.1,
-                random_state=2023,
+                # random_state=2023,
                 n_jobs=1
             ).fit_transform(embeddings)
 
-            if num_speakers >= 2:
-                clustering = AgglomerativeClustering(n_clusters=num_speakers, metric='cosine', linkage='average')
+            if num_speakers ==-1:
+                clustering = AgglomerativeClustering(n_clusters=2, metric='cosine', linkage='average')
                 labels = clustering.fit_predict(umap_embeddings)
                 logger.debug(f"Использовано {num_speakers} спикеров (Agglomerative Clustering)")
             else:
@@ -404,7 +228,7 @@ class Diarizer:
         logger.debug(f"Процедура: Объединение подсегментов - {merge_time:.4f} сек")
 
         total_diarize_time = time.perf_counter() - start_time
-        logger.debug(f"Процедура: Общая диаризация (diarize) - {total_diarize_time:.4f} сек")
+        logger.debug(f"Процедура: Общая диаризация - {total_diarize_time:.4f} сек")
 
         return merged_segments
 
@@ -432,94 +256,385 @@ class Diarizer:
             merged.append(current_phrase)
 
         merge_time = time.perf_counter() - start_time
-        logger.debug(f"Процедура: Объединение сегментов (merge_segments) - {merge_time:.4f} сек")
+        logger.debug(f"Процедура: Объединение сегментов - {merge_time:.4f} сек")
 
         return merged
 
-    async def diarize_and_merge(self, audio_frames: np.ndarray, num_speakers: int,
-                                filter_cutoff: int = 50, filter_order: int = 10,
-                                vad_sensity: int = 3) -> list[dict]:
+    async def diarize_and_merge(self, audio_frames: np.ndarray, asr_results: list,
+                                num_speakers: int, filter_cutoff: int = 50,
+                                filter_order: int = 10) -> list[dict]:
         start_time = time.perf_counter()
 
-        raw_result = await self.diarize(audio_frames, num_speakers, filter_cutoff, filter_order, vad_sensity)
+        raw_result = await self.diarize(audio_frames, asr_results, num_speakers, filter_cutoff, filter_order)
+
         merged_result = await self.merge_segments(raw_result)
 
         total_time = time.perf_counter() - start_time
-        logger.debug(f"Процедура: Полная диаризация и объединение (diarize_and_merge) - {total_time:.4f} сек")
+        logger.debug(f"Процедура: Полная диаризация и объединение - {total_time:.4f} сек")
 
         return merged_result
 
-async def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int = 512, sample_rate: int = 16000) -> np.ndarray:
-    """
-    :param audio: AudioSegment аудио данные
-    :param target_frame_size: int = 512 требования для работы SILERO VAD
-    :param sample_rate: int = 16000 требования для работы SILERO VAD
-    """
-
+async def load_and_preprocess_audio(audio: AudioSegment, sample_rate: int = 16000) -> np.ndarray:
     start_time = time.perf_counter()
 
     if audio.frame_rate != sample_rate:
-        audio = await resample_audiosegment(audio,sample_rate)
+        audio = audio.set_frame_rate(sample_rate)
     if audio.channels > 1:
-        audio = audio.split_to_mono()[1][0:60000]
+        audio = audio.split_to_mono()[0]
     samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
     samples_float32 = samples.astype(np.float32) / 32768.0
-    num_frames = len(samples_float32) // target_frame_size
-    frames = samples_float32[:num_frames * target_frame_size].reshape(num_frames, target_frame_size)
 
     load_time = time.perf_counter() - start_time
     logger.debug(f"В работу принято аудио продолжительностью {audio.duration_seconds} сек")
-    logger.debug(f"Процедура: Загрузка и предобработка аудио (load_and_preprocess_audio) - {load_time:.4f} сек")
+    logger.debug(f"Процедура: Загрузка и предобработка аудио - {load_time:.4f} сек")
 
-    return frames
-
+    return samples_float32
 
 async def main():
-    # Параметры диаризации и кластеризации
-    num_speakers = 2  # Количество спикеров (-1 для автоматического определения)
+    num_speakers = 2
+    max_phrase_gap = 0.1
+    use_gpu_diar = False
+    batch_size = 1
+    max_cpu_workers = 0
 
-    # Параметры извлечения ембеддингов
-    max_phrase_gap = 0.1  # расстояние между фразами для объединения в один кластер.
-    use_gpu_diar = True  # По возможности использовать графический процессор для вычислений
-    batch_size = 1  # Размер батча для извлечения эмбеддингов при работе GPU
-    max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
+    speaker_model_path = Path("../models/DIARISATION_model/voxceleb_gemini_dfresnet114_LM.onnx")
+    audio_path = "../trash/secret.wav"
 
-    # # Параметры сегментации (VAD)
-    vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
-    use_gpu_vad = True  # По возможности использовать графический процессор для вычислений
-
-    vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
-    speaker_model_path = Path("../models/DIARISATION_model/wespeaker_en_voxceleb_resnet293_LM.onnx")
-
-    audio_path = "../trash/q.wav"
-
-    vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
-    vad.set_mode(vad_mode)
 
     audio = AudioSegment.from_file(audio_path)
     audio_frames = await load_and_preprocess_audio(audio)
-    # Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
 
-    diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
-                        vad=vad,
-                        max_phrase_gap=max_phrase_gap,
-                        batch_size=batch_size,
-                        cpu_workers=max_cpu_workers,
-                        use_gpu=use_gpu_diar,
-                        )
+    # Пример результата ASR
+    asr_results = {
+        "channel_1": [
+            {
+                "data": {
+                    "result": [
+                        {
+                            "conf": 1,
+                            "start": 1.28,
+                            "end": 1.48,
+                            "word": "алло"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 2.2,
+                            "end": 2.44,
+                            "word": "алло"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 2.64,
+                            "end": 2.96,
+                            "word": "наталья"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 3.08,
+                            "end": 3.6,
+                            "word": "анатольевна"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 3.72,
+                            "end": 4,
+                            "word": "добрый"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 4.16,
+                            "end": 4.36,
+                            "word": "день"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 5.16,
+                            "end": 5.4,
+                            "word": "добрый"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 5.56,
+                            "end": 5.72,
+                            "word": "день"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 6.36,
+                            "end": 6.84,
+                            "word": "екатерина"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 6.96,
+                            "end": 7.48,
+                            "word": "руководитель"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 7.6,
+                            "end": 7.88,
+                            "word": "группы"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 8,
+                            "end": 8.28,
+                            "word": "отдела"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 8.44,
+                            "end": 9.12,
+                            "word": "сопровождения"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 9.76,
+                            "end": 10.08,
+                            "word": "наталья"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 10.16,
+                            "end": 10.72,
+                            "word": "анатольевна"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 10.88,
+                            "end": 11.08,
+                            "word": "звоню"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 11.24,
+                            "end": 11.24,
+                            "word": "с"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 11.36,
+                            "end": 11.8,
+                            "word": "весенними"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 11.92,
+                            "end": 12.4,
+                            "word": "праздниками"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 12.56,
+                            "end": 12.64,
+                            "word": "вас"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 12.76,
+                            "end": 12.92,
+                            "word": "всех"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 13.04,
+                            "end": 13.52,
+                            "word": "поздравить"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 14.12,
+                            "end": 14.48,
+                            "word": "спасбо"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 14.68,
+                            "end": 15,
+                            "word": "большое"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 15.16,
+                            "end": 15.56,
+                            "word": "взаимно"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 15.96,
+                            "end": 16,
+                            "word": "да"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 16.24,
+                            "end": 16.72,
+                            "word": "спасибо"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 17,
+                            "end": 17.08,
+                            "word": "как"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 17.2,
+                            "end": 17.2,
+                            "word": "у"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 17.32,
+                            "end": 17.4,
+                            "word": "вас"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 17.52,
+                            "end": 17.68,
+                            "word": "дела"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 17.88,
+                            "end": 18,
+                            "word": "как"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 18.16,
+                            "end": 18.72,
+                            "word": "настроение"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 18.92,
+                            "end": 19.48,
+                            "word": "весеннее"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 20.48,
+                            "end": 20.52,
+                            "word": "ну"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 20.76,
+                            "end": 22.08,
+                            "word": "сейасв"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 24.36,
+                            "end": 24.44,
+                            "word": "да"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 24.64,
+                            "end": 24.68,
+                            "word": "да"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 24.84,
+                            "end": 24.88,
+                            "word": "да"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 25,
+                            "end": 25.64,
+                            "word": "каждыа"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 25.92,
+                            "end": 26.24,
+                            "word": "выходишь"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 26.36,
+                            "end": 26.4,
+                            "word": "на"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 26.52,
+                            "end": 26.76,
+                            "word": "работу"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 26.88,
+                            "end": 27.28,
+                            "word": "солнышко"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 27.4,
+                            "end": 27.4,
+                            "word": "и"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 27.56,
+                            "end": 27.64,
+                            "word": "как"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 27.72,
+                            "end": 27.96,
+                            "word": "будто"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 28.08,
+                            "end": 28.12,
+                            "word": "бы"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 28.24,
+                            "end": 28.72,
+                            "word": "настроение"
+                        },
+                        {
+                            "conf": 1,
+                            "start": 28.92,
+                            "end": 29.12,
+                            "word": "лучше"
+                        }
+                  ],
+                  "text": "алло алло наталья анатольевна добрый день добрый день екатерина руководитель группы отдела сопровождения наталья анатольевна звоню с весенними праздниками вас всех поздравить спасбо большое взаимно да спасибо как у вас дела как настроение весеннее ну сейасв да да да каждыа выходишь на работу солнышко и как будто бы настроение лучше"
+                }
+            }
+        ]
+    }
+
+    diarizer = Diarizer(
+        embedding_model_path=str(speaker_model_path),
+        max_phrase_gap=max_phrase_gap,
+        batch_size=batch_size,
+        cpu_workers=max_cpu_workers,
+        use_gpu=use_gpu_diar,
+    )
 
     result = await diarizer.diarize_and_merge(
         audio_frames,
+        asr_results,
         num_speakers=num_speakers,
         filter_cutoff=50,
-        filter_order=10,
-        vad_sensity=vad_mode
+        filter_order=10
     )
 
     for r in result:
         print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
 
-
 if __name__ == "__main__":
-    # Todo - перевести тест в async
     asyncio.run(main())
