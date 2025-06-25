@@ -32,6 +32,8 @@ class PostFileRequest(BaseModel):
     do_echo_clearing: bool = False
     do_dialogue: bool = False
     do_punctuation: bool = False
+    do_diarization: bool = False
+    diar_vad_sensity: int = 3
 
 
 class PostFileRequestDiarize(BaseModel):
