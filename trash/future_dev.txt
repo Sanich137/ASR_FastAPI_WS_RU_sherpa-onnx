@@ -1,1 +1,0 @@
-# kontur-ai/sbert_punc_case_ru
