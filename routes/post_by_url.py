@@ -52,6 +52,7 @@ def sync_remove_echo(raw_data):  # Перепишите как синхронн�
 def sync_do_sensitizing(data, do_punctuation):  # Перепишите как синхронную
     return asyncio.run(do_sensitizing(data, do_punctuation))
 
+# todo - совместить с распознаванием FORM
 def process_request(tmp_path, params):
     res = False
     error_description = str()
@@ -70,8 +71,9 @@ def process_request(tmp_path, params):
         with audio_lock:
             posted_and_downloaded_audio[post_id] = AudioSegment.from_file(tmp_path)
     except Exception as e:
-        logger.error(f"Error loading audio file: {e}")
         error_description = f"Error loading audio file: {e}"
+        logger.error(error_description)
+        result["error_description"] = error_description
         return result
 
     # Приводим фреймрейт к фреймрейту модели

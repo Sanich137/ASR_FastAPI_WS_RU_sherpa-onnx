@@ -80,6 +80,7 @@ def sync_do_diarizing(post_id, raw_data, diar_vad_sensity):  # Перепиши�
 def sync_do_sensitizing(data, do_punctuation):  # Перепишите как синхронную
     return asyncio.run(do_sensitizing(data, do_punctuation=do_punctuation))
 
+# Todo - перенести обработку в эту логику и обработку файлов по ссылке.
 def process_file(tmp_path, params):
     res = False
     diarized = False
