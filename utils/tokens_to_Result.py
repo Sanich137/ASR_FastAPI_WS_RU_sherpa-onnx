@@ -1,11 +1,13 @@
 import asyncio
-import math
-#from utils.do_logging import logger
-import logging as logger
 
-# Функция для преобразования логарифмических вероятностей в обычные
-def logprob_to_prob(logprob):
-    return math.exp(logprob)  # Используем exp для преобразования ln(prob)
+from numpy.ma.core import count
+from sympy.physics.units import speed
+
+from utils.do_logging import logger
+
+# # Функция для преобразования логарифмических вероятностей в обычные
+# def logprob_to_prob(logprob):
+#     return math.exp(logprob)  # Используем exp для преобразования ln(prob)
 
 # Асинхронная функция для обработки JSON
 async def process_asr_json(input_json, time_shift = 0.0):
@@ -63,7 +65,15 @@ async def process_asr_json(input_json, time_shift = 0.0):
     return result
 
 
-async def process_gigaam_asr(input_json, time_shift=0.0):
+async def process_gigaam_asr(input_json, time_shift=0.0, multiplier=1):
+    """
+
+    :param input_json: Входящий результат распознавания
+    :param time_shift: Время старта чанка от начала аудио
+    :param multiplier: Коэффициент замедления аудио
+    :return:
+    """
+
     # Парсим JSON
     data = input_json
 
@@ -78,12 +88,12 @@ async def process_gigaam_asr(input_json, time_shift=0.0):
     current_word = ""
     current_timestamps = []
 
+
     for i, token in enumerate(data['tokens']):
-        timestamp = round((data['timestamps'][i] + time_shift), 3)
+        timestamp = round((data['timestamps'][i] * multiplier) + time_shift, 2) # (1/multiplier-1)
 
         if token != ' ':
             current_timestamps.append(timestamp)
-
             # Проверяем временной промежуток между текущим и предыдущим токеном
             if len(current_timestamps) > 1:
                 time_gap = current_timestamps[-1] - current_timestamps[-2]
@@ -119,11 +129,23 @@ async def process_gigaam_asr(input_json, time_shift=0.0):
             'start': current_timestamps[0],
             'end': current_timestamps[-1]
         })
+    count_tokens = len(data["tokens"]) - data["tokens"].count(' ')
+
+    time_to_speak_tokens = sum([(word['end']-word['start']) for word in words])
+    logger.error(f"Всего токенов: {count_tokens}")
+    logger.error(f"Время на произношение токенов: {time_to_speak_tokens}")
+
+    if time_to_speak_tokens !=0:
+        speech_speed = count_tokens//time_to_speak_tokens*1
+    else:
+        speech_speed = 0
+
 
     # Формируем итоговый массив
     result['data'] = {
         'result': [{'conf': 1.0, 'start': word['start'], 'end': word['end'], 'word': word['word']} for word in words],
-        'text': ' '.join(word['word'] for word in words)  # Обновляем текст на основе разделённых слов
+        'text': ' '.join(word['word'] for word in words),  # Обновляем текст на основе разделённых слов
+        'speech_speed': speech_speed
     }
     return result
 

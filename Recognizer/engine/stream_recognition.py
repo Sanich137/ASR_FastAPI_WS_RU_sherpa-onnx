@@ -120,7 +120,8 @@ async def simple_recognise(audio_data, ) -> dict:
 
     # перевод в семплы для распознавания.
     samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
-    # Переносим декодирование в отдельный поток
+
+    # Распознавание в отдельном потоке
     def decode_in_thread():
         stream = recognizer.create_stream()
         # передали аудиофрагмент на распознавание

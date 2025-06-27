@@ -2,6 +2,9 @@ from pydantic import BaseModel, HttpUrl, Field
 from typing import Union, Annotated
 from fastapi import UploadFile
 
+import config
+
+
 class SyncASRRequest(BaseModel):
     """
     :parameter keep_raw: - Если False, то запрос вернёт только пост-обработанные данные do_punctuation и do_dialogue.
@@ -33,7 +36,9 @@ class PostFileRequest(BaseModel):
     do_dialogue: Union[bool, None] = False
     do_punctuation: Union[bool, None] = False
     do_diarization: Union[bool, None] = False
-    diar_vad_sensity: int = 3
+    diar_vad_sensity: int = 3,
+    do_speech_speed_correction: Union[bool, None] = config.DO_SPEED_SPEECH_CORRECTION
+    speech_speed_correction_multiplier: float = config.SPEED_SPEECH_CORRECTION_MULTIPLIER,
 
 
 class PostFileRequestDiarize(BaseModel):

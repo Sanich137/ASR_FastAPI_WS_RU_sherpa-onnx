@@ -14,6 +14,7 @@ from utils.pre_start_init import (
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 from utils.resamppling import resample_audiosegment
+from utils.slow_down_audio import do_slow_down_audio
 from models.fast_api_models import PostFileRequest
 from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence, simple_recognise
 from Recognizer.engine.sentensizer import do_sensitizing
@@ -45,6 +46,8 @@ def get_file_request(
     do_punctuation: bool = Form(default=False, description="Восстанавливать пунктуацию."),
     do_diarization: bool = Form(default=False, description="Разделять по спикерам."),
     diar_vad_sensity: int = Form(default=3, description="Чувствительность VAD."),
+    do_speech_speed_correction: bool = Form(default=False, description="Корректировать скорость речи при распознавании."),
+    speech_speed_correction_multiplier: float = Form(default=1, description="Базовый коэффициент скорости речи."),
 ) -> PostFileRequest:
     return PostFileRequest(
         keep_raw=keep_raw,
@@ -53,32 +56,36 @@ def get_file_request(
         do_punctuation=do_punctuation,
         do_diarization=do_diarization,
         diar_vad_sensity=diar_vad_sensity,
+        do_speech_speed_correction = do_speech_speed_correction,
+        speech_speed_correction_multiplier = speech_speed_correction_multiplier
     )
 
-# Синхронные версии функций (заглушки, нужно переписать)
-def sync_simple_recognise(audio_data):  # Перепишите как синхронную
+
+def sync_simple_recognise(audio_data):
     return asyncio.run(simple_recognise(audio_data))
 
-def sync_resample_audiosegment(audio_data, target_sample_rate):  # Перепишите как синхронную
+def sync_resample_audiosegment(audio_data, target_sample_rate):
     return asyncio.run(resample_audiosegment(audio_data, target_sample_rate))
 
-def sync_find_last_speech_position(post_id):  # Перепишите как синхронную
+def sync_find_last_speech_position(post_id):
     return asyncio.run(find_last_speech_position(post_id))
 
-def sync_process_gigaam_asr(asr_result, duration):  # Перепишите как синхронную
-    return asyncio.run(process_gigaam_asr(asr_result, duration))
+def sync_process_gigaam_asr(asr_result, duration, multiplier = 1):
+    return asyncio.run(process_gigaam_asr(asr_result, duration, multiplier))
 
-def sync_process_asr_json(asr_result, duration):  # Перепишите как синхронную
+def sync_process_asr_json(asr_result, duration):
     return asyncio.run(process_asr_json(asr_result, duration))
 
-def sync_remove_echo(raw_data):  # Перепишите как синхронную
+def sync_remove_echo(raw_data):
     return asyncio.run(remove_echo(raw_data))
 
-def sync_do_diarizing(post_id, raw_data, diar_vad_sensity):  # Перепишите как синхронную
+def sync_do_diarizing(post_id, raw_data, diar_vad_sensity):
     return asyncio.run(do_diarizing(post_id, raw_data, diar_vad_sensity=diar_vad_sensity))
 
-def sync_do_sensitizing(data, do_punctuation):  # Перепишите как синхронную
+def sync_do_sensitizing(data, do_punctuation):
     return asyncio.run(do_sensitizing(data, do_punctuation=do_punctuation))
+
+
 
 # Todo - перенести обработку в эту логику и обработку файлов по ссылке.
 def process_file(tmp_path, params):
@@ -162,13 +169,21 @@ def process_file(tmp_path, params):
 
                 try:
                     with audio_lock:
+                        audio_to_asr[post_id] = asyncio.run(do_slow_down_audio(audio_segment=audio_to_asr[post_id],
+                                                                               slowdown_rate=params.speech_speed_correction_multiplier))
+
                         asr_result_wo_conf = sync_simple_recognise(audio_to_asr[post_id])
+
+
+
                 except Exception as e:
                     logger.error(f"Error ASR audio - {e}")
                     error_description = f"Error ASR audio - {e}"
                 else:
                     if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Whisper":
-                        asr_result = sync_process_gigaam_asr(asr_result_wo_conf, audio_duration[post_id])
+                        asr_result = sync_process_gigaam_asr(asr_result_wo_conf,
+                                                             audio_duration[post_id],
+                                                             params.speech_speed_correction_multiplier)
                     else:
                         asr_result = sync_process_asr_json(asr_result_wo_conf, audio_duration[post_id])
 
