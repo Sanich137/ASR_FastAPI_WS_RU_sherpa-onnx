@@ -132,13 +132,16 @@ async def process_gigaam_asr(input_json, time_shift=0.0, multiplier=1):
     count_tokens = len(data["tokens"]) - data["tokens"].count(' ')
 
     time_to_speak_tokens = sum([(word['end']-word['start']) for word in words])
+    logger.error(f"------------------------------")
     logger.error(f"Всего токенов: {count_tokens}")
     logger.error(f"Время на произношение токенов: {time_to_speak_tokens}")
 
     if time_to_speak_tokens !=0:
-        speech_speed = count_tokens//time_to_speak_tokens*1
+        speech_speed = count_tokens//(time_to_speak_tokens/ multiplier)
     else:
         speech_speed = 0
+    logger.error(f"Скорость речи: {speech_speed}")
+    logger.error(f"------------------------------")
 
 
     # Формируем итоговый массив

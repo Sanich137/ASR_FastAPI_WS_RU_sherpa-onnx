@@ -8,7 +8,6 @@ from utils.pre_start_init import (audio_overlap,
 from pydub import AudioSegment
 from VoiceActivityDetector import vad
 from utils.resamppling import resample_audiosegment
-import numpy as np
 
 import numpy as np
 from pydub import AudioSegment

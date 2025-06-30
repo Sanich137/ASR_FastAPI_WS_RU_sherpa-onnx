@@ -146,6 +146,7 @@ def process_file(tmp_path, params):
     else:
         # Обрабатываем чанки с аудио по N секунд
         for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
+            # Подготовительные действия
             try:
                 with audio_lock:
                     audio_buffer[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
@@ -160,6 +161,7 @@ def process_file(tmp_path, params):
 
             result["raw_data"].update({f"channel_{n_channel + 1}": list()})
 
+            # Основной процесс перебора чанков для распознавания
             for overlap in mono_data[::config.MAX_OVERLAP_DURATION * 1000]:
                 with audio_lock:
                     if (audio_overlap[post_id].duration_seconds + overlap.duration_seconds) < 3:
