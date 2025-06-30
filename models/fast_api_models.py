@@ -33,6 +33,7 @@ class PostFileRequest(BaseModel):
     do_dialogue: Union[bool, None] = False
     do_punctuation: Union[bool, None] = False
     do_diarization: Union[bool, None] = False
+    make_mono: Union[bool, None] = False
     diar_vad_sensity: int = 3
 
 
