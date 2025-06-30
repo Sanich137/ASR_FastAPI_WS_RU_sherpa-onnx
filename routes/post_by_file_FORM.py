@@ -48,6 +48,7 @@ def get_file_request(
     diar_vad_sensity: int = Form(default=3, description="Чувствительность VAD."),
     do_speech_speed_correction: bool = Form(default=False, description="Корректировать скорость речи при распознавании."),
     speech_speed_correction_multiplier: float = Form(default=1, description="Базовый коэффициент скорости речи."),
+    make_mono: bool = Form(default=False, description="Соединить несколько каналов в mono"),
 ) -> PostFileRequest:
     return PostFileRequest(
         keep_raw=keep_raw,
@@ -56,6 +57,7 @@ def get_file_request(
         do_punctuation=do_punctuation,
         do_diarization=do_diarization,
         diar_vad_sensity=diar_vad_sensity,
+        make_mono=make_mono
         do_speech_speed_correction = do_speech_speed_correction,
         speech_speed_correction_multiplier = speech_speed_correction_multiplier
     )
@@ -105,7 +107,10 @@ def process_file(tmp_path, params):
 
     try:
         with audio_lock:
-            posted_and_downloaded_audio[post_id] = AudioSegment.from_file(tmp_path)
+            if params.make_mono:
+                posted_and_downloaded_audio[post_id] = AudioSegment.from_file(tmp_path).set_channels(1)
+            else:
+                posted_and_downloaded_audio[post_id] = AudioSegment.from_file(tmp_path)
     except Exception as e:
         error_description += f"Error loading audio file: {e}"
         logger.error(error_description)
