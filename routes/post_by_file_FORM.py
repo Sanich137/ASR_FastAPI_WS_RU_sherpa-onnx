@@ -57,7 +57,7 @@ def get_file_request(
         do_punctuation=do_punctuation,
         do_diarization=do_diarization,
         diar_vad_sensity=diar_vad_sensity,
-        make_mono=make_mono
+        make_mono=make_mono,
         do_speech_speed_correction = do_speech_speed_correction,
         speech_speed_correction_multiplier = speech_speed_correction_multiplier
     )
