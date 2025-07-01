@@ -3,6 +3,7 @@
 *.mp3
 *.ogg
 *.onnx
+*.m4a
 /.venv/
 /venv/
 /models/vosk-model-ru/

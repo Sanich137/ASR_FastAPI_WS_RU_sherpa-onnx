@@ -183,6 +183,7 @@ def match_asr_with_diarization(asr_data, diarization_data, min_overlap_ratio=0.5
                             # Сохраняем все оригинальные поля из asr_segment['data']
                             **{k: v for k, v in asr_segment['data'].items() if k not in ['result', 'text']}
                         },
+                        # Todo- перенести в data выше
                         'start': replica[0]['start'],
                         'end': replica[-1]['end']
                     })
