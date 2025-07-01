@@ -6,9 +6,9 @@ pathlib~=1.0.1
 ujson~=5.10.0
 numpy~=1.26.4
 
-uvicorn~=0.34.0
+uvicorn~=0.34.2
 fastapi~=0.115.12
-pydantic~=2.11.2
+pydantic~=2.11.4
 websockets~=15.0.1
 jinja2
 python-multipart
@@ -24,16 +24,16 @@ psutil
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
 sherpa-onnx==1.12.1+cuda
 onnxruntime-gpu==1.17.1
-librosa
+librosa~=0.11.0
 
 # For punctuation
-transformers~=4.51.0
+transformers~=4.51.3
 
 # For diarisation
-scikit-learn==1.5.2  # Понижен, чтоыбы избегать варнингов
+scikit-learn~=1.5.2
 python_speech_features
-umap-learn
-hdbscan
+umap-learn~=0.5.7
+hdbscan~=0.8.40
 
 
 # for VAD
@@ -42,3 +42,7 @@ requests~=2.32.3
 # For monitoring
 pynvml~=12.0.0
 nvidia-ml-py~=12.570.86
+
+aiofiles~=24.1.0
+python_speech_features~=0.6
+scipy~=1.15.2
