@@ -28,10 +28,13 @@ class PostFileRequest(BaseModel):
     чем некое среднее значение.
     :param do_punctuation: Расставляет пунктуацию.
     """
-    keep_raw: bool = True
-    do_echo_clearing: bool = False
-    do_dialogue: bool = False
-    do_punctuation: bool = False
+    keep_raw: Union[bool, None] = True
+    do_echo_clearing: Union[bool, None] = False
+    do_dialogue: Union[bool, None] = False
+    do_punctuation: Union[bool, None] = False
+    do_diarization: Union[bool, None] = False
+    make_mono: Union[bool, None] = False
+    diar_vad_sensity: int = 3
 
 
 class PostFileRequestDiarize(BaseModel):

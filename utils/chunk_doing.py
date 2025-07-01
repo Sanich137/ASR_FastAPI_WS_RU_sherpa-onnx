@@ -12,7 +12,6 @@ import numpy as np
 
 import numpy as np
 from pydub import AudioSegment
-import logging
 
 async def find_last_speech_position(socket_id, sample_width=2):
     """
@@ -21,8 +20,9 @@ async def find_last_speech_position(socket_id, sample_width=2):
     3. Находим позицию последнего сегмента тишины перед речью в аудио.
     4. Всё до этой позиции отправляем на распознавание
     5. Остаток, хвост, складываем отдельно как overlap
-    6. Если не находит ни одного сегмента без речи, помечаем его как полностью речь и отдаём на расп leaf    """
-    logger = logging.getLogger(__name__)
+    6. Если не находит ни одного сегмента без речи, помечаем его как полностью речь и отдаём на расп leaf
+    """
+
     frame_rate = audio_buffer[socket_id].frame_rate
 
     # 16000 - битрейт, требуемый Silero VAD

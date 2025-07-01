@@ -181,15 +181,15 @@ def match_asr_with_diarization(asr_data, diarization_data, min_overlap_ratio=0.5
                             'result': replica,
                             'text': ' '.join(w['word'] for w in replica),
                             # Сохраняем все оригинальные поля из asr_segment['data']
-                            **{k: v for k, v in asr_segment['data'].items() if k not in ['result', 'text']}
+                            **{k: v for k, v in asr_segment['data'].items() if k not in ['result', 'text']},
+                            'replica_start': replicas[0][0]['start'],
+                            'replica_end': replicas[-1][-1]['end']
                         },
-                        'start': replica[0]['start'],
-                        'end': replica[-1]['end']
                     })
 
     # Сортировка результатов по времени начала
     for speaker in result:
-        result[speaker].sort(key=lambda x: x['start'])
+        result[speaker].sort(key=lambda x: x['data']['replica_start'])
 
     return dict(result)
 
