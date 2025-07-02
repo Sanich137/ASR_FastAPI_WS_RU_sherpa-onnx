@@ -1,162 +1,178 @@
+import config
 from utils.do_logging import logger
-import ujson
-import statistics
+import numpy as np
 import asyncio
 from Punctuation import sbertpunc
 
-# is_async=False, task_id=None, raw_recognition=None):
 async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_async: bool = False):
-  """
-  :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
-  :param is_async: Ранее был реализован сервис постановки задачи на распознавание в работу. И, как следствие,
-  результат нужно было хранить в отдельном месте до его получения и удаления. Сейчас скорость обработки аудио уже не
-  требует такого. Понаблюдать, при необходимости можно удалить (и часть кода связанная с хранением переменных)
-  :param input_asr_json: {"channel_{n_channel + 1}":
-                              {"data":{"result":
-                                          [
-                                              { "conf": 1,
-                                                  "start": float(),
-                                                  "end": float(),
-                                                  "word": str()
-                                              }, ...
-                                          ],
-                                      "text": str()
-                              },
-                              ...
-                          }
-  :return:  {
-          "raw_text_sentenced_recognition": str() - текст с переносами, сортировкой по времени начала спикера,
-          "list_of_sentenced_recognitions": list() - список словарей с текстом, временем начала и номером спикера
-          "full_text_only": text_only, list() - список с суммированным текстом каждого канала
-          "err_state": err_state - ошибка, если не удалось
-      }
-  """
-  import statistics
+    """
+    :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
+    :param is_async: Ранее был реализован сервис постановки задачи на распознавание в работу. И, как следствие,
+    результат нужно было хранить в отдельном месте до его получения и удаления. Сейчас скорость обработки аудио уже не
+    требует такого. Понаблюдать, при необходимости можно удалить (и часть кода связанная с хранением переменных)
+    :param input_asr_json: {"channel_{n_channel + 1}":
+                                {"data":{"result":
+                                            [
+                                                { "conf": 1,
+                                                    "start": float(),
+                                                    "end": float(),
+                                                    "word": str()
+                                                }, ...
+                                            ],
+                                        "text": str()
+                                },
+                                ...
+                            }
+    :return:  {
+            "raw_text_sentenced_recognition": str() - текст с переносами, сортировкой по времени начала спикера,
+            "list_of_sentenced_recognitions": list() - список словарей с текстом, временем начала и номером спикера
+            "full_text_only": text_only, list() - список с суммированным текстом каждого канала
+            "err_state": err_state - ошибка, если не удалось
+        }
+    """
 
-  err_state = None
-  sentenced_recognition = []
-  text_only = []
+    err_state = None
+    sentenced_recognition = []
+    text_only = []
 
-  if not input_asr_json:
-    err_state = "Err_No_data_to_sensitize"
-  else:
-    for channel in input_asr_json:
-      words = list()
-      word_pause = 1.5
-      sentence_element = None
-      one_text_only = str()
-      err_state = None
+    if not input_asr_json:
+        err_state = "Err_No_data_to_sensitize"
+    else:
+        for channel in input_asr_json:
+            words = list()
+            word_pause = 1.5
+            sentence_element = None
+            one_text_only = str()
+            err_state = None
 
-      for results in input_asr_json[channel]:
-        if "result" in results["data"]:
-          for w in results["data"]["result"]:
-            words.append(w)
-          one_text_only += (results["data"].get("text", None)) + ' '
-        else:
-          continue
+            for results in input_asr_json[channel]:
+                if "result" in results["data"]:
+                    for w in results["data"]["result"]:
+                        words.append(w)
+                    one_text_only += (results["data"].get("text", None)) + ' '
+                else:
+                    continue
 
-      if len(words) < 1:
-        err_state = f"Err_No_words in {channel}"
-        sentence_element = []
-        logger.info(f"В списке слов только одно слово в канале {channel}")
-      else:
-        sentence_element = []
-        sentences = []
-        start_time = words[0].get('start')
-        end_time = words[0].get('end')
-
-        if len(words) == 1:
-          # Обработка случая с одним словом
-          text = words[0].get('word')
-          if do_punctuation:
-            text = await sbertpunc.punctuate(text)
-
-          sentence_element.append({
-            "start": start_time,
-            "end": end_time,
-            "text": text,
-            "speaker": channel
-          })
-        else:
-          # Оригинальная логика для нескольких слов
-          between_words_delta = []
-          end_time = words[0].get('end')
-
-          for word in words[1:]:
-            between_words_delta.append(word.get('end') - end_time)
-            end_time = word.get('end')
-
-          words_mean = statistics.mean(between_words_delta) * word_pause
-
-          for word in words:
-            if start_time == 0:
-              start_time = word.get('start')
-            if end_time == 0:
-              end_time = word.get('end')
-
-            if (word.get('start') - end_time) < words_mean:
-              sentences.append(word.get('word'))
-              end_time = word.get('end')
+            if len(words) < 1:
+                err_state = f"Err_No_words in {channel}"
+                sentence_element = []
+                logger.info(f"В списке слов только одно слово в канале {channel}")
             else:
-              if do_punctuation:
-                text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
-              else:
-                text = ' '.join(str(word) for word in sentences)
+                sentence_element = []
+                sentences = []
+                start_time = words[0].get('start')
+                end_time = words[0].get('end')
 
-              sentence_element.append({
-                "start": start_time,
-                "end": end_time,
-                "text": text,
-                "speaker": channel
-              })
-              sentences = list()
-              sentences.append(word.get('word'))
-              start_time = 0
-              end_time = 0
-              continue
+                if len(words) == 1:
+                    # Обработка случая с одним словом
+                    text = words[0].get('word')
+                    if do_punctuation:
+                        text = await sbertpunc.punctuate(text)
 
-          if do_punctuation:
-            text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
-          else:
-            text = ' '.join(str(word) for word in sentences)
+                    sentence_element.append({
+                      "start": start_time,
+                      "end": end_time,
+                      "text": text,
+                      "speaker": channel
+                    })
+                else:
+                    # Оригинальная логика для нескольких слов
+                    between_words_delta = []
+                    end_time = words[0].get('end')
 
-          sentence_element.append({
-            "start": start_time,
-            "end": end_time,
-            "text": text,
-            "speaker": channel
-          })
+                    for word in words[1:]:
+                        between_words_delta.append(word.get('end') - end_time)
+                        end_time = word.get('end')
 
-      sentenced_recognition.append(sentence_element)
+                    words_mean = np.percentile(between_words_delta, config.BETWEEN_WORDS_PERCENTILE)
+                    logger.debug(f"words_mean = {words_mean}")
+                    # words_mean = statistics.mean(between_words_delta) * word_pause
+                    # words_mean *= word_pause
 
-      if do_punctuation:
-        one_text_only = str(await sbertpunc.punctuate(one_text_only))
+                    start_time = 0
+                    end_time = 0
 
-      text_only.append(one_text_only)
+                    for word in words:
+                        logger.debug(f"В работе слово '{word.get('word')}' 'start'={word.get('start')}, 'end'={word.get('end')}, "
+                                    f"start_time={start_time}, end_time={end_time}")
 
-  sentenced_recognition_joined = [element for sentence in sentenced_recognition for element in sentence]
-  new_sentenced_recognition = sorted(sentenced_recognition_joined, key=lambda d: d['start'])
+                        if start_time == 0:
+                            start_time = word.get('start')
+                        if end_time == 0:
+                            end_time = word.get('end')
 
-  for speaker_sentence_index in reversed(range(len(sentenced_recognition))):
-    for sentence in sentenced_recognition[speaker_sentence_index]:
-      sentence['combined_text'] = sentence["speaker"] + ": " + sentence['text']
+                        logger.debug(f"start_time={start_time}, end_time={end_time}")
 
-  raw_text_of_resentenced_recognition = str()
-  for sentence in new_sentenced_recognition:
-    raw_text_of_resentenced_recognition += sentence.get('combined_text') + '\n'
+                        if word.get('start') < end_time:
+                            logger.debug(f"Ошибка при логике расчёта времени на слове {word.get('word')} start = {word.get('start')}, end = {end_time}")
 
-  for sentence in new_sentenced_recognition:
-    sentence.pop('combined_text')
+                        if (word.get('start') - end_time) < words_mean:
+                            sentences.append(word.get('word'))
+                            end_time = word.get('end')
+                            continue
 
-  if is_async:
-    pass
-  else:
-    return {
-      "raw_text_sentenced_recognition": raw_text_of_resentenced_recognition,
-      "list_of_sentenced_recognitions": new_sentenced_recognition,
-      "full_text_only": text_only,
-      "err_state": err_state
-    }
+                        else:
+                            if do_punctuation:
+                                text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
+                            else:
+                                text = ' '.join(str(word) for word in sentences)
+
+                            sentence_element.append({
+                                "start": start_time,
+                                "end": end_time,
+                                "text": text,
+                                "speaker": channel
+                                })
+                            # Переопределяем список
+                            sentences = list()
+                            # В новый список помещаем слово
+                            sentences.append(word.get('word'))
+                            start_time = word.get('start')
+                            end_time = word.get('end')
+                            continue
+
+                    if do_punctuation:
+                        text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
+                    else:
+                        text = ' '.join(str(word) for word in sentences)
+
+                    sentence_element.append({
+                        "start": start_time,
+                        "end": end_time,
+                        "text": text,
+                        "speaker": channel
+                      })
+
+            sentenced_recognition.append(sentence_element)
+
+            if do_punctuation:
+                one_text_only = str(await sbertpunc.punctuate(one_text_only))
+
+            text_only.append(one_text_only)
+
+    sentenced_recognition_joined = [element for sentence in sentenced_recognition for element in sentence]
+    new_sentenced_recognition = sorted(sentenced_recognition_joined, key=lambda d: d['start'])
+
+    for speaker_sentence_index in reversed(range(len(sentenced_recognition))):
+        for sentence in sentenced_recognition[speaker_sentence_index]:
+            sentence['combined_text'] = sentence["speaker"] + ": " + sentence['text']
+
+    raw_text_of_resentenced_recognition = str()
+    for sentence in new_sentenced_recognition:
+        raw_text_of_resentenced_recognition += sentence.get('combined_text') + '\n'
+
+    for sentence in new_sentenced_recognition:
+        sentence.pop('combined_text')
+
+    if is_async:
+        pass
+    else:
+        return {
+          "raw_text_sentenced_recognition": raw_text_of_resentenced_recognition,
+          "list_of_sentenced_recognitions": new_sentenced_recognition,
+          "full_text_only": text_only,
+          "err_state": err_state
+        }
 
 
 if __name__ == "__main__":
