@@ -206,7 +206,7 @@ def process_file(tmp_path, params):
         if params.do_diarization:
             try:
                 result["diarized_data"] = sync_do_diarizing(
-                    post_id, result["raw_data"], diar_vad_sensity=params.diar_vad_sensity
+                    post_id, result["raw_data"], # diar_vad_sensity=params.diar_vad_sensity
                 )
             except Exception as e:
                 logger.error(f"do_diarizing - {e}")
@@ -214,17 +214,6 @@ def process_file(tmp_path, params):
                 res = False
             else:
                 diarized = True
-    if params.do_diarization:
-        try:
-            result["diarized_data"] = sync_do_diarizing(
-                post_id, result["raw_data"],
-            )
-        except Exception as e:
-            logger.error(f"do_diarizing - {e}")
-            error_description = f"do_diarizing - {e}"
-            res = False
-        else:
-            diarized = True
 
         if params.do_dialogue:
             data_to_do_sensitizing = result["diarized_data"] if diarized else result["raw_data"]

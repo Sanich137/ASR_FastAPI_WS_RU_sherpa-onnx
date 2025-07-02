@@ -1,5 +1,6 @@
 from utils.do_logging import logger
 import ujson
+import numpy as np
 import statistics
 import asyncio
 from Punctuation import sbertpunc
@@ -31,7 +32,6 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_a
           "err_state": err_state - ошибка, если не удалось
       }
   """
-  import statistics
 
   err_state = None
   sentenced_recognition = []
@@ -86,17 +86,33 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_a
             between_words_delta.append(word.get('end') - end_time)
             end_time = word.get('end')
 
-          words_mean = statistics.mean(between_words_delta) * word_pause
+          words_mean = np.percentile(between_words_delta, 25)
+          logger.debug(f"words_mean = {words_mean}")
+          # words_mean = statistics.mean(between_words_delta) * word_pause
+          # words_mean *= word_pause
+
+          start_time = 0
+          end_time = 0
 
           for word in words:
+            logger.debug(f"В работе слово '{word.get('word')}' 'start'={word.get('start')}, 'end'={word.get('end')}, "
+                        f"start_time={start_time}, end_time={end_time}")
+
             if start_time == 0:
               start_time = word.get('start')
             if end_time == 0:
               end_time = word.get('end')
 
+            logger.debug(f"start_time={start_time}, end_time={end_time}")
+
+            if word.get('start') < end_time:
+              logger.error(f"Ошибка расчёта времени на слове {word.get('word')} start = {word.get('start')}, end = {end_time}")
+
             if (word.get('start') - end_time) < words_mean:
               sentences.append(word.get('word'))
               end_time = word.get('end')
+              continue
+
             else:
               if do_punctuation:
                 text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
@@ -109,10 +125,12 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_a
                 "text": text,
                 "speaker": channel
               })
+              # Переопределяем список
               sentences = list()
+              # В новый список помещаем слово
               sentences.append(word.get('word'))
-              start_time = 0
-              end_time = 0
+              start_time = word.get('start')
+              end_time = word.get('end')
               continue
 
           if do_punctuation:

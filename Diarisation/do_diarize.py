@@ -13,6 +13,7 @@ import time
 from umap import UMAP
 from hdbscan import HDBSCAN
 import logging as logger
+# import lists_of_recs
 
 class Diarizer:
     def __init__(self, embedding_model_path: str,
@@ -128,22 +129,36 @@ class Diarizer:
 
     async def diarize(self, audio_frames: np.ndarray, asr_results: list, num_speakers: int,
                       filter_cutoff: float, filter_order: int) -> list[dict]:
+        """
+        :param audio_frames: аудио в формате ndarray
+        :param asr_results:
+        :param num_speakers: если -1, то сам определяет спикеров, если больше 1 - принудительно разделяет
+        :param filter_cutoff: фильтр высоких частот
+        :param filter_order: порядок фильтра высоких частот
+        :return: список сегментов с указанием спикеров
+        """
         start_time = time.perf_counter()
 
         logger.debug("Начало обработки ASR сегментов...")
         seg_start = time.perf_counter()
         segments = []
+        word_indices = []
 
-        for channel in asr_results.get(f"channel_{len(asr_results.keys())}", []):
+        for channel in asr_results.get(f"channel_{len(asr_results)}", []):
             for result in channel["data"]["result"]:
                 start = result["start"]
                 end = result["end"]
+                word = result["word"]
                 if end - start >= self.min_duration:
                     audio_segment = audio_frames[int(start * self.sample_rate):int(end * self.sample_rate)]
                     segments.append((start, end, audio_segment))
-                else:
-                    audio_segment = audio_frames[int((start-0.05) * self.sample_rate):int((end+0.05) * self.sample_rate)]
+                elif (start - 0.06) < 0:
+                    audio_segment = audio_frames[int(start * self.sample_rate):int((end + 0.06) * self.sample_rate)]
                     segments.append((start, end, audio_segment))
+                else:
+                    audio_segment = audio_frames[int((start - 0.06) * self.sample_rate):int((end + 0.06) * self.sample_rate)]
+                    segments.append((start, end, audio_segment))
+                word_indices.append(word)
 
         seg_time = time.perf_counter() - seg_start
         logger.debug(f"Процедура: Обработка ASR сегментов - {seg_time:.4f} сек")
@@ -152,19 +167,22 @@ class Diarizer:
             logger.debug("Сегменты не найдены")
             return []
 
-        frame_shift = int(self.winstep * 1000)
+        frame_shift = int(self.winstep * 500)
         window_fs = int(1.5 * 1000) // frame_shift
         period_fs = int(0.75 * 1000) // frame_shift
 
         subsegs = []
         subseg_audios = []
-        for start, end, audio in segments:
-            audio = await self.highpass_filter(audio, cutoff=self.filter_cutoff, filter_order=self.filter_order)
+        subseg_word_indices = []
+
+        for i, (start, end, audio) in enumerate(segments):
+            audio = await self.highpass_filter(audio, cutoff=filter_cutoff, filter_order=filter_order)
             seg_id = f"{start:.3f}-{end:.3f}"
             fbank_feats = await self.extract_fbank(audio)
             tmp_subsegs, tmp_subseg_fbanks = await self.subsegment(fbank_feats, seg_id, window_fs, period_fs, frame_shift)
             subsegs.extend(tmp_subsegs)
             subseg_audios.extend(tmp_subseg_fbanks)
+            subseg_word_indices.extend([i] * len(tmp_subsegs))
 
         logger.debug("Начало извлечения эмбеддингов...")
         emb_start = time.perf_counter()
@@ -178,51 +196,67 @@ class Diarizer:
 
         logger.debug(f"Количество эмбеддингов: {len(embeddings)}")
 
-        embeddings = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
+        # Вычисление средних эмбеддингов для каждого слова
+        n_words = len(segments)
+        average_embeddings = []
+        for i in range(n_words):
+            word_subseg_indices = [j for j, word_idx in enumerate(subseg_word_indices) if word_idx == i]
+            if word_subseg_indices:
+                word_embeddings = embeddings[word_subseg_indices]
+                avg_emb = np.mean(word_embeddings, axis=0)
+                average_embeddings.append(avg_emb)
+
+        if not average_embeddings:
+            logger.debug("Нет средних эмбеддингов для кластеризации")
+            return []
+
+        average_embeddings = np.vstack(average_embeddings)
+        average_embeddings = average_embeddings / (np.linalg.norm(average_embeddings, axis=1, keepdims=True) + 1e-8)
 
         logger.debug("Начало кластеризации...")
         clust_start = time.perf_counter()
-        if len(embeddings) <= 2:
-            labels = [0] * len(embeddings)
+        if len(average_embeddings) <= 2:
+            word_labels = [0] * len(average_embeddings)
         else:
-            n_neighbors = min(5, len(embeddings) - 1)
+            n_neighbors = min(5, len(average_embeddings) - 1)
             umap_embeddings = UMAP(
-                n_components=min(32, len(embeddings) - 2),
+                n_components=min(32, len(average_embeddings) - 2),
                 metric='cosine',
                 n_neighbors=n_neighbors,
                 min_dist=0.1,
-                # random_state=2023,
                 n_jobs=1
-            ).fit_transform(embeddings)
+            ).fit_transform(average_embeddings)
 
-            if num_speakers ==-1:
+            if num_speakers == -1:
                 clustering = AgglomerativeClustering(n_clusters=2, metric='cosine', linkage='average')
-                labels = clustering.fit_predict(umap_embeddings)
+                word_labels = clustering.fit_predict(umap_embeddings)
                 logger.debug(f"Использовано {num_speakers} спикеров (Agglomerative Clustering)")
             else:
-                labels = HDBSCAN(min_cluster_size=3).fit_predict(umap_embeddings)
-                logger.debug(f"Всего labels: {len(labels)}")
-                if np.all(labels == -1):
+                word_labels = HDBSCAN(min_cluster_size=3).fit_predict(umap_embeddings)
+                if np.all(word_labels == -1):
                     logger.debug("Все точки помечены как шум, предполагается один спикер")
-                    labels = np.zeros_like(labels)
+                    word_labels = np.zeros_like(word_labels)
                 else:
-                    unique_labels = np.unique(labels)
+                    unique_labels = np.unique(word_labels[word_labels != -1])
                     if len(unique_labels) > 1:
-                        score = silhouette_score(embeddings, labels, metric='cosine')
+                        score = silhouette_score(average_embeddings, word_labels, metric='cosine')
                         logger.debug(f"Силуэтный коэффициент: {score:.4f}")
                         if score < 0.1:
                             logger.debug("Низкий силуэтный коэффициент, предполагается один спикер")
-                            labels = np.zeros_like(labels)
+                            word_labels = np.zeros_like(word_labels)
                     else:
                         logger.debug("Найден только один кластер, силуэтный коэффициент не вычисляется")
 
         clust_time = time.perf_counter() - clust_start
         logger.debug(f"Процедура: Кластеризация - {clust_time:.4f} сек")
-        logger.debug(f"Число кластеров: {len(np.unique(labels))}")
+        logger.debug(f"Число кластеров: {len(np.unique(word_labels))}")
+
+        # Присвоение меток подсегментам на основе меток слов
+        subseg_labels = [word_labels[subseg_word_indices[j]] for j in range(len(subsegs))]
 
         logger.debug("Начало объединения подсегментов...")
         merge_start = time.perf_counter()
-        merged_segments = await self.merge_subsegments(subsegs, labels)
+        merged_segments = await self.merge_subsegments(subsegs, subseg_labels)
         merged_segments = [seg for seg in merged_segments if seg["end"] - seg["start"] >= self.min_duration]
         merge_time = time.perf_counter() - merge_start
         logger.debug(f"Процедура: Объединение подсегментов - {merge_time:.4f} сек")
@@ -291,331 +325,19 @@ async def load_and_preprocess_audio(audio: AudioSegment, sample_rate: int = 1600
     return samples_float32
 
 async def main():
-    num_speakers = 2
+    num_speakers = -1
     max_phrase_gap = 0.1
-    use_gpu_diar = False
+    use_gpu_diar = True
     batch_size = 1
     max_cpu_workers = 0
 
     speaker_model_path = Path("../models/DIARISATION_model/voxceleb_gemini_dfresnet114_LM.onnx")
     audio_path = "../trash/secret.wav"
 
-
     audio = AudioSegment.from_file(audio_path)
     audio_frames = await load_and_preprocess_audio(audio)
 
-    # Пример результата ASR
-    asr_results = {
-        "channel_1": [
-            {
-                "data": {
-                    "result": [
-                        {
-                            "conf": 1,
-                            "start": 1.28,
-                            "end": 1.48,
-                            "word": "алло"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 2.2,
-                            "end": 2.44,
-                            "word": "алло"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 2.64,
-                            "end": 2.96,
-                            "word": "наталья"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 3.08,
-                            "end": 3.6,
-                            "word": "анатольевна"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 3.72,
-                            "end": 4,
-                            "word": "добрый"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 4.16,
-                            "end": 4.36,
-                            "word": "день"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 5.16,
-                            "end": 5.4,
-                            "word": "добрый"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 5.56,
-                            "end": 5.72,
-                            "word": "день"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 6.36,
-                            "end": 6.84,
-                            "word": "екатерина"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 6.96,
-                            "end": 7.48,
-                            "word": "руководитель"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 7.6,
-                            "end": 7.88,
-                            "word": "группы"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 8,
-                            "end": 8.28,
-                            "word": "отдела"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 8.44,
-                            "end": 9.12,
-                            "word": "сопровождения"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 9.76,
-                            "end": 10.08,
-                            "word": "наталья"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 10.16,
-                            "end": 10.72,
-                            "word": "анатольевна"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 10.88,
-                            "end": 11.08,
-                            "word": "звоню"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 11.24,
-                            "end": 11.24,
-                            "word": "с"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 11.36,
-                            "end": 11.8,
-                            "word": "весенними"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 11.92,
-                            "end": 12.4,
-                            "word": "праздниками"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 12.56,
-                            "end": 12.64,
-                            "word": "вас"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 12.76,
-                            "end": 12.92,
-                            "word": "всех"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 13.04,
-                            "end": 13.52,
-                            "word": "поздравить"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 14.12,
-                            "end": 14.48,
-                            "word": "спасбо"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 14.68,
-                            "end": 15,
-                            "word": "большое"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 15.16,
-                            "end": 15.56,
-                            "word": "взаимно"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 15.96,
-                            "end": 16,
-                            "word": "да"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 16.24,
-                            "end": 16.72,
-                            "word": "спасибо"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 17,
-                            "end": 17.08,
-                            "word": "как"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 17.2,
-                            "end": 17.2,
-                            "word": "у"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 17.32,
-                            "end": 17.4,
-                            "word": "вас"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 17.52,
-                            "end": 17.68,
-                            "word": "дела"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 17.88,
-                            "end": 18,
-                            "word": "как"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 18.16,
-                            "end": 18.72,
-                            "word": "настроение"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 18.92,
-                            "end": 19.48,
-                            "word": "весеннее"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 20.48,
-                            "end": 20.52,
-                            "word": "ну"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 20.76,
-                            "end": 22.08,
-                            "word": "сейасв"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 24.36,
-                            "end": 24.44,
-                            "word": "да"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 24.64,
-                            "end": 24.68,
-                            "word": "да"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 24.84,
-                            "end": 24.88,
-                            "word": "да"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 25,
-                            "end": 25.64,
-                            "word": "каждыа"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 25.92,
-                            "end": 26.24,
-                            "word": "выходишь"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 26.36,
-                            "end": 26.4,
-                            "word": "на"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 26.52,
-                            "end": 26.76,
-                            "word": "работу"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 26.88,
-                            "end": 27.28,
-                            "word": "солнышко"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 27.4,
-                            "end": 27.4,
-                            "word": "и"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 27.56,
-                            "end": 27.64,
-                            "word": "как"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 27.72,
-                            "end": 27.96,
-                            "word": "будто"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 28.08,
-                            "end": 28.12,
-                            "word": "бы"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 28.24,
-                            "end": 28.72,
-                            "word": "настроение"
-                        },
-                        {
-                            "conf": 1,
-                            "start": 28.92,
-                            "end": 29.12,
-                            "word": "лучше"
-                        }
-                  ],
-                  "text": "алло алло наталья анатольевна добрый день добрый день екатерина руководитель группы отдела сопровождения наталья анатольевна звоню с весенними праздниками вас всех поздравить спасбо большое взаимно да спасибо как у вас дела как настроение весеннее ну сейасв да да да каждыа выходишь на работу солнышко и как будто бы настроение лучше"
-                }
-            }
-        ]
-    }
+    asr_results = lists_of_recs.asr_results
 
     diarizer = Diarizer(
         embedding_model_path=str(speaker_model_path),
@@ -629,7 +351,7 @@ async def main():
         audio_frames,
         asr_results,
         num_speakers=num_speakers,
-        filter_cutoff=50,
+        filter_cutoff=4000,
         filter_order=10
     )
 

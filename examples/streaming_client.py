@@ -124,6 +124,15 @@ if __name__ == "__main__":
     parser.add_argument("--buffer-size", type=float, default=0.5)
     args = parser.parse_args()
 
+    # Для запуска из IDE
+    # parser = argparse.ArgumentParser()
+    # args = parser.parse_args()
+    # args.uri ="ws://192.168.100.29:49153/ws"
+    # args.file = "test.wav"
+    # args.frame_rate = 8000
+    # args.buffer_size = 4
+
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(levelname)s - %(message)s"
