@@ -4,12 +4,9 @@ import numpy as np
 import asyncio
 from Punctuation import sbertpunc
 
-async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_async: bool = False):
+async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
     """
     :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
-    :param is_async: Ранее был реализован сервис постановки задачи на распознавание в работу. И, как следствие,
-    результат нужно было хранить в отдельном месте до его получения и удаления. Сейчас скорость обработки аудио уже не
-    требует такого. Понаблюдать, при необходимости можно удалить (и часть кода связанная с хранением переменных)
     :param input_asr_json: {"channel_{n_channel + 1}":
                                 {"data":{"result":
                                             [
@@ -86,8 +83,6 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_a
 
                     words_mean = np.percentile(between_words_delta, config.BETWEEN_WORDS_PERCENTILE)
                     logger.debug(f"words_mean = {words_mean}")
-                    # words_mean = statistics.mean(between_words_delta) * word_pause
-                    # words_mean *= word_pause
 
                     start_time = 0
                     end_time = 0
@@ -164,15 +159,12 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_a
     for sentence in new_sentenced_recognition:
         sentence.pop('combined_text')
 
-    if is_async:
-        pass
-    else:
-        return {
-          "raw_text_sentenced_recognition": raw_text_of_resentenced_recognition,
-          "list_of_sentenced_recognitions": new_sentenced_recognition,
-          "full_text_only": text_only,
-          "err_state": err_state
-        }
+    return {
+      "raw_text_sentenced_recognition": raw_text_of_resentenced_recognition,
+      "list_of_sentenced_recognitions": new_sentenced_recognition,
+      "full_text_only": text_only,
+      "err_state": err_state
+    }
 
 
 if __name__ == "__main__":
@@ -754,7 +746,6 @@ if __name__ == "__main__":
       }
     ]
   }
-
 
     res = asyncio.run(do_sensitizing(input_asr_json=input_json), )
     print(res)

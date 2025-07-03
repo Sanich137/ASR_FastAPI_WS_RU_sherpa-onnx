@@ -193,6 +193,9 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
 def calc_speed(data):
 
     count_tokens = len(data["tokens"]) - data["tokens"].count(' ')
+    if count_tokens == 0:
+        return 0
+
     ind = [i for i, val in enumerate(data["tokens"]) if val == " "]
     time_to_speak_tokens = (data["timestamps"][-1] -
                             sum([data["timestamps"][index+1] - data["timestamps"][index]
