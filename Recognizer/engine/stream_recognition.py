@@ -191,21 +191,23 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
 
 
 def calc_speed(data):
-
+    time_to_speak_tokens = 0
     count_tokens = len(data["tokens"]) - data["tokens"].count(' ')
     if count_tokens == 0:
         return 0
 
     ind = [i for i, val in enumerate(data["tokens"]) if val == " "]
-    time_to_speak_tokens = (data["timestamps"][-1] -
-                            sum([data["timestamps"][index+1] - data["timestamps"][index]
-                            for index, token in enumerate(data["timestamps"]) if
-                            index in ind and index < len(data["timestamps"]) + 1]))
-
-
-    logger.debug(f"------------------------------")
-    logger.debug(f"Всего токенов: {count_tokens}")
-    logger.debug(f"Время на произношение токенов: {time_to_speak_tokens}")
+    try:
+        time_to_speak_tokens = (data["timestamps"][-1] -
+                                sum([data["timestamps"][index+1] - data["timestamps"][index]
+                                for index, token in enumerate(data["timestamps"]) if
+                                index in ind and index < len(data["timestamps"])-1]))
+    except Exception as e:
+        logger.error(e)
+    else:
+        logger.debug(f"------------------------------")
+        logger.debug(f"Всего токенов: {count_tokens}")
+        logger.debug(f"Время на произношение токенов: {time_to_speak_tokens}")
 
     if time_to_speak_tokens != 0:
         speech_speed = count_tokens // time_to_speak_tokens
