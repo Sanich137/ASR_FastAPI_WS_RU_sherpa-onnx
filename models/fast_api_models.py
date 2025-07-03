@@ -38,8 +38,7 @@ class PostFileRequest(BaseModel):
     do_diarization: Union[bool, None] = False
     make_mono: Union[bool, None] = False
     diar_vad_sensity: int = 3
-    diar_vad_sensity: int = 3,
-    do_speech_speed_correction: Union[bool, None] = config.DO_SPEED_SPEECH_CORRECTION
+    do_auto_speech_speed_correction: Union[bool, None] = config.DO_SPEED_SPEECH_CORRECTION
     speech_speed_correction_multiplier: float = config.SPEED_SPEECH_CORRECTION_MULTIPLIER,
 
 

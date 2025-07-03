@@ -21,14 +21,17 @@ IS_PROD = True if int(os.getenv('IS_PROD', 1))==1 else False
 # Recognition_settings
 MAX_OVERLAP_DURATION = int(os.getenv('MAX_OVERLAP_DURATION', 30))  # Максимальная продолжительность буфера аудио (зависит от модели) приемлемый диапазон 10-15 сек. Для Vosk, для Гига СТС можно больше.
 RECOGNITION_ATTEMPTS = 1  # Пока не менять
+SPEECH_PER_SEC_NORM_RATE = 18  # Нормальное количество токенов в секунду. При превышении этого значения становится
+# возможным автоматически замедлять скорость речи для улучшения распознавания. В реальной речи, как правило, находится
+# в интервале от 13 до 25.
 
 # Vad_settings
 VAD_SENSITIVITY = int(os.getenv('VAD_SENSE', 3))  # 1 to 5 Higher - more words.
 VAD_WITH_GPU = True if int(os.getenv('VAD_WITH_GPU', 0)) == 1 else False
 
 # Sentensize_settings
-BETWEEN_WORDS_PERCENTILE = int(os.getenv('BETWEEN_WORDS_PERCENTILE', 90)) # Параметр определяет как мелко будут биться текст на предложения
-# Чем меньше значение, тем более короткие будут предложения. В среднем в одном предложении 10 слов.
+BETWEEN_WORDS_PERCENTILE = int(os.getenv('BETWEEN_WORDS_PERCENTILE', 90)) # Параметр определяет как мелко будет биться
+# текст на предложения. Чем меньше значение, тем более короткие будут предложения. В среднем в одном предложении 10 слов.
 # То есть, по длительности каждая десятая пауза означает конец предложения или мысли. Влияет на пунктуацию выражений.
 
 # Punctuate_settings

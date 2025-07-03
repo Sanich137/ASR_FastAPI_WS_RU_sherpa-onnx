@@ -122,7 +122,7 @@ async def do_slow_down_audio(audio_segment: AudioSegment, slowdown_rate: float) 
         channels=channels
     )
 
-    logger.info(f"Новая длина аудиосегмента: {slowered_audiosegment.duration_seconds}")
-    logger.info(f"Соотношение длин: {audio_segment.duration_seconds / slowered_audiosegment.duration_seconds}")
+    logger.debug(f"Новая длина аудиосегмента: {slowered_audiosegment.duration_seconds}")
+    logger.debug(f"Соотношение длин: {audio_segment.duration_seconds / slowered_audiosegment.duration_seconds}")
 
     return slowered_audiosegment

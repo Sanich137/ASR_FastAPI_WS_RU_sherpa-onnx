@@ -492,7 +492,7 @@ async def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int 
 #     use_gpu_vad = False  # По возможности использовать графический процессор для вычислений
 #
 #     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
-#     speaker_model_path = Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
+#     speaker_model_path =  Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
 #
 #     audio_path = "../trash/Роман.mp3"
 #

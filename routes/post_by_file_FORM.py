@@ -14,29 +14,19 @@ from utils.pre_start_init import (
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 from utils.resamppling import resample_audiosegment
-from utils.slow_down_audio import do_slow_down_audio
 from models.fast_api_models import PostFileRequest
-from Recognizer.engine.stream_recognition import recognise_w_calculate_confidence, simple_recognise
+from Recognizer.engine.stream_recognition import simple_recognise, recognise_w_speed_correction
 from Recognizer.engine.sentensizer import do_sensitizing
 from Recognizer.engine.echoe_clearing import remove_echo
 from fastapi import Depends, File, Form, UploadFile
-from pydantic import BaseModel
 from Diarisation.diarazer import do_diarizing
 import aiofiles
 import os
 from threading import Lock
 
+
 # Глобальный лок для потокобезопасности
 audio_lock = Lock()
-
-# # Определение модели данных для параметров
-# class PostFileRequest(BaseModel):
-#     keep_raw: bool = True
-#     do_echo_clearing: bool = False
-#     do_dialogue: bool = False
-#     do_punctuation: bool = False
-#     do_diarization: bool = False
-#     diar_vad_sensity: int = 4
 
 # Функция для извлечения параметров из FormData
 def get_file_request(
@@ -46,7 +36,7 @@ def get_file_request(
     do_punctuation: bool = Form(default=False, description="Восстанавливать пунктуацию."),
     do_diarization: bool = Form(default=False, description="Разделять по спикерам."),
     diar_vad_sensity: int = Form(default=3, description="Чувствительность VAD."),
-    do_speech_speed_correction: bool = Form(default=False, description="Корректировать скорость речи при распознавании."),
+    do_auto_speech_speed_correction: bool = Form(default=False, description="Корректировать скорость речи при распознавании."),
     speech_speed_correction_multiplier: float = Form(default=1, description="Базовый коэффициент скорости речи."),
     make_mono: bool = Form(default=False, description="Соединить несколько каналов в mono"),
 ) -> PostFileRequest:
@@ -58,7 +48,7 @@ def get_file_request(
         do_diarization=do_diarization,
         diar_vad_sensity=diar_vad_sensity,
         make_mono=make_mono,
-        do_speech_speed_correction = do_speech_speed_correction,
+        do_auto_speech_speed_correction = do_auto_speech_speed_correction,
         speech_speed_correction_multiplier = speech_speed_correction_multiplier
     )
 
@@ -176,10 +166,15 @@ def process_file(tmp_path, params):
 
                 try:
                     with audio_lock:
-                        audio_to_asr[post_id] = asyncio.run(do_slow_down_audio(audio_segment=audio_to_asr[post_id],
-                                                                               slowdown_rate=params.speech_speed_correction_multiplier))
+                        # Снижаем скорость аудио по необходимости
+                        if params.do_auto_speech_speed_correction or params.speech_speed_correction_multiplier != 1:
+                            logger.debug("Будут использованы механизмы анализа скорости речи и замедления аудио")
+                            asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_to_asr[post_id], can_slow_down=True,
+                                                                              multiplier=params.speech_speed_correction_multiplier))
+                            params.speech_speed_correction_multiplier = multiplier
 
-                        asr_result_wo_conf = sync_simple_recognise(audio_to_asr[post_id])
+                        else:
+                            asr_result_wo_conf = sync_simple_recognise(audio_to_asr[post_id])
 
 
 
