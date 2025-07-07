@@ -3,9 +3,8 @@ import onnxruntime as ort
 from pydub import AudioSegment
 from pathlib import Path
 from utils.resamppling import resample_audiosegment
+from utils.do_logging import logger
 
-# from utils.do_logging import logger
-import logging as logger
 
 class SileroVAD:
     def __init__(self, onnx_path: Path, use_gpu=False):

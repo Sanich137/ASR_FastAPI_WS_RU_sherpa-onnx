@@ -151,7 +151,7 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
 
     speed = 0
     if can_slow_down and multiplier < 1:
-        logger.info(f"Коэффициент замедления для аудио фрагмента: {multiplier}")
+        logger.info(f"Обработка быстрой речи с коэффициентом: {multiplier:.2f}")
         audio_data = await do_slow_down_audio(audio_segment=audio_data,slowdown_rate=multiplier)
 
 

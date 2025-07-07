@@ -1,7 +1,7 @@
 # Базовый образ с CUDA и cuDNN
 FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
-# Установка зависимостей в один RUN для уменьшения слоев
+# Установка зависимостей
 RUN apt-get update && apt-get install -y \
     git \
     git-lfs \
@@ -13,25 +13,48 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*  # Очистка кеша apt
 
-    # Клонирование репозитория копирование модели Silero
-RUN git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx && \
-    curl -L https://github.com/snakers4/silero-vad/blob/v5.0/files/silero_vad.onnx?raw=true \
-         -o /ASR_FastAPI_WS_RU_sherpa-onnx/models/VAD_silero_v5/silero_vad.onnx
+RUN git lfs install
 
-
-    # установка остальных моделей
-RUN cd ASR_FastAPI_WS_RU_sherpa-onnx && \
-    git lfs install && \
-    ls -la /ASR_FastAPI_WS_RU_sherpa-onnx/models/VAD_silero_v5/ && \
-    cd models && \
+# Собираем модели для ASR
+RUN mkdir "temp_models" && \
+    cd temp_models && \
     git clone https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx && \
     git clone https://huggingface.co/Alexanrd/sbert_punc_case_ru_onnx && \
     cd ..
+
+# Собираем модели для VAD
+RUN mkdir -p temp_models/VAD_silero_v5
+RUN curl -L https://github.com/snakers4/silero-vad/raw/v5.0/files/silero_vad.onnx \
+         -o temp_models/VAD_silero_v5/silero_vad.onnx
+RUN test -f temp_models/VAD_silero_v5/silero_vad.onnx || (echo "File download failed!" && exit 1)
+
+
+# Устанавливаем основное приложени
+RUN git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
+
+# Переносим модели
+RUN rm -rf ASR_FastAPI_WS_RU_sherpa-onnx/models && \
+    mkdir -p ASR_FastAPI_WS_RU_sherpa-onnx/models && \
+    mv temp_models/* ASR_FastAPI_WS_RU_sherpa-onnx/models/ && \
+    rm -rf temp_models
 
 WORKDIR /ASR_FastAPI_WS_RU_sherpa-onnx
 
 # Установка Python-зависимостей
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Установка переменных окружения
+ENV BASE_SAMPLE_RATE=16000 \
+    CAN_DIAR=1 \
+    DIAR_MODEL_NAME=voxceleb_gemini_dfresnet114_LM \
+    DIAR_WITH_GPU=1 \
+    IS_PROD=1 \
+    LOGGING_LEVEL=INFO \
+    MAX_OVERLAP_DURATION=25 \
+    MODEL_NAME=Gigaam\
+    NUM_THREADS=4 \
+    PROVIDER=CUDA \
+    VAD_SENSE=3
 
 # Открываем порт и запускаем приложение
 EXPOSE 49153
