@@ -22,15 +22,14 @@ RUN mkdir "temp_models" && \
     git clone https://huggingface.co/Alexanrd/sbert_punc_case_ru_onnx && \
     cd ..
 
-# Устанавливаем основное приложени
-RUN  --mount=type=ssh git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
-
-
 # Собираем модели для VAD
 RUN mkdir -p temp_models/VAD_silero_v5
 RUN curl -L https://github.com/snakers4/silero-vad/raw/v5.0/files/silero_vad.onnx \
          -o temp_models/VAD_silero_v5/silero_vad.onnx
 RUN test -f temp_models/VAD_silero_v5/silero_vad.onnx || (echo "File download failed!" && exit 1)
+
+# Устанавливаем основное приложени
+RUN  --mount=type=ssh git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
 
 
 # Переносим модели
