@@ -1,7 +1,5 @@
-
 from utils.pre_start_init import app
 from models.fast_api_models import WebSocketModel
-
 
 @app.post("/ws")
 async def post_not_websocket(ws:WebSocketModel):

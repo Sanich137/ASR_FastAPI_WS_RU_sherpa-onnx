@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     curl \
     ca-certificates \
+    jq \
     && rm -rf /var/lib/apt/lists/*  # Очистка кеша apt
 
 RUN git lfs install
@@ -22,31 +23,30 @@ RUN mkdir "temp_models" && \
     git clone https://huggingface.co/Alexanrd/sbert_punc_case_ru_onnx && \
     cd ..
 
-# Собираем модели для VAD
+# Устанавливаем основное приложени
+RUN  --mount=type=ssh git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
+
+    # Собираем модели для VAD
 RUN mkdir -p temp_models/VAD_silero_v5
 RUN curl -L https://github.com/snakers4/silero-vad/raw/v5.0/files/silero_vad.onnx \
          -o temp_models/VAD_silero_v5/silero_vad.onnx
 RUN test -f temp_models/VAD_silero_v5/silero_vad.onnx || (echo "File download failed!" && exit 1)
 
-# Устанавливаем основное приложени
-RUN  --mount=type=ssh git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
 
 
 # Переносим модели
-RUN rm -rf ASR_FastAPI_WS_RU_sherpa-onnx/models && \
-    mkdir -p ASR_FastAPI_WS_RU_sherpa-onnx/models && \
-    mv temp_models/* ASR_FastAPI_WS_RU_sherpa-onnx/models/ && \
+RUN mkdir -p ASR_FastAPI_WS_RU_sherpa-onnx/models && \
+    cp -r temp_models/* ASR_FastAPI_WS_RU_sherpa-onnx/models/ && \
     rm -rf temp_models
 
-WORKDIR /ASR_FastAPI_WS_RU_sherpa-onnx
 
 # Установка Python-зависимостей
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements.txt
 
 # Установка переменных окружения
 ENV BASE_SAMPLE_RATE=16000 \
     CAN_DIAR=1 \
-    DIAR_MODEL_NAME=voxceleb_gemini_dfresnet114_LM \
+    DIAR_MODEL_NAME=voxceleb_resnet34_LM \
     DIAR_WITH_GPU=1 \
     IS_PROD=1 \
     LOGGING_LEVEL=INFO \
@@ -54,7 +54,40 @@ ENV BASE_SAMPLE_RATE=16000 \
     MODEL_NAME=Gigaam\
     NUM_THREADS=4 \
     PROVIDER=CUDA \
-    VAD_SENSE=3
+    VAD_SENSE=3 \
+    PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx
+
+
+# Установка переменных окружения
+ENV DIAR_MODEL_OUTPUT_PATH=/ASR_FastAPI_WS_RU_sherpa-onnx/models/DIARISATION_model \
+    API_URL=https://modelscope.cn/api/v1/datasets/wenet/wespeaker_pretrained_models/oss/tree
+
+# Скачивание модели - ВСЕ В ОДНОМ RUN-слое!
+RUN mkdir -p $(dirname "$DIAR_MODEL_OUTPUT_PATH") && \
+    echo "Пытаемся скачать модель $DIAR_MODEL_NAME..." && \
+    # 1. Получаем JSON с данными файлов
+    curl -s -L -H "User-Agent: Mozilla/5.0" "$API_URL" > /tmp/api_response.json && \
+    # 2. Ищем нужный файл в JSON
+    file_url=$(jq -r --arg model "$DIAR_MODEL_NAME.onnx" '.Data[] | select(.Key == $model) | .Url' /tmp/api_response.json) && \
+    if [ -z "$file_url" ]; then \
+        echo "ОШИБКА: Модель $DIAR_MODEL_NAME не найдена. Доступные модели:"; \
+        jq -r '.Data[] | select(.Key | endswith(".onnx")) | "\(.Key) - \(.Size / (1024*1024) | floor) MB"' /tmp/api_response.json | sort; \
+        exit 1; \
+    fi && \
+    # 3. Скачиваем файл
+    echo "Найдена модель, скачиваем по URL: $file_url" && \
+    curl -L -o "$DIAR_MODEL_OUTPUT_PATH/$DIAR_MODEL_NAME.onnx" "$file_url" && \
+    # Проверяем успешность скачивания
+    if [ ! -f "$DIAR_MODEL_OUTPUT_PATH/$DIAR_MODEL_NAME.onnx" ]; then \
+        echo "ОШИБКА: Не удалось скачать модель"; \
+        exit 1; \
+    else \
+        echo "УСПЕХ: Модель сохранена в $DIAR_MODEL_OUTPUT_PATH/$DIAR_MODEL_NAME.onnx"; \
+    fi && \
+    rm -f /tmp/api_response.json
+
+WORKDIR /ASR_FastAPI_WS_RU_sherpa-onnx
+ENV PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx
 
 # Открываем порт и запускаем приложение
 EXPOSE 49153

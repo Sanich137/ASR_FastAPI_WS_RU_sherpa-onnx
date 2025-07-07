@@ -53,7 +53,7 @@ if config.CAN_DIAR:
     if not paths.get("diar_speaker_model_path").exists():
         logger.error(f"Модель для Диаризации отсутствует. Диризация выключена и будет не доступна.")
         logger.error(f"Скачайте модель со страницы 'https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md' "
-                     f"и поместите в по адресу: {str(paths.get("diar_speaker_model_path"))}")
+                     f"и поместите в по адресу: {str(paths.get('diar_speaker_model_path'))}")
         config.CAN_DIAR = False
     else:
         from .do_diarize import Diarizer
