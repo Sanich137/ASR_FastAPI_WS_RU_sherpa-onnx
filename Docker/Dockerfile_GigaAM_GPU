@@ -47,7 +47,7 @@ RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements.t
 ENV BASE_SAMPLE_RATE=16000 \
     CAN_DIAR=1 \
     DIAR_MODEL_NAME=voxblink2_samresnet100_ft \
-    DIAR_WITH_GPU=1 \
+    DIAR_WITH_GPU=0 \
     IS_PROD=1 \
     LOGGING_LEVEL=INFO \
     MAX_OVERLAP_DURATION=25 \
