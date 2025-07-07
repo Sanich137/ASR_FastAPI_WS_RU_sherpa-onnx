@@ -43,6 +43,9 @@ RUN mkdir -p ASR_FastAPI_WS_RU_sherpa-onnx/models && \
 # Установка Python-зависимостей
 RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements.txt
 
+# Даём возможность менять модель диаризации на этапе сборки.
+ARG DIAR_MODEL_NAME=voxblink2_samresnet100_ft
+
 # Установка переменных окружения
 ENV BASE_SAMPLE_RATE=16000 \
     CAN_DIAR=1 \

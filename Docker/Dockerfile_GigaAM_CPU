@@ -1,6 +1,5 @@
 # Базовый образ без CUDA и cuDNN
 FROM python:3.12-slim-bullseye
-ARG DIAR_MODEL_NAME=voxblink2_samresnet100_ft
 
 # Установка зависимостей
 RUN apt-get update && apt-get install -y \
@@ -44,6 +43,10 @@ RUN mkdir -p ASR_FastAPI_WS_RU_sherpa-onnx/models && \
 # Установка Python-зависимостей
 RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements_cpu.txt
 
+
+# Даём возможность менять модель диаризации на этапе сборки.
+ARG DIAR_MODEL_NAME=voxblink2_samresnet100_ft
+
 # Установка переменных окружения
 ENV BASE_SAMPLE_RATE=16000 \
     CAN_DIAR=1 \
@@ -54,7 +57,7 @@ ENV BASE_SAMPLE_RATE=16000 \
     MAX_OVERLAP_DURATION=25 \
     MODEL_NAME=Gigaam\
     NUM_THREADS=4 \
-    PROVIDER=CUDA \
+    PROVIDER=CPU \
     VAD_SENSE=3 \
     PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx \
     DIAR_MODEL_OUTPUT_PATH=/ASR_FastAPI_WS_RU_sherpa-onnx/models/DIARISATION_model \
