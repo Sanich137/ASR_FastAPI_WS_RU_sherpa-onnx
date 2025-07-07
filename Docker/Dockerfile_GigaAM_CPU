@@ -1,6 +1,6 @@
 # Базовый образ без CUDA и cuDNN
 FROM python:3.12-slim-bullseye
-
+ARG DIAR_MODEL_NAME=voxblink2_samresnet100_ft
 
 # Установка зависимостей
 RUN apt-get update && apt-get install -y \
@@ -47,7 +47,7 @@ RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements_c
 # Установка переменных окружения
 ENV BASE_SAMPLE_RATE=16000 \
     CAN_DIAR=1 \
-    DIAR_MODEL_NAME=voxblink2_samresnet100_ft \
+    DIAR_MODEL_NAME=$DIAR_MODEL_NAME \
     DIAR_WITH_GPU=1 \
     IS_PROD=1 \
     LOGGING_LEVEL=INFO \

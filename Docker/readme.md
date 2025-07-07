@@ -1,23 +1,45 @@
-Инструкция по установке и запуске контейнера.
-> 1. Файл [Dockerfile](Dockerfile_GigaAM) создан для запуска на GPU Nvidia.
-> 2. В образе уже будет установлена модель GigaAMv2
+# Инструкция по установке и запуске контейнеров ASR.
+- Файл [Dockerfile_GigaAM_GPU](Dockerfile_GigaAM_GPU) создан для запуска на GPU Nvidia, а [Dockerfile_GigaAM_CPU](Dockerfile_GigaAM_CPU) для запуска только на CPU
+- В образе уже будет установлена модели GigaAMv2, SileroVAD и voxblink2_samresnet100_ft для диаризации.
+- Для замены voxblink2_samresnet100_ft на другую модель диаризации, при старте дополнительно передайте её название из списка основном readme.md 
 
-Настройка оборудования.
-> 3. Установите [Nvidia container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), 
-чтобы драйвер видеокарты был доступен в контейнере. 
+## Настройка оборудования для работы CUDA. (Для контейнера _CPU пропускаем).
+- Установите [Nvidia container-toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), чтобы драйвер видеокарты был доступен в контейнере. 
 
-Работа с образом.
-
-> 4. Создаём образ:
-```commandline
+## Сборка и запуск контейнера.
+- Скачиваем необходимый докер файл и помещаем его в любую папку.
+- Переходим в папку и создаём образ:
+```bash
 docker build -t asr /path/to/Dockerfile_GigaAM
 ```
-
-> 5. Запускаем образ:
+- Запускаем образ c GPU:
 ```commandline
 docker run --runtime=nvidia -it --rm -p 8888:49153 asr
 ```
-- для запуска в Pycharm не забываем указать дополнительный **Run options**:  "--runtime=nvidia -p 8888:49153"
+
+- Запускаем образ на CPU:
+```commandline
+docker run -it --rm -p 8888:49153 asr
+```
+
+## Изменение параметров при сборке и запуске
+При сборке и запуске контейнера можно передать значение переменных виртуального окружения. Например, если Вы хотите 
+использовать для диаризации другую модель, например "voxceleb_gemini_dfresnet114_LM" (полный список есть в основном ридми)
+то при сборке контейнера и при его запуске необходимо передать дополнительный параметр -e DIAR_MODEL_NAME=:
+```bash
+docker build --build-arg DIAR_MODEL_NAME=voxceleb_gemini_dfresnet114_LM -t asr /path/to/Dockerfile_GigaAM
+```
+В таком случае, обязательно и при запуске контейнера передать название модели диаризации. В противном случае, при каждом 
+запуске будет скачиваться вновь установленная по умолчанию **voxblink2_samresnet100_ft**:
+
+```bash
+docker run -it --rm -e DIAR_MODEL_NAME=voxceleb_gemini_dfresnet114_LM -p 8888:49153 asr
+```
+Все остальные параметры виртуального окружения можно передать при запуске контейнера без необходимости передавать их при сборке.
+Полный список тоже смотрите в основном ридми.
+
+
+- для запуска в Pycharm так же не забываем указать эти дополнительыне  **Run options**:  "--runtime=nvidia -p 8888:49153"
 
 > 6. Сервис будет доступен по адресу http://127.0.0.1:8888/docs#
 > 7. Страниwа для тестов будет доступна по адресу http://127.0.0.1:8888/demo
