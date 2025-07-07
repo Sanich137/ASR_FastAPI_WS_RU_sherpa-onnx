@@ -1,5 +1,6 @@
-# Базовый образ с CUDA и cuDNN
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+# Базовый образ без CUDA и cuDNN
+FROM python:3.9-slim-bookworm
+
 
 # Установка зависимостей
 RUN apt-get update && apt-get install -y \
@@ -23,15 +24,15 @@ RUN mkdir "temp_models" && \
     git clone https://huggingface.co/Alexanrd/sbert_punc_case_ru_onnx && \
     cd ..
 
-# Устанавливаем основное приложени
-RUN  --mount=type=ssh git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
-
     # Собираем модели для VAD
 RUN mkdir -p temp_models/VAD_silero_v5
 RUN curl -L https://github.com/snakers4/silero-vad/raw/v5.0/files/silero_vad.onnx \
          -o temp_models/VAD_silero_v5/silero_vad.onnx
 RUN test -f temp_models/VAD_silero_v5/silero_vad.onnx || (echo "File download failed!" && exit 1)
 
+
+# Устанавливаем основное приложени
+RUN  --mount=type=ssh git clone https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx
 
 
 # Переносим модели
@@ -46,7 +47,7 @@ RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements.t
 # Установка переменных окружения
 ENV BASE_SAMPLE_RATE=16000 \
     CAN_DIAR=1 \
-    DIAR_MODEL_NAME=voxceleb_resnet34_LM \
+    DIAR_MODEL_NAME=voxblink2_samresnet100_ft \
     DIAR_WITH_GPU=1 \
     IS_PROD=1 \
     LOGGING_LEVEL=INFO \
@@ -55,18 +56,15 @@ ENV BASE_SAMPLE_RATE=16000 \
     NUM_THREADS=4 \
     PROVIDER=CUDA \
     VAD_SENSE=3 \
-    PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx
-
-
-# Установка переменных окружения
-ENV DIAR_MODEL_OUTPUT_PATH=/ASR_FastAPI_WS_RU_sherpa-onnx/models/DIARISATION_model \
-    API_URL=https://modelscope.cn/api/v1/datasets/wenet/wespeaker_pretrained_models/oss/tree
+    PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx \
+    DIAR_MODEL_OUTPUT_PATH=/ASR_FastAPI_WS_RU_sherpa-onnx/models/DIARISATION_model \
+    DIAR_API_URL=https://modelscope.cn/api/v1/datasets/wenet/wespeaker_pretrained_models/oss/tree
 
 # Скачивание модели - ВСЕ В ОДНОМ RUN-слое!
 RUN mkdir -p $(dirname "$DIAR_MODEL_OUTPUT_PATH") && \
     echo "Пытаемся скачать модель $DIAR_MODEL_NAME..." && \
     # 1. Получаем JSON с данными файлов
-    curl -s -L -H "User-Agent: Mozilla/5.0" "$API_URL" > /tmp/api_response.json && \
+    curl -s -L -H "User-Agent: Mozilla/5.0" "$DIAR_API_URL" > /tmp/api_response.json && \
     # 2. Ищем нужный файл в JSON
     file_url=$(jq -r --arg model "$DIAR_MODEL_NAME.onnx" '.Data[] | select(.Key == $model) | .Url' /tmp/api_response.json) && \
     if [ -z "$file_url" ]; then \
