@@ -7,7 +7,7 @@ ujson~=5.10.0
 numpy~=1.26.4
 
 uvicorn~=0.34.2
-fastapi~=0.115.12
+fastapi
 pydantic~=2.11.4
 websockets~=15.0.1
 jinja2
@@ -22,7 +22,7 @@ psutil
 
 # For ASR
 sherpa-onnx
-onnxruntime-gpu==1.17.1
+onnxruntime==1.17.1
 librosa~=0.11.0
 
 # For punctuation

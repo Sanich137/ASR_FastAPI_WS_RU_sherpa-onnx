@@ -42,7 +42,7 @@ RUN mkdir -p ASR_FastAPI_WS_RU_sherpa-onnx/models && \
 
 
 # Установка Python-зависимостей
-RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements.txt
+RUN pip install --no-cache-dir -r ./ASR_FastAPI_WS_RU_sherpa-onnx/requirements_cpu.txt
 
 # Установка переменных окружения
 ENV BASE_SAMPLE_RATE=16000 \
