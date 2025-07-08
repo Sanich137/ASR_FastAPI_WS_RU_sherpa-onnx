@@ -10,7 +10,7 @@
 - Скачиваем необходимый докер файл и помещаем его в любую папку.
 - Переходим в папку и создаём образ:
 ```bash
-docker build -t asr -f /Path/to/Docker/File/Dockerfile_GigaAM_CPU /Path/to/Docker/Folder
+docker build -t asr -f /mnt/e/Coding/Docker/Dockerfile_GigaAM_CPU /mnt/e/Coding/Docker
 ```
  
 - Запускаем образ c GPU:
@@ -33,7 +33,6 @@ docker run -it --rm -p 8888:49153 asr
 
 ```bash
 docker run -d 
-  -it \ 
   --rm \
   -p 8888:49153 \
   -v /путь/на/хосте/logs:/ASR_FastAPI_WS_RU_sherpa-onnx/logs \

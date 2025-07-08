@@ -58,4 +58,6 @@ def start_file_watcher(file_path: str) -> Observer:
     observer = PollingObserver()
     observer.schedule(event_handler=event_handler, path=file_path, recursive=True)
     observer.start()
+    logging.info(f"Включили отслеживание состояния папки {file_path}")
+
     return observer

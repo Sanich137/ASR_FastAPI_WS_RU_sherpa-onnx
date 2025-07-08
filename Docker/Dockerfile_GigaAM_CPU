@@ -90,11 +90,11 @@ RUN mkdir -p $(dirname "$DIAR_MODEL_OUTPUT_PATH") && \
     fi && \
     rm -f /tmp/api_response.json
 
-WORKDIR /ASR_FastAPI_WS_RU_sherpa-onnx
-
 VOLUME ["/ASR_FastAPI_WS_RU_sherpa-onnx/logs", \
        "/ASR_FastAPI_WS_RU_sherpa-onnx/local_asr/to_asr", \
        "/ASR_FastAPI_WS_RU_sherpa-onnx/local_asr/after_asr"]
+
+WORKDIR /ASR_FastAPI_WS_RU_sherpa-onnx
 
 # Открываем порт и запускаем приложение
 EXPOSE 49153

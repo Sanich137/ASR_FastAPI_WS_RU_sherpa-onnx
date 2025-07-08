@@ -45,3 +45,5 @@ nvidia-ml-py~=12.570.86
 aiofiles~=24.1.0
 python_speech_features~=0.6
 scipy~=1.15.2
+
+watchdog
