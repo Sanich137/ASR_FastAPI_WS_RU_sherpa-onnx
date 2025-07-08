@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
     global observer
     if config.DO_LOCAL_FILE_RECOGNITIONS:
         observer_thread = threading.Thread(
-            target=lambda: start_file_watcher(path=str(paths.get("local_recognition_folder"))),
+            target=lambda: start_file_watcher(file_path=str(paths.get("local_recognition_folder"))),
             daemon=True
         )
         observer_thread.start()
