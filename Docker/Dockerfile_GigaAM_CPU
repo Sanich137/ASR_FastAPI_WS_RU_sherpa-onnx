@@ -61,7 +61,10 @@ ENV BASE_SAMPLE_RATE=16000 \
     VAD_SENSE=3 \
     PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx \
     DIAR_MODEL_OUTPUT_PATH=/ASR_FastAPI_WS_RU_sherpa-onnx/models/DIARISATION_model \
-    DIAR_API_URL=https://modelscope.cn/api/v1/datasets/wenet/wespeaker_pretrained_models/oss/tree
+    DIAR_API_URL=https://modelscope.cn/api/v1/datasets/wenet/wespeaker_pretrained_models/oss/tree \
+    DO_LOCAL_FILE_RECOGNITIONS=0 \
+    DELETE_LOCAL_FILE_AFTR_ASR=0 \
+    PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx
 
 # Скачивание модели - ВСЕ В ОДНОМ RUN-слое!
 RUN mkdir -p $(dirname "$DIAR_MODEL_OUTPUT_PATH") && \
@@ -88,7 +91,10 @@ RUN mkdir -p $(dirname "$DIAR_MODEL_OUTPUT_PATH") && \
     rm -f /tmp/api_response.json
 
 WORKDIR /ASR_FastAPI_WS_RU_sherpa-onnx
-ENV PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx
+
+VOLUME ["/ASR_FastAPI_WS_RU_sherpa-onnx/logs", \
+       "/ASR_FastAPI_WS_RU_sherpa-onnx/local_asr/to_asr", \
+       "/ASR_FastAPI_WS_RU_sherpa-onnx/local_asr/after_asr"]
 
 # Открываем порт и запускаем приложение
 EXPOSE 49153
