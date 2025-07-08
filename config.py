@@ -53,9 +53,14 @@ CPU_WORKERS = int(os.getenv('CPU_WORKERS', 0)) # Для значений мен�
 # ('voxceleb_gemini_dfresnet114_LM', 24), ('voxceleb_resnet152_LM', 75), ('voxceleb_resnet221_LM', 90),
 # ('voxceleb_resnet293_LM', 109), ('voxceleb_resnet34', 25), ('voxceleb_resnet34_LM', 25)]
 
-# Инструменты регулирования коррекции скорости речи
+# Инструменты управления распознаванием быстрой речи.
 DO_SPEED_SPEECH_CORRECTION = True if int(os.getenv('USE_SPEED_SPEECH_CORRECTION', 0)) == 1 else False
 # 1 - обычная скорость, меньше - медленнее, больше - быстрее
 SPEED_SPEECH_CORRECTION_MULTIPLIER = float(os.getenv('SPEED_SPEECH_CORRECTION_MULTIPLIER', 1))
+
+# Настройки сервиса локального распознавания.
+DO_LOCAL_FILE_RECOGNITIONS = True if int(os.getenv('DO_LOCAL_FILE_RECOGNITIONS', 0)) == 1 else False
+DELETE_LOCAL_FILE_AFTR_ASR = True if int(os.getenv('DELETE_LOCAL_FILE_AFTR_ASR', 0)) == 1 else False
+
 
 print(f"Using '{LOGGING_LEVEL}' LOGGING_LEVEL")

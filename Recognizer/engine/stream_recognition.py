@@ -141,7 +141,7 @@ async def simple_recognise(audio_data, ) -> dict:
 async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_slow_down = False,
                                        ) -> tuple:
     """
-    Распознавание чанка с возможностью замедления. Замедление не более чем на 20%
+    Распознавание чанка с возможностью контроля быстрой речи.
 
     :param multiplier: Float
     :param can_slow_down: Boolean
