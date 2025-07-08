@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from utils.do_logging import logger
+from utils.files_whatcher import start_file_watcher
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
 import config
+import threading
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 paths = {
@@ -37,6 +39,8 @@ paths = {
     "BASE_DIR": BASE_DIR,
     "test_file": BASE_DIR /'trash'/'111.wav',
     "trash_folder": BASE_DIR / 'trash',
+    "local_recognition_folder": BASE_DIR / 'local_asr' / 'to_asr',
+    "result_local_recognition_folder": BASE_DIR / 'local_asr' / 'after_asr',
 }
 
 from collections import defaultdict
@@ -49,14 +53,20 @@ audio_duration = defaultdict(float)
 ws_collected_asr_res = defaultdict()
 posted_and_downloaded_audio = defaultdict()
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # on_start
-    logger.debug("Приложение  FastAPI запущено")
+    logger.debug("Приложение FastAPI запущено")
+    global observer
+    if config.DO_LOCAL_FILE_RECOGNITIONS:
+        observer_thread = threading.Thread(
+            target=lambda: start_file_watcher(path=str(paths.get("local_recognition_folder"))),
+            daemon=True
+        )
+        observer_thread.start()
+        logger.info("File watcher started")
 
-    yield  # on_stop
-    logger.debug("Приложение FastAPI завершено")
+    yield  # Здесь приложение работает
 
 app = FastAPI(lifespan=lifespan,
               version="1.0",
