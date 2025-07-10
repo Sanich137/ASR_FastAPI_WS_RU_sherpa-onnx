@@ -61,6 +61,20 @@ SPEED_SPEECH_CORRECTION_MULTIPLIER = float(os.getenv('SPEED_SPEECH_CORRECTION_MU
 # Настройки сервиса локального распознавания.
 DO_LOCAL_FILE_RECOGNITIONS = True if int(os.getenv('DO_LOCAL_FILE_RECOGNITIONS', 0)) == 1 else False
 DELETE_LOCAL_FILE_AFTR_ASR = True if int(os.getenv('DELETE_LOCAL_FILE_AFTR_ASR', 0)) == 1 else False
+AUDIOEXTENTIONS =  [
+    # Основные форматы
+    '.mp3', '.wav', '.aac', '.ogg', '.flac', '.m4a', '.wma', '.aiff', '.alac',
+    # Менее распространённые форматы
+    '.ape', '.opus', '.amr', '.au', '.mid', '.midi', '.ac3', '.dts', '.ra', '.rm', '.voc',
+    # Форматы для сжатия и профессионального аудио
+    '.dsd', '.pcm', '.raw', '.tta', '.webm', '.3ga', '.8svx', '.cda',
+    # Форматы с потерями и без потерь
+    '.mp2', '.mp1', '.gsm', '.vox', '.dss', '.mka', '.tak', '.ofr', '.spx',
+    # Игровые аудиоформаты
+    '.xm', '.mod', '.s3m', '.it', '.nsf',
+    # Редкие/устаревшие форматы
+    '.669', '.mtm', '.med', '.far', '.umx'
+]
 
 
 print(f"Using '{LOGGING_LEVEL}' LOGGING_LEVEL")

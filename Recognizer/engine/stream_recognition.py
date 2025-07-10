@@ -151,7 +151,7 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
 
     speed = 0
     if can_slow_down and multiplier < 1:
-        logger.info(f"Обработка быстрой речи с коэффициентом: {multiplier:.2f}")
+        logger.debug(f"Обработка быстрой речи с коэффициентом: {multiplier:.2f}")
         audio_data = await do_slow_down_audio(audio_segment=audio_data,slowdown_rate=multiplier)
 
 
@@ -180,7 +180,7 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
         speed = calc_speed(result)
         logger.debug(f"Скорость аудио {speed} единиц в секунду")
         if speed > config.SPEECH_PER_SEC_NORM_RATE:
-            print(max((config.SPEECH_PER_SEC_NORM_RATE - 1) / speed, 0.8))
+            # print(max((config.SPEECH_PER_SEC_NORM_RATE - 1) / speed, 0.8))
 
             result, speed, multiplier = await recognise_w_speed_correction(audio_data=audio_data,
                                                can_slow_down=True,
