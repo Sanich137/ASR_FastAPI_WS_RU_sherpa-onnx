@@ -101,6 +101,10 @@ CAN_DIAR = 0 # Включение и выключение возможности
 DIAR_MODEL_NAME = "voxceleb_resnet34_LM"  # Выбор модели для диаризации (скачает сам).
 DIAR_WITH_GPU = 0 # 0 - использование для диаризации CPU, 1 - GPU
 CPU_WORKERS = 0  # Количество CPU воркеров для диаризаии. 0 - решает onnxruntime (max).
+
+# Настройки сервиса локального распознавания.
+DO_LOCAL_FILE_RECOGNITIONS = 1 # Включить распознавание при помещении в папку файла.
+DELETE_LOCAL_FILE_AFTR_ASR = 1 # Удалять файлы из папки после распознавания.
 ```
 
 ### Список доступных моделей для диаризации:
@@ -179,6 +183,8 @@ sudo systemctl enable vosk_gpu
 свяжитесь со мной через [GitHub Issues](https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx/issues) или [GitHub Discussions](https://github.com/Sanich137/ASR_FastAPI_WS_RU_sherpa-onnx/discussions)
 
 ## Работы
+- 21 июля 2025 - реализован механизм распознавания переданных в папку файлов.
+- 07 июля 2025 - реализован механизм улучшения распознавания при распознавании быстрой речи.
 - 22 апреля 2025 - внедрена диаризация. Выбрать можно из [множества](https://github.com/wenet-e2e/wespeaker/blob/master/docs/pretrained.md) моделей wespeaker. (соблюдайте лицензии).
 Использование опционально, возможна работа как на CPU, так и на GPU.
 - 10 апреля 2025 - webrtcvad заменён на Silero v5, пунктуация производится силами GPU.
