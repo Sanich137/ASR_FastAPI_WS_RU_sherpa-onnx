@@ -29,9 +29,11 @@ def send_file_to_asr(event, file_path):
             tmp_path=file_path,
             params=file_params
         )
+        # Имя файла без расширения
+        file_name = file_path.stem
 
         if asr_data["success"]:
-            asyncio.run(save_to_md(asr_data))
+            asyncio.run(save_to_md(asr_data, file_name))
 
             if config.DELETE_LOCAL_FILE_AFTR_ASR:
                 try:
@@ -62,7 +64,7 @@ class FileHandler(FileSystemEventHandler):
         logging.info(f"Получено сообщение о переименовании  файла {event.dest_path}")
 
         if file_path.suffix not in config.AUDIOEXTENTIONS:
-            logging.info(f"Файл {file_path.name}. Пропускаем, т.к. не аудио формат")
+            logging.info(f"Файл {file_path.name} пропущен, т.к. не аудио формат")
         else:
             send_file_to_asr(event, file_path)
 
