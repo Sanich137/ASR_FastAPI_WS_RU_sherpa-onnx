@@ -1,39 +1,8 @@
-import config
 from utils.do_logging import logger
-import ujson
-import numpy as np
-import statistics
 import numpy as np
 import asyncio
 from Punctuation import sbertpunc
 
-# is_async=False, task_id=None, raw_recognition=None):
-async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False, is_async: bool = False):
-  """
-  :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
-  :param is_async: Ранее был реализован сервис постановки задачи на распознавание в работу. И, как следствие,
-  результат нужно было хранить в отдельном месте до его получения и удаления. Сейчас скорость обработки аудио уже не
-  требует такого. Понаблюдать, при необходимости можно удалить (и часть кода связанная с хранением переменных)
-  :param input_asr_json: {"channel_{n_channel + 1}":
-                              {"data":{"result":
-                                          [
-                                              { "conf": 1,
-                                                  "start": float(),
-                                                  "end": float(),
-                                                  "word": str()
-                                              }, ...
-                                          ],
-                                      "text": str()
-                              },
-                              ...
-                          }
-  :return:  {
-          "raw_text_sentenced_recognition": str() - текст с переносами, сортировкой по времени начала спикера,
-          "list_of_sentenced_recognitions": list() - список словарей с текстом, временем начала и номером спикера
-          "full_text_only": text_only, list() - список с суммированным текстом каждого канала
-          "err_state": err_state - ошибка, если не удалось
-      }
-  """
 async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
     """
     :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
@@ -111,22 +80,12 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
                         between_words_delta.append(word.get('end') - end_time)
                         end_time = word.get('end')
 
-          words_mean = np.percentile(between_words_delta, 25)
-          logger.debug(f"words_mean = {words_mean}")
-          # words_mean = statistics.mean(between_words_delta) * word_pause
-          # words_mean *= word_pause
+                    words_mean = np.percentile(between_words_delta, config.BETWEEN_WORDS_PERCENTILE)
+                    logger.debug(f"words_mean = {words_mean}")
 
-          start_time = 0
-          end_time = 0
+                    start_time = 0
+                    end_time = 0
 
-          for word in words:
-            logger.debug(f"В работе слово '{word.get('word')}' 'start'={word.get('start')}, 'end'={word.get('end')}, "
-                        f"start_time={start_time}, end_time={end_time}")
-
-            if start_time == 0:
-              start_time = word.get('start')
-            if end_time == 0:
-              end_time = word.get('end')
                     for word in words:
                         logger.debug(f"В работе слово '{word.get('word')}' 'start'={word.get('start')}, 'end'={word.get('end')}, "
                                     f"start_time={start_time}, end_time={end_time}")
@@ -136,21 +95,6 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
                         if end_time == 0:
                             end_time = word.get('end')
 
-            logger.debug(f"start_time={start_time}, end_time={end_time}")
-
-            if word.get('start') < end_time:
-              logger.error(f"Ошибка расчёта времени на слове {word.get('word')} start = {word.get('start')}, end = {end_time}")
-
-            if (word.get('start') - end_time) < words_mean:
-              sentences.append(word.get('word'))
-              end_time = word.get('end')
-              continue
-
-            else:
-              if do_punctuation:
-                text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
-              else:
-                text = ' '.join(str(word) for word in sentences)
                         logger.debug(f"start_time={start_time}, end_time={end_time}")
 
                         if word.get('start') < end_time:
@@ -167,19 +111,6 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
                             else:
                                 text = ' '.join(str(word) for word in sentences)
 
-              sentence_element.append({
-                "start": start_time,
-                "end": end_time,
-                "text": text,
-                "speaker": channel
-              })
-              # Переопределяем список
-              sentences = list()
-              # В новый список помещаем слово
-              sentences.append(word.get('word'))
-              start_time = word.get('start')
-              end_time = word.get('end')
-              continue
                             sentence_element.append({
                                 "start": start_time,
                                 "end": end_time,
