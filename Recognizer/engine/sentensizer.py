@@ -1,6 +1,7 @@
 from utils.do_logging import logger
 import numpy as np
 import asyncio
+import config
 from Punctuation import sbertpunc
 
 async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
