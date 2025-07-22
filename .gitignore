@@ -3,6 +3,8 @@
 *.mp3
 *.ogg
 *.onnx
+*.m4a
+*.md
 /.venv/
 /venv/
 /models/vosk-model-ru/
@@ -14,3 +16,4 @@
 /models/sherpa-onnx-whisper-medium/
 /models/sherpa-onnx-whisper-small/
 /trash/test_data.py
+/.idea/

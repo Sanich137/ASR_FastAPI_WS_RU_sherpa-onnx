@@ -19,8 +19,6 @@ def are_words_similar(word1: str, word2: str, similarity_threshold: float = 0.8)
         return True
 
 
-
-
 async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float = 0.9) -> Dict[str, List[Dict[str, Any]]]:
     output_json = {}
 

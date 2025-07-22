@@ -94,8 +94,7 @@ async def websocket(ws: WebSocket):
                     except Exception as e:
                         logger.error(f"Ошибка принятия аудио - {e}")
                     else:
-                        logger.info("Чанк принят и распознан")
-                        audiosegment_chunk.export('chunk.wav', "wav")
+                        logger.debug("Чанк принят и распознан")
 
                 # Приводим фреймрейт к фреймрейту модели
                 if audiosegment_chunk.frame_rate != config.BASE_SAMPLE_RATE:

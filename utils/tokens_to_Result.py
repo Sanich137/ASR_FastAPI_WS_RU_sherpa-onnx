@@ -1,11 +1,13 @@
 import asyncio
-import math
-#from utils.do_logging import logger
-import logging as logger
 
-# Функция для преобразования логарифмических вероятностей в обычные
-def logprob_to_prob(logprob):
-    return math.exp(logprob)  # Используем exp для преобразования ln(prob)
+from numpy.ma.core import count
+from sympy.physics.units import speed
+
+from utils.do_logging import logger
+
+# # Функция для преобразования логарифмических вероятностей в обычные
+# def logprob_to_prob(logprob):
+#     return math.exp(logprob)  # Используем exp для преобразования ln(prob)
 
 # Асинхронная функция для обработки JSON
 async def process_asr_json(input_json, time_shift = 0.0):
@@ -63,10 +65,18 @@ async def process_asr_json(input_json, time_shift = 0.0):
     return result
 
 
-async def process_gigaam_asr(input_json, time_shift=0.0):
+async def process_gigaam_asr(input_json, time_shift=0.0, multiplier=1):
+    """
+
+    :param input_json: Входящий результат распознавания
+    :param time_shift: Время старта чанка от начала аудио
+    :param multiplier: Коэффициент замедления аудио
+    :return:
+    """
+
     # Парсим JSON
     data = input_json
-
+    logger.debug(f" на разбор после ASR получен JSON - {input_json}")
     # Формируем шаблон результата
     result = {"data": {"result": [], "text": ""}}
 
@@ -78,12 +88,12 @@ async def process_gigaam_asr(input_json, time_shift=0.0):
     current_word = ""
     current_timestamps = []
 
+
     for i, token in enumerate(data['tokens']):
-        timestamp = round((data['timestamps'][i] + time_shift), 3)
+        timestamp = round((data['timestamps'][i] * multiplier) + time_shift, 2) # (1/multiplier-1)
 
         if token != ' ':
             current_timestamps.append(timestamp)
-
             # Проверяем временной промежуток между текущим и предыдущим токеном
             if len(current_timestamps) > 1:
                 time_gap = current_timestamps[-1] - current_timestamps[-2]
@@ -120,10 +130,13 @@ async def process_gigaam_asr(input_json, time_shift=0.0):
             'end': current_timestamps[-1]
         })
 
+
+
+
     # Формируем итоговый массив
     result['data'] = {
         'result': [{'conf': 1.0, 'start': word['start'], 'end': word['end'], 'word': word['word']} for word in words],
-        'text': ' '.join(word['word'] for word in words)  # Обновляем текст на основе разделённых слов
+        'text': ' '.join(word['word'] for word in words),  # Обновляем текст на основе разделённых слов
     }
     return result
 

@@ -1,4 +1,4 @@
-setuptools~=80.0.1
+setuptools
 
 httpx~=0.28.1
 
@@ -7,23 +7,22 @@ ujson~=5.10.0
 numpy~=1.26.4
 
 uvicorn~=0.34.2
-fastapi~=0.115.12
+fastapi
 pydantic~=2.11.4
 websockets~=15.0.1
-jinja2~=3.1.6
-python-multipart~=0.0.20
+jinja2
+python-multipart
 ujson
-soundfile~=0.13.1
+soundfile
 
 pydub~=0.25.1
 
-tqdm~=4.67.1
-psutil~=7.0.0
+tqdm
+psutil
 
 # For ASR
--f https://k2-fsa.github.io/sherpa/onnx/cuda.html
-sherpa-onnx==1.12.1+cuda
-onnxruntime-gpu==1.17.1
+sherpa-onnx
+onnxruntime==1.17.1
 librosa~=0.11.0
 
 # For punctuation
@@ -44,5 +43,7 @@ pynvml~=12.0.0
 nvidia-ml-py~=12.570.86
 
 aiofiles~=24.1.0
+python_speech_features~=0.6
+scipy~=1.15.2
 
-watchdog~=6.0.0
+watchdog

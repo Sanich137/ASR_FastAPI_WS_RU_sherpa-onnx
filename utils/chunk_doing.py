@@ -8,7 +8,6 @@ from utils.pre_start_init import (audio_overlap,
 from pydub import AudioSegment
 from VoiceActivityDetector import vad
 from utils.resamppling import resample_audiosegment
-import numpy as np
 
 import numpy as np
 from pydub import AudioSegment
@@ -16,11 +15,11 @@ from pydub import AudioSegment
 async def find_last_speech_position(socket_id, sample_width=2):
     """
     1. Берём собранное аудио, добавляем в начало overlap
-    2. Конвертируем его в np.int16
+    2. Конвертируем его в np.float32
     3. Находим позицию последнего сегмента тишины перед речью в аудио.
     4. Всё до этой позиции отправляем на распознавание
     5. Остаток, хвост, складываем отдельно как overlap
-    6. Если не находит ни одного сегмента без речи, помечаем его как полностью речь и отдаём на расп leaf
+    6. Если не находит ни одного сегмента без речи, помечаем его как полностью речь и отдаём на распознавание
     """
 
     frame_rate = audio_buffer[socket_id].frame_rate
