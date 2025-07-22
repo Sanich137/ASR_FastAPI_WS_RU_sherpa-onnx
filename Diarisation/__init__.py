@@ -59,7 +59,7 @@ if config.CAN_DIAR:
         from .do_diarize import Diarizer
 
         diarizer = Diarizer(embedding_model_path=paths.get("diar_speaker_model_path"),
-                            # vad=vad,
+                            vad=vad,
                             max_phrase_gap=1,
                             batch_size=4,
                             cpu_workers=0,
