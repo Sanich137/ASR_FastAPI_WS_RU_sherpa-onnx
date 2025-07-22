@@ -50,9 +50,10 @@ def process_file(tmp_path, params):
         result["error_description"] = error_description
         return result
     else:
-        if posted_and_downloaded_audio[post_id].duration_seconds < 5:
+        if posted_and_downloaded_audio[post_id].duration_seconds < config.MAX_OVERLAP_DURATION:
             logger.debug("На вход передано аудио короче 5 секунд. Будет дополнено тишиной ещё 5 сек.")
-            posted_and_downloaded_audio[post_id]+=AudioSegment.silent(5000,frame_rate=config.BASE_SAMPLE_RATE)
+            silent_secs = config.MAX_OVERLAP_DURATION - posted_and_downloaded_audio[post_id].duration_seconds
+            posted_and_downloaded_audio[post_id]+=AudioSegment.silent(silent_secs,frame_rate=config.BASE_SAMPLE_RATE)
 
     if params.do_diarization and not config.CAN_DIAR:
         params.do_diarization = False
@@ -103,8 +104,9 @@ def process_file(tmp_path, params):
             # Основной процесс перебора чанков для распознавания
             for overlap in mono_data[::config.MAX_OVERLAP_DURATION * 1000]:
                 with audio_lock:
-                    if (audio_overlap[post_id].duration_seconds + overlap.duration_seconds) < 3:
-                        overlap += AudioSegment.silent(3000, frame_rate=config.BASE_SAMPLE_RATE)
+                    if (audio_overlap[post_id].duration_seconds + overlap.duration_seconds) < config.MAX_OVERLAP_DURATION:
+                        silent_secs = config.MAX_OVERLAP_DURATION - (audio_overlap[post_id].duration_seconds + overlap.duration_seconds)
+                        overlap += AudioSegment.silent(silent_secs, frame_rate=config.BASE_SAMPLE_RATE)
                     audio_buffer[post_id] = overlap
                     asyncio.run(find_last_speech_position(post_id))
 
@@ -113,8 +115,10 @@ def process_file(tmp_path, params):
                         # Снижаем скорость аудио по необходимости
                         if params.do_auto_speech_speed_correction or params.speech_speed_correction_multiplier != 1:
                             logger.debug("Будут использованы механизмы анализа скорости речи и замедления аудио")
+
                             asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_to_asr[post_id], can_slow_down=True,
                                                                               multiplier=params.speech_speed_correction_multiplier))
+
                             params.speech_speed_correction_multiplier = multiplier
 
                         else:

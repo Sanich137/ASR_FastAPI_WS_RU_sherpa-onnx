@@ -15,10 +15,15 @@ class SyncASRRequest(BaseModel):
     """
 
     AudioFileUrl: HttpUrl
+    keep_raw: Union[bool, None] = True
     do_echo_clearing: Union[bool, None] = True
     do_dialogue: Union[bool, None] = False
     do_punctuation: Union[bool, None] = False
-    keep_raw: Union[bool, None] = True
+    do_diarization: Union[bool, None] = False
+    make_mono: Union[bool, None] = False
+    diar_vad_sensity: int = 3
+    do_auto_speech_speed_correction: Union[bool, None] = config.DO_SPEED_SPEECH_CORRECTION
+    speech_speed_correction_multiplier: Union[float, None] = config.SPEED_SPEECH_CORRECTION_MULTIPLIER
 
 
 class PostFileRequest(BaseModel):
@@ -39,7 +44,7 @@ class PostFileRequest(BaseModel):
     make_mono: Union[bool, None] = False
     diar_vad_sensity: int = 3
     do_auto_speech_speed_correction: Union[bool, None] = config.DO_SPEED_SPEECH_CORRECTION
-    speech_speed_correction_multiplier: float = config.SPEED_SPEECH_CORRECTION_MULTIPLIER,
+    speech_speed_correction_multiplier: float = config.SPEED_SPEECH_CORRECTION_MULTIPLIER
 
 
 class PostFileRequestDiarize(BaseModel):
