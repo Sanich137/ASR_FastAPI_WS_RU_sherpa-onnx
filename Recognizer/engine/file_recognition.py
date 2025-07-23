@@ -50,15 +50,10 @@ def process_file(tmp_path, params):
         result["error_description"] = error_description
         return result
     else:
-        if posted_and_downloaded_audio[post_id].duration_seconds < config.MAX_OVERLAP_DURATION:
-            logger.debug("На вход передано аудио короче 5 секунд. Будет дополнено тишиной ещё 5 сек.")
-            silent_secs = config.MAX_OVERLAP_DURATION - posted_and_downloaded_audio[post_id].duration_seconds
-            posted_and_downloaded_audio[post_id]+=AudioSegment.silent(silent_secs,frame_rate=config.BASE_SAMPLE_RATE)
-
-    if params.do_diarization and not config.CAN_DIAR:
-        params.do_diarization = False
-        error_description += "Diarization is not available\n"
-        logger.error("Запрошена диаризация, но она не доступна.")
+        # Проверка длины переданного на распознавание аудио
+        if posted_and_downloaded_audio[post_id].duration_seconds < 5:
+            logger.debug(f"На вход передано аудио короче 5 секунд. Будет дополнено тишиной ещё 5 сек.")
+            posted_and_downloaded_audio[post_id]+=AudioSegment.silent(duration=5,frame_rate=config.BASE_SAMPLE_RATE)
 
     # Приводим фреймрейт к фреймрейту модели
     try:
@@ -68,7 +63,6 @@ def process_file(tmp_path, params):
                     audio_data=posted_and_downloaded_audio[post_id],
                     target_sample_rate=config.BASE_SAMPLE_RATE)
                 )
-
 
     except KeyError as e_key:
         error_description = f"Ошибка обращения по ключу {post_id} при изменения фреймрейта - {e_key}"
@@ -102,13 +96,18 @@ def process_file(tmp_path, params):
             result["raw_data"].update({f"channel_{n_channel + 1}": list()})
 
             # Основной процесс перебора чанков для распознавания
-            for overlap in mono_data[::config.MAX_OVERLAP_DURATION * 1000]:
+            overlaps = list(mono_data[::config.MAX_OVERLAP_DURATION * 1000])
+            total_chunks = len(overlaps)
+
+            for idx, overlap in enumerate(overlaps):
+                is_last_chunk = (idx == total_chunks - 1)
+
                 with audio_lock:
                     if (audio_overlap[post_id].duration_seconds + overlap.duration_seconds) < config.MAX_OVERLAP_DURATION:
                         silent_secs = config.MAX_OVERLAP_DURATION - (audio_overlap[post_id].duration_seconds + overlap.duration_seconds)
                         overlap += AudioSegment.silent(silent_secs, frame_rate=config.BASE_SAMPLE_RATE)
                     audio_buffer[post_id] = overlap
-                    asyncio.run(find_last_speech_position(post_id))
+                    asyncio.run(find_last_speech_position(post_id, is_last_chunk))
 
                 try:
                     with audio_lock:
@@ -118,13 +117,10 @@ def process_file(tmp_path, params):
 
                             asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_to_asr[post_id], can_slow_down=True,
                                                                               multiplier=params.speech_speed_correction_multiplier))
-
                             params.speech_speed_correction_multiplier = multiplier
-
                         else:
+                            # Производим распознавание
                             asr_result_wo_conf = asyncio.run(simple_recognise(audio_to_asr[post_id]))
-
-
 
                 except Exception as e:
                     logger.error(f"Error ASR audio - {e}")
@@ -164,6 +160,11 @@ def process_file(tmp_path, params):
                 logger.error(f"Error echo clearing - {e}")
                 error_description = f"Error echo clearing - {e}"
                 res = False
+
+        if params.do_diarization and not config.CAN_DIAR:
+            params.do_diarization = False
+            error_description += "Diarization is not available\n"
+            logger.error("Запрошена диаризация, но она не доступна.")
 
         if params.do_diarization:
             try:

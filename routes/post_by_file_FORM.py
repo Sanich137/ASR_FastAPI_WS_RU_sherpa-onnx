@@ -15,12 +15,10 @@ from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 from utils.resamppling import resample_audiosegment
 from models.fast_api_models import PostFileRequest
-from Recognizer.engine.stream_recognition import simple_recognise, recognise_w_speed_correction
 from Recognizer.engine.sentensizer import do_sensitizing
 from Recognizer.engine.echoe_clearing import remove_echo
 from Recognizer.engine.file_recognition import process_file
 from fastapi import Depends, File, Form, UploadFile
-from Diarisation.diarazer import do_diarizing
 import aiofiles
 import os
 from threading import Lock
@@ -54,9 +52,6 @@ def get_file_request(
     )
 
 
-def sync_simple_recognise(audio_data):
-    return asyncio.run(simple_recognise(audio_data))
-
 def sync_resample_audiosegment(audio_data, target_sample_rate):
     return asyncio.run(resample_audiosegment(audio_data, target_sample_rate))
 
@@ -71,9 +66,6 @@ def sync_process_asr_json(asr_result, duration):
 
 def sync_remove_echo(raw_data):
     return asyncio.run(remove_echo(raw_data))
-
-def sync_do_diarizing(post_id, raw_data, diar_vad_sensity):
-    return asyncio.run(do_diarizing(post_id, raw_data, diar_vad_sensity=diar_vad_sensity))
 
 def sync_do_sensitizing(data, do_punctuation):
     return asyncio.run(do_sensitizing(data, do_punctuation=do_punctuation))

@@ -197,18 +197,15 @@ class Diarizer:
                  use_gpu: bool = False,
                  max_phrase_gap: float = 0.5,
                  min_duration: float = 0.15,
-                 filter_cutoff: int = 100,
-                 filter_order: int = 10,
                  batch_size: int = 1,
                  cpu_workers: int = 0):
+
         self.vad = vad
         self.sample_rate = sample_rate
         self.winlen = 0.025
         self.winstep = 0.01
         self.num_mel_bins = 80
         self.nfft = 512
-        self.filter_cutoff = filter_cutoff
-        self.filter_order = filter_order
         self.max_phrase_gap = max_phrase_gap
         self.min_duration = min_duration
 
@@ -336,7 +333,7 @@ class Diarizer:
         subsegs = []
         subseg_audios = []
         for start, end, audio in segments:
-            audio = await self.highpass_filter(audio, cutoff=self.filter_cutoff, filter_order=self.filter_order)
+            audio = await self.highpass_filter(audio, cutoff=filter_cutoff, filter_order=filter_order)
             seg_id = f"{start:.3f}-{end:.3f}"
             fbank_feats = await self.extract_fbank(audio)
             tmp_subsegs, tmp_subseg_fbanks = await self.subsegment(fbank_feats, seg_id, window_fs, period_fs, frame_shift)
