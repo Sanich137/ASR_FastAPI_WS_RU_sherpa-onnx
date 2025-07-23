@@ -23,7 +23,7 @@ async def find_last_speech_position(socket_id, is_last_chunk):
     """
 
     if is_last_chunk:
-        audio_to_asr[socket_id] = audio_buffer[socket_id]
+        audio_to_asr[socket_id] = audio_overlap[socket_id] + audio_buffer[socket_id]
     else:
         frame_rate = audio_buffer[socket_id].frame_rate
         # 16000 - битрейт, требуемый Silero VAD

@@ -60,9 +60,9 @@ def process_file(tmp_path, params):
         with audio_lock:
             if posted_and_downloaded_audio[post_id].frame_rate != config.BASE_SAMPLE_RATE:
                 posted_and_downloaded_audio[post_id] = asyncio.run(resample_audiosegment(
-                    audio_data=posted_and_downloaded_audio[post_id],
-                    target_sample_rate=config.BASE_SAMPLE_RATE)
-                )
+                                                                        audio_data=posted_and_downloaded_audio[post_id],
+                                                                        target_sample_rate=config.BASE_SAMPLE_RATE)
+                                                                    )
 
     except KeyError as e_key:
         error_description = f"Ошибка обращения по ключу {post_id} при изменения фреймрейта - {e_key}"
@@ -96,18 +96,17 @@ def process_file(tmp_path, params):
             result["raw_data"].update({f"channel_{n_channel + 1}": list()})
 
             # Основной процесс перебора чанков для распознавания
-            overlaps = list(mono_data[::config.MAX_OVERLAP_DURATION * 1000])
-            total_chunks = len(overlaps)
+            overlaps = list(mono_data[::config.MAX_OVERLAP_DURATION * 1000])  # Чанки аудио для рапсознавания
+            total_chunks = len(overlaps)  # Количество чанков, для поиска последнего
 
             for idx, overlap in enumerate(overlaps):
-                is_last_chunk = (idx == total_chunks - 1)
-
+                is_last_chunk = (idx == total_chunks - 1) # Если чанк последний
                 with audio_lock:
                     if (audio_overlap[post_id].duration_seconds + overlap.duration_seconds) < config.MAX_OVERLAP_DURATION:
                         silent_secs = config.MAX_OVERLAP_DURATION - (audio_overlap[post_id].duration_seconds + overlap.duration_seconds)
                         overlap += AudioSegment.silent(silent_secs, frame_rate=config.BASE_SAMPLE_RATE)
                     audio_buffer[post_id] = overlap
-                    asyncio.run(find_last_speech_position(post_id, is_last_chunk))
+                    asyncio.run(find_last_speech_position(post_id, is_last_chunk)) # Последний чанк обрабатывается иначе.
 
                 try:
                     with audio_lock:
