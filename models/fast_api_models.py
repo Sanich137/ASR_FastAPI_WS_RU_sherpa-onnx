@@ -29,7 +29,6 @@ class SyncASRRequest(BaseModel):
 class PostFileRequest(BaseModel):
     """
     Модель для проверки запроса пользователя.
-
     :param keep_raw: Если False, то запрос вернёт только пост-обработанные данные do_punctuation и do_dialogue.
     :param do_echo_clearing: Проверяет наличие повторений между каналами.
     :param do_dialogue: Собирает из распознанного текста фразы, разделённые более длинным молчанием,

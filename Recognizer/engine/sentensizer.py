@@ -4,7 +4,7 @@ import asyncio
 import config
 from Punctuation import sbertpunc
 
-async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
+async def do_sensitizing(input_asr_json: dict, do_punctuation: bool = False):
     """
     :param do_punctuation: Если True, то производит пунктуацию и капитализацию над собранными в предложения выражения.
     :param input_asr_json: {"channel_{n_channel + 1}":
@@ -37,8 +37,6 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
     else:
         for channel in input_asr_json:
             words = list()
-            word_pause = 1.5
-            sentence_element = None
             one_text_only = str()
             err_state = None
 
@@ -53,7 +51,7 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
             if len(words) < 1:
                 err_state = f"Err_No_words in {channel}"
                 sentence_element = []
-                logger.info(f"В списке слов только одно слово в канале {channel}")
+                logger.info(f"нет слов в канале {channel}")
             else:
                 sentence_element = []
                 sentences = []

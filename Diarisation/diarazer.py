@@ -2,7 +2,7 @@ import config
 from Diarisation.do_diarize import load_and_preprocess_audio
 from utils.pre_start_init import posted_and_downloaded_audio
 from utils.do_logging import logger
-from collections import defaultdict
+from Diarisation.do_diarize import extract_speech_segments
 
 from collections import defaultdict
 
@@ -13,21 +13,36 @@ async def do_diarizing(
         file_id:str,
         asr_raw_data,
         num_speakers:int = -1,
-        filter_cutoff:int = 50,
+        filter_cutoff:int = 30,
         filter_order:int = 10,
-        diar_vad_sensity: int = 3
         ):
     # Предобработка аудио.
-    # ВАЖНЫЙ момент. Мы диаризируем только последний канал.
-    audio_frames = await load_and_preprocess_audio(posted_and_downloaded_audio[file_id].split_to_mono()[-1])
+    # ВАЖНЫЙ момент. Здесь мы диаризируем только последний канал.
+    samples_float32 = await load_and_preprocess_audio(audio=posted_and_downloaded_audio[file_id],
+                                                   sample_rate=16000, filter_cutoff=filter_cutoff,
+                                                   filter_order=filter_order)
+
+    segments_times = extract_speech_segments(asr_raw_data["channel_1"], pause_threshold=0.25, min_duration=0.15)
+
+    segments = []
+    for start, end in segments_times:
+        start_sample = int(start * 16000)
+        end_sample = int(end * 16000)
+        if end_sample > len(samples_float32):
+            logger.warning(f"Конец сегмента {end:.3f} превышает длину аудио, обрезается")
+            end_sample = len(samples_float32)
+        if start_sample >= end_sample:
+            logger.warning(f"Некорректный сегмент {start:.3f}-{end:.3f}, пропускается")
+            continue
+        audio_fragment = samples_float32[start_sample:end_sample]
+        segments.append((audio_fragment, start, end))
+
+
 
     # Непосредственно получение временных меток речи
-    diar_result = await diarizer.diarize_and_merge(
-        audio_frames,
+    diar_result = await diarizer.diarize(
+        segments=segments,
         num_speakers=num_speakers,
-        filter_cutoff=filter_cutoff,
-        filter_order=filter_order,
-        vad_sensity=diar_vad_sensity
     )
 
     for r in diar_result:
@@ -35,177 +50,101 @@ async def do_diarizing(
 
 
     # Построение структуры аналогично raw_data для дальнейшего построения диалога и вывод результата
-#     return merge_asr_diarisation(asr_raw_data, diar_result)
-    return match_asr_with_diarization(asr_raw_data, diar_result)
+    m_asr = match_asr_with_diarization(asr_raw_data, diar_result)
+    return m_asr
 
-
-
-
-
-def match_asr_with_diarization(asr_data, diarization_data, min_overlap_ratio=0.5,
-                               max_pause=2.0, group_unmatched_words=True):
-    """
-    Параметры:
-        group_unmatched_words: если True, группирует несопоставленные слова с ближайшими сопоставленными
-    """
+def match_asr_with_diarization(asr_data, diarization_data, min_overlap_ratio=0.5, max_pause=2.0, group_unmatched_words=True):
     result = defaultdict(list)
     diarization_data_sorted = sorted(diarization_data, key=lambda x: x['start'])
 
     for channel, asr_segments in asr_data.items():
         for asr_segment in asr_segments:
-            # Сохраняем все оригинальные поля из asr_segment
             segment_metadata = {k: v for k, v in asr_segment.items() if k != 'data'}
             words = asr_segment['data']['result']
             word_assignments = {}
 
-            # Первый проход: сопоставление слов с интервалами диаризации
+            # Сопоставление слов с диаризацией
             for i, word in enumerate(words):
-                word_start = word['start']
-                word_end = word['end']
-                word_duration = word_end - word_start
-                best_speaker = None
-                best_overlap = 0
+                word_start, word_end = word['start'], word['end']
+                word_duration = word_end - word_start or 0.0001
+                best_speaker, max_overlap = None, 0
 
                 for diar_segment in diarization_data_sorted:
-                    diar_start = diar_segment['start']
-                    diar_end = diar_segment['end']
+                    diar_start, diar_end = diar_segment['start'], diar_segment['end']
+                    overlap_start = max(word_start, diar_start)
+                    overlap_end = min(word_end, diar_end)
+                    overlap = max(0, overlap_end - overlap_start)
+                    overlap_ratio = overlap / word_duration
 
-                    if word_duration == 0:
-                        is_inside = diar_start <= word_start < diar_end
+                    if word_duration <= 0.0001:
+                        is_inside = diar_start <= word_start <= diar_end
                         overlap_ratio = 1.0 if is_inside else 0.0
                         overlap = 1.0 if is_inside else 0.0
-                    else:
-                        overlap_start = max(word_start, diar_start)
-                        overlap_end = min(word_end, diar_end)
-                        overlap = max(0, overlap_end - overlap_start)
-                        overlap_ratio = overlap / word_duration
 
-                    if overlap_ratio >= min_overlap_ratio and overlap > best_overlap:
-                        best_speaker = diar_segment['speaker']
-                        best_overlap = overlap
+                    if overlap_ratio >= min_overlap_ratio and overlap > max_overlap:
+                        best_speaker = str(diar_segment['speaker'])  # Преобразуем спикера в строку
+                        max_overlap = overlap
 
                 word_assignments[i] = best_speaker
 
-            # Второй проход: группировка несопоставленных слов
+            # Группировка несопоставленных слов
             if group_unmatched_words:
-                speech_segments = []
-                current_speaker = None
-                segment_start = None
+                for i, speaker in enumerate(word_assignments.values()):
+                    if speaker is None:
+                        word_start, word_end = words[i]['start'], words[i]['end']
+                        min_dist = float('inf')
+                        best_speaker = None
 
-                for i, word in enumerate(words):
-                    speaker = word_assignments[i]
+                        for diar_segment in diarization_data_sorted:
+                            dist_to_start = abs(word_start - diar_segment['start'])
+                            dist_to_end = abs(word_start - diar_segment['end'])
+                            dist = min(dist_to_start, dist_to_end)
+                            if dist < min_dist and dist <= max_pause:
+                                min_dist = dist
+                                best_speaker = str(diar_segment['speaker'])  # Преобразуем в строку
 
-                    if speaker != current_speaker:
-                        if current_speaker is not None:
-                            speech_segments.append({
-                                'speaker': current_speaker,
-                                'start': segment_start,
-                                'end': words[i - 1]['end']
-                            })
+                        word_assignments[i] = best_speaker if best_speaker is not None else "unknown"
 
-                        current_speaker = speaker
-                        segment_start = word['start']
-
-                if current_speaker is not None:
-                    speech_segments.append({
-                        'speaker': current_speaker,
-                        'start': segment_start,
-                        'end': words[-1]['end']
-                    })
-
-                for i, word in enumerate(words):
-                    if word_assignments[i] is None:
-                        word_start = word['start']
-                        word_end = word['end']
-
-                        prev_segment = None
-                        next_segment = None
-
-                        for segment in speech_segments:
-                            if segment['end'] <= word_start:
-                                if prev_segment is None or segment['end'] > prev_segment['end']:
-                                    prev_segment = segment
-                            elif segment['start'] >= word_end:
-                                if next_segment is None or segment['start'] < next_segment['start']:
-                                    next_segment = segment
-
-                        if prev_segment and next_segment:
-                            dist_prev = word_start - prev_segment['end']
-                            dist_next = next_segment['start'] - word_end
-                            best_segment = prev_segment if dist_prev < dist_next else next_segment
-                        elif prev_segment:
-                            best_segment = prev_segment
-                        elif next_segment:
-                            best_segment = next_segment
-                        else:
-                            best_segment = None
-
-                        if best_segment:
-                            word_assignments[i] = best_segment['speaker']
-
-            # Группируем слова по спикерам
+            # Группировка слов по спикерам и формирование реплик
             speaker_words = defaultdict(list)
             for i, word in enumerate(words):
-                speaker = word_assignments[i] if word_assignments[i] is not None else 'unknown'
+                speaker = word_assignments[i] if word_assignments[i] is not None else "unknown"
                 speaker_words[speaker].append(word)
 
-            # Формируем результирующие реплики с сохранением структуры
             for speaker, words_in_segment in speaker_words.items():
                 if not words_in_segment:
                     continue
 
                 words_sorted = sorted(words_in_segment, key=lambda x: x['start'])
                 replicas = []
-                current_replica = []
+                current_replica = [words_sorted[0]]
 
-                for word in words_sorted:
-                    if not current_replica:
+                for word in words_sorted[1:]:
+                    if word['start'] - current_replica[-1]['end'] <= max_pause:
                         current_replica.append(word)
                     else:
-                        last_end = current_replica[-1]['end']
-                        if word['start'] - last_end > max_pause:
-                            replicas.append(current_replica)
-                            current_replica = [word]
-                        else:
-                            current_replica.append(word)
+                        replicas.append(current_replica)
+                        current_replica = [word]
                 if current_replica:
                     replicas.append(current_replica)
 
                 for replica in replicas:
-                    # Сохраняем оригинальную структуру с обёрткой "data"
+                    replica_text = ' '.join(w['word'] for w in replica)
                     result[speaker].append({
-                        **segment_metadata,  # Все дополнительные поля из asr_segment
+                        **segment_metadata,
                         'data': {
                             'result': replica,
-                            'text': ' '.join(w['word'] for w in replica),
-                            # Сохраняем все оригинальные поля из asr_segment['data']
+                            'text': replica_text,
                             **{k: v for k, v in asr_segment['data'].items() if k not in ['result', 'text']},
-                            'replica_start': replicas[0][0]['start'],
-                            'replica_end': replicas[-1][-1]['end']
-                        },
+                            'replica_start': replica[0]['start'],
+                            'replica_end': replica[-1]['end']
+                        }
                     })
 
-    # Сортировка результатов по времени начала
     for speaker in result:
         result[speaker].sort(key=lambda x: x['data']['replica_start'])
 
     return dict(result)
-
-def group_words(words):
-    if not words:
-        return []
-    words = sorted(words, key=lambda x: x["start"])
-    groups = []
-    current_group = [words[0]]
-    for word in words[1:]:
-        if word["start"] <= current_group[-1]["end"] + 0.5:  # Небольшой порог для объединения
-            current_group.append(word)
-        else:
-            groups.append(current_group)
-            current_group = [word]
-    if current_group:
-        groups.append(current_group)
-    return groups
 
 
 # if __name__ == "__main__":

@@ -13,6 +13,7 @@ from utils.pre_start_init import (
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 from utils.resamppling import resample_audiosegment
+from utils.slow_down_audio import do_slow_down_audio
 from Recognizer.engine.stream_recognition import simple_recognise, recognise_w_speed_correction
 from Recognizer.engine.sentensizer import do_sensitizing
 from Recognizer.engine.echoe_clearing import remove_echo
@@ -167,9 +168,8 @@ def process_file(tmp_path, params):
 
         if params.do_diarization:
             try:
-                result["diarized_data"] = asyncio.run(do_diarizing(
-                    file_id=str(post_id), asr_raw_data=result["raw_data"], diar_vad_sensity=params.diar_vad_sensity
-                ))
+                result["diarized_data"] = asyncio.run(do_diarizing(file_id=str(post_id),
+                                                                   asr_raw_data=result["raw_data"]))
             except Exception as e:
                 logger.error(f"do_diarizing - {e}")
                 error_description = f"do_diarizing - {e}"
