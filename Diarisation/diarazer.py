@@ -3,6 +3,8 @@ from Diarisation.do_diarize import load_and_preprocess_audio
 from utils.pre_start_init import posted_and_downloaded_audio
 from utils.do_logging import logger
 from Diarisation.do_diarize import extract_speech_segments
+from Diarisation.pause_threshold_calculation import calculate_pause_threshold
+
 
 from collections import defaultdict
 
@@ -22,7 +24,10 @@ async def do_diarizing(
                                                    sample_rate=16000, filter_cutoff=filter_cutoff,
                                                    filter_order=filter_order)
 
-    segments_times = extract_speech_segments(asr_raw_data["channel_1"], pause_threshold=0.25, min_duration=0.15)
+    calculated_pause_threshold = calculate_pause_threshold(asr_raw_data["channel_1"])
+
+    print(calculated_pause_threshold)
+    segments_times = extract_speech_segments(asr_raw_data["channel_1"], pause_threshold=calculated_pause_threshold, min_duration=0.15)
 
     segments = []
     for start, end in segments_times:

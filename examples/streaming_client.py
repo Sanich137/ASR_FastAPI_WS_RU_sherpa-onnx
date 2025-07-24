@@ -39,11 +39,6 @@ class ASRStreamingClient:
         if sound.frame_rate != self.frame_rate:
             logging.warning(f"Конвертация FR {sound.frame_rate} → {self.frame_rate}")
             sound = (sound.
-
-
-
-
-
                      set_frame_rate(self.frame_rate))
         return sound.set_channels(1)
 
@@ -117,20 +112,21 @@ class ASRStreamingClient:
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--uri", default="ws://localhost:49153/ws")
-    parser.add_argument("--file", required=True)
-    parser.add_argument("--frame-rate", type=int, default=8000)
-    parser.add_argument("--buffer-size", type=float, default=0.5)
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--uri", default="ws://localhost:49153/ws")
+    # parser.add_argument("--uri", default="ws://192.168.100.29:49153/ws")
+    # parser.add_argument("--file", required=True)
+    # parser.add_argument("--frame-rate", type=int, default=8000)
+    # parser.add_argument("--buffer-size", type=float, default=0.5)
+    # args = parser.parse_args()
 
     # Для запуска из IDE
-    # parser = argparse.ArgumentParser()
-    # args = parser.parse_args()
-    # args.uri ="ws://192.168.100.29:49153/ws"
-    # args.file = "test.wav"
-    # args.frame_rate = 8000
-    # args.buffer_size = 4
+    parser = argparse.ArgumentParser()
+    args = parser.parse_args()
+    args.uri ="ws://192.168.100.29:49153/ws"
+    args.file = "orig.wav"
+    args.frame_rate = 8000
+    args.buffer_size = 4
 
 
     logging.basicConfig(
