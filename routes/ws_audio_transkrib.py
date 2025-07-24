@@ -109,7 +109,7 @@ async def websocket(ws: WebSocket):
                 if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds >= config.MAX_OVERLAP_DURATION:
 
                     # Проверяем новый чанк перед объединением (там же режем хвост и добавляем его при необходимости)
-                    await find_last_speech_position(client_id)
+                    await find_last_speech_position(client_id, is_last_chunk=False)
 
                 else:
                     continue

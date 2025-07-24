@@ -97,7 +97,7 @@ class SileroVAD:
             chunk = audio_frames[current_start:current_start + window_size_samples]
             if len(chunk) < window_size_samples:
                 chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
-            prob, new_state = await self.is_speech(chunk)
+            prob, new_state = await self.is_speech(chunk, self.sample_rate)
             self.state = new_state
             speech_probs.append(prob)
 
