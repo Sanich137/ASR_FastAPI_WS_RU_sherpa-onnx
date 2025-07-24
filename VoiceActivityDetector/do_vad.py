@@ -47,11 +47,11 @@ class SileroVAD:
         elif mode == 5:
             self.prob_level = 0.15
 
-    async def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
+    async def is_speech(self, audio_frame: np.ndarray, sample_rate) -> tuple[bool, np.ndarray]:
         """Обработка аудио-фрейма (миничанка)
                 Args:
                     :param audio_frame: 1D numpy array размером 512 сэмплов
-                    :param sample_rate:
+                    :param sample_rate: его sample_rate
                 Returns:
                     float: вероятность, что чанк это речь
                     state: ntreott состояние модели.
@@ -63,7 +63,7 @@ class SileroVAD:
         inputs = {
             'input': audio_frame.reshape(1, -1).astype(np.float32),
             'state': self.state,
-            'sr': np.array(16000, dtype=np.int64)
+            'sr': np.array(object=sample_rate, dtype=np.int64)
         }
 
         outputs = self.session.run(['output', 'stateN'], inputs)
@@ -97,7 +97,7 @@ class SileroVAD:
             chunk = audio_frames[current_start:current_start + window_size_samples]
             if len(chunk) < window_size_samples:
                 chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
-            prob, new_state = await self.is_speech(chunk)
+            prob, new_state = await self.is_speech(chunk, self.sample_rate)
             self.state = new_state
             speech_probs.append(prob)
 

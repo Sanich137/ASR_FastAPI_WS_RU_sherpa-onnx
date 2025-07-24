@@ -57,7 +57,7 @@ async def find_last_speech_position(socket_id, is_last_chunk):
         # Входные данные для деления фреймов
         duration_seconds = 0.5
         # Длина фрейма для Silero VAD: 256 семплов для 8 кГц, 512 семплов для 16 кГц
-        frame_length = 256 if audio_for_vad.frame_rate == 8000 else 512 if audio_for_vad.frame_rate == 16000 else None
+        frame_length = 512 if audio_for_vad.frame_rate == 16000 else 256
 
         if frame_length is None:
             raise ValueError("для VAD Поддерживаются только фреймрейты 8000 или 16000 Гц")
@@ -89,7 +89,7 @@ async def find_last_speech_position(socket_id, is_last_chunk):
                     continue
                 else:
                     logger.debug(f"Обработка фрейма {i}: длина={len(frame)}, min={np.min(frame)}, max={np.max(frame)}")
-                    speech_prob, vad_state = await vad.is_speech(frame)
+                    speech_prob, vad_state = await vad.is_speech(frame, audio_for_vad.frame_rate)
                     if speech_prob < vad.prob_level:
                         logger.debug(f"Найден не голос на speech_end = {speech_end-(i+1)*frame_length-partial_frame_length}")
                         silence_frames += 1
