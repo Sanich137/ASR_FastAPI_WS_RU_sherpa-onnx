@@ -432,8 +432,9 @@ class Diarizer:
                 n_components=min(32, len(embeddings) - 2),
                 metric='cosine',
                 n_neighbors=n_neighbors,
+                low_memory = False,
                 min_dist=0.15,
-                n_jobs=1
+                n_jobs=4
             ).fit_transform(embeddings)
 
             if num_speakers >= 2:
@@ -444,9 +445,9 @@ class Diarizer:
                 clustering = HDBSCAN(
                     metric='precomputed',
                     min_cluster_size=2,
-                    min_samples=3,
-                    # cluster_selection_epsilon=6,
-                    allow_single_cluster=True
+                    min_samples=1,
+                    cluster_selection_epsilon=0.7,
+                    # allow_single_cluster=True
                 )
                 labels = clustering.fit_predict(cosine_distances(umap_embeddings).astype(np.float64))
                 if np.all(labels == -1):
@@ -486,16 +487,16 @@ class Diarizer:
 
 async def main():
     num_speakers = -1
-    use_gpu_diar = True
+    use_gpu_diar = False
     batch_size = 32
     max_cpu_workers = 0
     speaker_model_path = Path("../models/DIARISATION_model/voxceleb_resnet34_LM.onnx")
     segmentation_model_path = Path("../models/Segmentation/model.onnx")
-    audio_path = "../trash/replit/Luxury_Girl_audio.wav"
-    asr_file = "../trash/replit/Luxury_Girl_asr.json"
+    # audio_path = "../trash/replit/Amiran_audio.mp3"
+    # asr_file = "../trash/replit/Amiran_asr.json"
 
-    # audio_path = "../trash/replit/Single_audio.wav"
-    # asr_file = "../trash/replit/Single_asr.json"
+    audio_path = "../trash/replit/Amiran_audio.mp3"
+    asr_file = "../trash/replit/Amiran_asr.json"
 
     audio = AudioSegment.from_file(audio_path)
     samples_float32 = await load_and_preprocess_audio(audio)
