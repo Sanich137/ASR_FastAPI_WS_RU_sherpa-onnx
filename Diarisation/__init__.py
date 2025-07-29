@@ -56,9 +56,10 @@ if config.CAN_DIAR:
                      f"и поместите в по адресу: {str(paths.get('diar_speaker_model_path'))}")
         config.CAN_DIAR = False
     else:
-        from .do_diarize import Diarizer
+        from .pyannote_diarize import Diarizer
 
         diarizer = Diarizer(embedding_model_path=paths.get("diar_speaker_model_path"),
+                            segmentation_model_path=paths.get("segmentation_model_path"),
                             batch_size=4,
                             cpu_workers=0,
                             use_gpu=config.DIAR_WITH_GPU)

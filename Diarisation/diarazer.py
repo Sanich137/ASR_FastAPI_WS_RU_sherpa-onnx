@@ -26,8 +26,7 @@ async def do_diarizing(
     diar_result = await diarizer.diarize(
         audio=samples_float32,
         asr_data=asr_raw_data["channel_1"],
-        num_speakers=num_speakers,
-        tau=10)
+        num_speakers=num_speakers)
 
     for r in diar_result:
         logger.debug(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
