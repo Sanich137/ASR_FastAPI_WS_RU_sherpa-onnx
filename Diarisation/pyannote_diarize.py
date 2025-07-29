@@ -92,7 +92,7 @@ class Diarizer:
         )
         # Проверка входных имен модели
         segmentation_inputs = [input.name for input in self.segmentation_session.get_inputs()]
-        logger.info(f"Входные имена модели сегментации: {segmentation_inputs}")
+        logger.debug(f"Входные имена модели сегментации: {segmentation_inputs}")
         self.segmentation_input_name = 'x' if 'x' in segmentation_inputs else segmentation_inputs[0]
         logger.info(f"Используемые для диаризации провайдеры: {self.embedding_session.get_providers()}")
         logger.info(f"Используемые для сегментации провайдеры: {self.segmentation_session.get_providers()}")
@@ -402,6 +402,7 @@ class Diarizer:
 
             # Извлечение эмбеддингов для всех подсегментов
             window_embeddings = await self.extract_embeddings(window_fbanks, subseg_cmn=True)
+
             if len(window_embeddings) == 0:
                 logger.info(
                     f"Не удалось извлечь валидные эмбеддинги для сегмента {seg['start']:.2f}-{seg['end']:.2f}")
@@ -417,6 +418,9 @@ class Diarizer:
         if not embeddings:
             logger.info("Не удалось извлечь валидные эмбеддинги")
             return []
+
+        # Нормализация эмбеддингов
+        embeddings = embeddings / (np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-8)
 
         embeddings = np.array(embeddings).astype(np.float64)  # Преобразуем в float64 для совместимости с HDBSCAN
         logger.info(f"Количество эмбеддингов: {len(embeddings)}")
@@ -434,7 +438,8 @@ class Diarizer:
                 n_neighbors=n_neighbors,
                 low_memory = False,
                 min_dist=0.15,
-                n_jobs=4
+                random_state=2023,
+                n_jobs=1
             ).fit_transform(embeddings)
 
             if num_speakers >= 2:
@@ -445,8 +450,8 @@ class Diarizer:
                 clustering = HDBSCAN(
                     metric='precomputed',
                     min_cluster_size=2,
-                    min_samples=1,
-                    cluster_selection_epsilon=0.7,
+                    min_samples=3,
+                    cluster_selection_epsilon=2,
                     # allow_single_cluster=True
                 )
                 labels = clustering.fit_predict(cosine_distances(umap_embeddings).astype(np.float64))
@@ -495,8 +500,8 @@ async def main():
     # audio_path = "../trash/replit/Amiran_audio.mp3"
     # asr_file = "../trash/replit/Amiran_asr.json"
 
-    audio_path = "../trash/replit/Amiran_audio.mp3"
-    asr_file = "../trash/replit/Amiran_asr.json"
+    audio_path = "../trash/replit/Luxury_Girl_audio.wav"
+    asr_file = "../trash/replit/Luxury_Girl_asr.json"
 
     audio = AudioSegment.from_file(audio_path)
     samples_float32 = await load_and_preprocess_audio(audio)
