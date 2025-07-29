@@ -30,7 +30,7 @@ VAD_SENSITIVITY = int(os.getenv('VAD_SENSE', 3))  # 1 to 5 Higher - more words.
 VAD_WITH_GPU = True if int(os.getenv('VAD_WITH_GPU', 0)) == 1 else False
 
 # Sentensize_settings
-BETWEEN_WORDS_PERCENTILE = int(os.getenv('BETWEEN_WORDS_PERCENTILE', 90)) # Параметр определяет как мелко будет биться
+BETWEEN_WORDS_PERCENTILE = int(os.getenv('BETWEEN_WORDS_PERCENTILE', 80)) # Параметр определяет как мелко будет биться
 # текст на предложения. Чем меньше значение, тем более короткие будут предложения. В среднем в одном предложении 10 слов.
 # То есть, по длительности каждая десятая пауза означает конец предложения или мысли. Влияет на пунктуацию выражений.
 
