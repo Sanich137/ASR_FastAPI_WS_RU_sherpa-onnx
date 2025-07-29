@@ -25,6 +25,7 @@ class SileroVAD:
         session_options.log_severity_level = 4
         session_options.inter_op_num_threads = 0
         session_options.intra_op_num_threads = 0
+        session_options.enable_mem_pattern = False
 
         self.session = ort.InferenceSession(path_or_bytes=onnx_path,
                                             sess_options=session_options,

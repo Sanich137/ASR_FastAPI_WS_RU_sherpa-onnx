@@ -79,6 +79,11 @@ class SbertPuncCaseOnnx:
                                                        )
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 4  # Выключаем подробный лог
+        session_options.enable_profiling = False
+        session_options.enable_mem_pattern = False
+        session_options.inter_op_num_threads = 0
+        session_options.intra_op_num_threads = 0
+
 
         if not use_gpu:
             providers = ['CPUExecutionProvider']

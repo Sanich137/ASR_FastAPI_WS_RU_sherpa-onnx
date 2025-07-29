@@ -217,14 +217,15 @@ class Diarizer:
             self.max_cpu_workers = os.cpu_count() - 1 if cpu_workers < 1 else cpu_workers
 
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
-        so = ort.SessionOptions()
-        so.log_severity_level = 4
-        so.enable_profiling = False
-        so.inter_op_num_threads = 0
-        so.intra_op_num_threads = 0
+        session_options = ort.SessionOptions()
+        session_options.log_severity_level = 4
+        session_options.enable_profiling = False
+        session_options.inter_op_num_threads = 0
+        session_options.intra_op_num_threads = 0
+        session_options.enable_mem_pattern = False
         self.embedding_session = ort.InferenceSession(
             embedding_model_path,
-            sess_options=so,
+            sess_options=session_options,
             providers=providers
         )
         self.table = {}
