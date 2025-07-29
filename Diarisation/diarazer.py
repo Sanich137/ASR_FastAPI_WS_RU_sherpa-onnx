@@ -2,8 +2,6 @@ import config
 from Diarisation.do_diarize import load_and_preprocess_audio
 from utils.pre_start_init import posted_and_downloaded_audio
 from utils.do_logging import logger
-from Diarisation.do_diarize import extract_speech_segments
-from Diarisation.pause_threshold_calculation import calculate_pause_threshold
 
 
 from collections import defaultdict
@@ -24,31 +22,12 @@ async def do_diarizing(
                                                    sample_rate=16000, filter_cutoff=filter_cutoff,
                                                    filter_order=filter_order)
 
-    calculated_pause_threshold = calculate_pause_threshold(asr_raw_data["channel_1"])
-
-    print(calculated_pause_threshold)
-    segments_times = extract_speech_segments(asr_raw_data["channel_1"], pause_threshold=calculated_pause_threshold, min_duration=0.15)
-
-    segments = []
-    for start, end in segments_times:
-        start_sample = int(start * 16000)
-        end_sample = int(end * 16000)
-        if end_sample > len(samples_float32):
-            logger.warning(f"Конец сегмента {end:.3f} превышает длину аудио, обрезается")
-            end_sample = len(samples_float32)
-        if start_sample >= end_sample:
-            logger.warning(f"Некорректный сегмент {start:.3f}-{end:.3f}, пропускается")
-            continue
-        audio_fragment = samples_float32[start_sample:end_sample]
-        segments.append((audio_fragment, start, end))
-
-
-
     # Непосредственно получение временных меток речи
     diar_result = await diarizer.diarize(
-        segments=segments,
+        audio=samples_float32,
+        asr_data=asr_raw_data["channel_1"],
         num_speakers=num_speakers,
-    )
+        tau=10)
 
     for r in diar_result:
         logger.debug(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
