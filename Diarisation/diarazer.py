@@ -12,7 +12,7 @@ if config.CAN_DIAR:
 async def do_diarizing(
         file_id:str,
         asr_raw_data,
-        num_speakers:int = -1,
+        num_speakers:int = 2,
         filter_cutoff:int = 30,
         filter_order:int = 10,
         ):
