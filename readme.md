@@ -59,9 +59,14 @@ git clone --filter=blob:none --no-checkout https://huggingface.co/alphacep/vosk-
 cd vosk-model-ru && \
 git checkout 0b81d4985ca88ccf8463cb222f9e284bb0ea06bb
 ```
-### Загрузка модели GigaAM
+### Загрузка модели GigaAM_CTC
 ```bash 
 cd models && git clone https://huggingface.co/Alexanrd/GigaAMv2_CTC_RU_ASR_for_sherpa_onnx && cd ..
+```
+
+### Загрузка модели GigaAM_RNNT
+```bash 
+cd models && git clone https://huggingface.co/Alexanrd/GigaAMv2_RNNT_RU_ASR_for_sherpa_onnx && cd ..
 ```
 
 ### Загрузка модели для пунктуации. Обязательное условие.
@@ -79,11 +84,14 @@ HOST="0.0.0.0"
 PORT=49153
 
 # ASR settings
-MODEL_NAME=Gigaam      # доступные значения: Vosk5 и Gigaam. 
+MODEL_NAME=Gigaam      # доступные значения: Vosk5, Gigaam и Gigaam_rnnt 
 BASE_SAMPLE_RATE=16000 # Частота дискретизации модели. К этой частоте будут приведены получаемые аудио. 
 PROVIDER=CUDA          # доступные значения: CUDA и CPU 
 NUM_THREADS=4          # Желательно не менее 2
-MAX_OVERLAP_DURATION = 30 # Размер отправляемого на распознавание чанка. Для vosk < 18, для Gigaam 16-30.
+MAX_OVERLAP_DURATION = 30 # Размер отправляемого на распознавание чанка. Для vosk < 18, для Gigaam_ctc 16-30, 
+для Gigaam_rnnt можно от 10 до 30. 
+BETWEEN_WORDS_PERCENTILE = 80 # Параметр определяет как мелко будет биться
+# текст на предложения при подготовке диалога. Чем меньше значение, тем более короткие будут предложения.
 
 # Logger settings
 LOGGING_LEVEL="INFO"   # доступные значения: INFO, DEBUG

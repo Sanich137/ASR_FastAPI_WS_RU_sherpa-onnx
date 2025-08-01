@@ -25,6 +25,11 @@ paths = {
     "gigaam_tokens_path": BASE_DIR / "models" / "GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" / "tokens.txt",
     "gigaam_encoder_path": BASE_DIR / "models" / "GigaAMv2_CTC_RU_ASR_for_sherpa_onnx" / "GigaAMv2_ctc_public.onnx",
 
+    "gigaam_rnnt_encoder_path": BASE_DIR / "models" / "GigaAMv2_RNNT_RU_ASR_for_sherpa_onnx" / "encoder.onnx",
+    "gigaam_rnnt_decoder_path": BASE_DIR / "models" / "GigaAMv2_RNNT_RU_ASR_for_sherpa_onnx" / "decoder.onnx",
+    "gigaam_rnnt_joiner_path": BASE_DIR / "models" / "GigaAMv2_RNNT_RU_ASR_for_sherpa_onnx" / "joiner.onnx",
+    "gigaam_rnnt_tokens_path": BASE_DIR / "models" / "GigaAMv2_RNNT_RU_ASR_for_sherpa_onnx" / "tokens.txt",
+
     # "whisper_tokens_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-tokens.txt",
     # "whisper_encoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-encoder.onnx",
     # "whisper_decoder_path": BASE_DIR / "models" / "sherpa-onnx-whisper-medium" / "medium-decoder.onnx",

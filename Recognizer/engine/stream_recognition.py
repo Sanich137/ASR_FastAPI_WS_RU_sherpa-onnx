@@ -8,6 +8,35 @@ from utils.resamppling import resample_audiosegment
 from utils.slow_down_audio import do_slow_down_audio
 from utils.do_logging import logger
 
+def calc_speed(data):
+    time_to_speak_tokens = 0
+    count_tokens = len(data["tokens"]) - data["tokens"].count(' ')
+    if count_tokens == 0:
+        return 0
+
+    ind = [i for i, val in enumerate(data["tokens"]) if val == " "]
+    try:
+        time_to_speak_tokens = (data["timestamps"][-1] -
+                                sum([data["timestamps"][index+1] - data["timestamps"][index]
+                                for index, token in enumerate(data["timestamps"]) if
+                                index in ind and index < len(data["timestamps"])-1]))
+    except Exception as e:
+        logger.error(e)
+    else:
+        logger.debug(f"------------------------------")
+        logger.debug(f"Всего токенов: {count_tokens}")
+        logger.debug(f"Время на произношение токенов: {time_to_speak_tokens}")
+
+    if time_to_speak_tokens != 0:
+        speech_speed = count_tokens // time_to_speak_tokens
+    else:
+        speech_speed = 0
+
+    logger.debug(f"Скорость речи: {speech_speed}")
+    logger.debug(f"------------------------------")
+
+    return speech_speed
+
 
 async def recognise_w_calculate_confidence(audio_data,
                                      num_trials = 1,
@@ -190,34 +219,7 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
 
 
 
-def calc_speed(data):
-    time_to_speak_tokens = 0
-    count_tokens = len(data["tokens"]) - data["tokens"].count(' ')
-    if count_tokens == 0:
-        return 0
 
-    ind = [i for i, val in enumerate(data["tokens"]) if val == " "]
-    try:
-        time_to_speak_tokens = (data["timestamps"][-1] -
-                                sum([data["timestamps"][index+1] - data["timestamps"][index]
-                                for index, token in enumerate(data["timestamps"]) if
-                                index in ind and index < len(data["timestamps"])-1]))
-    except Exception as e:
-        logger.error(e)
-    else:
-        logger.debug(f"------------------------------")
-        logger.debug(f"Всего токенов: {count_tokens}")
-        logger.debug(f"Время на произношение токенов: {time_to_speak_tokens}")
-
-    if time_to_speak_tokens != 0:
-        speech_speed = count_tokens // time_to_speak_tokens
-    else:
-        speech_speed = 0
-
-    logger.debug(f"Скорость речи: {speech_speed}")
-    logger.debug(f"------------------------------")
-
-    return speech_speed
 
 if __name__ == "__main__":
     json = {

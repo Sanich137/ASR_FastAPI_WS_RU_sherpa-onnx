@@ -70,6 +70,25 @@ if config.MODEL_NAME== "Gigaam":
         feature_dim=64,
         debug=True if config.LOGGING_LEVEL == "DEBUG" else False,
     )
+elif config.MODEL_NAME=="Gigaam_rnnt":
+    recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(
+        encoder=str(paths.get("gigaam_rnnt_encoder_path")),
+        decoder=str(paths.get("gigaam_rnnt_decoder_path")),
+        joiner=str(paths.get("gigaam_rnnt_joiner_path")),
+        tokens=str(paths.get("gigaam_rnnt_tokens_path")),
+        feature_dim=64,
+        num_threads=4,    #config.NUM_THREADS,
+        dither=0.00003,
+        sample_rate=config.BASE_SAMPLE_RATE,
+        decoding_method="greedy_search",
+        modeling_unit="cjkchar+bpe",  # по умолчанию "cjkchar" пишут что надо только для горячих слов
+        # bpe_vocab=str(model_settings.get("bpe_vocab")), # Указан, но кажется не работает без hotwords
+        lm_scale=0.2,  # по умолчанию 0.1
+        provider=config.PROVIDER,
+        model_type="nemo_transducer",
+        debug=True if config.LOGGING_LEVEL == "DEBUG" else False,
+    )
+
 elif config.MODEL_NAME== "Whisper":
     recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
         encoder=str(model_settings.get("encoder")),

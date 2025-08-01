@@ -110,12 +110,17 @@ def process_file(tmp_path, params):
 
                 try:
                     with audio_lock:
+                        use_batching = True
+                        if use_batching:
+                            pass
+
                         # Снижаем скорость аудио по необходимости
                         if params.do_auto_speech_speed_correction or params.speech_speed_correction_multiplier != 1:
                             logger.debug("Будут использованы механизмы анализа скорости речи и замедления аудио")
 
-                            asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_to_asr[post_id], can_slow_down=True,
-                                                                              multiplier=params.speech_speed_correction_multiplier))
+                            asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_to_asr[post_id],
+                                                                                can_slow_down=True,
+                                                                                multiplier=params.speech_speed_correction_multiplier))
                             params.speech_speed_correction_multiplier = multiplier
                         else:
                             # Производим распознавание
@@ -125,7 +130,7 @@ def process_file(tmp_path, params):
                     logger.error(f"Error ASR audio - {e}")
                     error_description = f"Error ASR audio - {e}"
                 else:
-                    if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Whisper":
+                    if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":  # Whisper
                         asr_result = asyncio.run(process_gigaam_asr(asr_result_wo_conf,
                                                              audio_duration[post_id],
                                                              params.speech_speed_correction_multiplier))
