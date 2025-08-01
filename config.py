@@ -16,6 +16,7 @@ LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
 LOGGING_FORMAT = os.getenv('LOGGING_FORMAT', u'#%(levelname)-8s %(filename)s [LINE:%(lineno)d] [%(asctime)s]  %(message)s')
 FILENAME = os.getenv('FILENAME', f'logs/ASR-{datetime.datetime.now().date()}.log')
 FILEMODE = os.getenv('FILEMODE', 'a')
+LOG_BACKUP_COUNT = os.getenv('LOG_BACKUP_COUNT', 180)   # Срок хранения логов в днях
 IS_PROD = True if int(os.getenv('IS_PROD', 1))==1 else False
 
 # Recognition_settings

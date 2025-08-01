@@ -1,6 +1,7 @@
 # import trash.test_data
 from typing import List, Dict, Any
 from difflib import SequenceMatcher
+from utils.do_logging import logger
 
 def are_words_similar(word1: str, word2: str, similarity_threshold: float = 0.8) -> bool:
     """
@@ -53,9 +54,9 @@ async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float 
                                             if other_word["end"] < word["end"]: # Оставляем, если сдвиг слишком мал
                                                 is_echo = True
 
-                                                print(f"<--- слово '{word['word']}' найдено до текущего, удаляем '{word['word']}' из текущего канала")
-                                                print(f"В текущем канале время {word['start']}")
-                                                print(f"В другом канале время {other_word['start']}")
+                                                logger.debug(f"<--- слово '{word['word']}' найдено до текущего, удаляем '{word['word']}' из текущего канала")
+                                                logger.debug(f"В текущем канале время {word['start']}")
+                                                logger.debug(f"В другом канале время {other_word['start']}")
 
 
                                                 break
@@ -65,10 +66,10 @@ async def remove_echo(input_json: Dict[str, List[Dict[str, Any]]], delta: float 
                                                 other_message["data"]["text"] = " ".join(
                                                     [w["word"] for w in other_message["data"]["result"]]
                                                 )
-                                                print(
+                                                logger.debug(
                                                     f"---> слово '{word['word']}' найдено после текущего, удаляем '{other_word['word']}' из другого канала")
-                                                print(f"В текущем канале время {word['start']}")
-                                                print(f"В другом канале время {other_word['start']}")
+                                                logger.debug(f"В текущем канале время {word['start']}")
+                                                logger.debug(f"В другом канале время {other_word['start']}")
 
                                     if is_echo:
                                         break
