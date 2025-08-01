@@ -117,7 +117,7 @@ async def websocket(ws: WebSocket):
                 logger.error(f"AcceptWaveform error - {e}")
             else:
                 try:
-                    if config.MODEL_NAME == "Gigaam":
+                    if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
                         asr_first_result_wo_conf =await simple_recognise(audio_to_asr[client_id])
                         asr_result_words = await process_gigaam_asr(asr_first_result_wo_conf, audio_duration[client_id])
 
