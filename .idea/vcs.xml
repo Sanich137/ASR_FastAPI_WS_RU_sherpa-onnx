@@ -3,5 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/models/GigaAMv2_RNNT_RU_ASR_for_sherpa_onnx" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/models/gigaam-v2-onnx" vcs="Git" />
   </component>
 </project>

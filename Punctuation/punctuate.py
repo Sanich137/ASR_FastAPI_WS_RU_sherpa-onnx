@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 import asyncio
+import datetime
+
 import numpy as np
 from transformers import AutoTokenizer
 import onnxruntime as ort
 from pathlib import Path
-
+import pynvml
 
 # Прогнозируемые знаки препинания
 PUNK_MAPPING = {".": "PERIOD", ",": "COMMA", "?": "QUESTION"}
@@ -81,6 +83,9 @@ class SbertPuncCaseOnnx:
         session_options.log_severity_level = 4  # Выключаем подробный лог
         session_options.enable_profiling = False
         session_options.enable_mem_pattern = False
+        session_options.enable_mem_reuse = False
+        session_options.enable_cpu_mem_arena = False
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.inter_op_num_threads = 0
         session_options.intra_op_num_threads = 0
 
@@ -88,7 +93,15 @@ class SbertPuncCaseOnnx:
         if not use_gpu:
             providers = ['CPUExecutionProvider']
         else:
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            providers = [('CUDAExecutionProvider', {
+                            'device_id': 1,
+                            # 'arena_extend_strategy': 'kNextPowerOfTwo', # DВыделяет память с запасом
+                            'arena_extend_strategy': 'kSameAsRequested' ,# 20.657809 на 1000 итераций и 26 Мб съел
+                            'gpu_mem_limit': int(1.7 * 1024 * 1024 * 1024), #  Потребляет где-то 1.9 Гб памяти ГПУ
+                            'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                            'do_copy_in_default_stream': True,
+                                }),
+                         'CPUExecutionProvider']
             # providers = ort.get_available_providers() можно завести на тензор провайдер, на 2хххRTX работает медленно.
             # https://developer.nvidia.com/nvidia-tensorrt-8x-download#
             # https://docs.nvidia.com/deeplearning/tensorrt/latest/installing-tensorrt/installing.html#download
@@ -138,22 +151,61 @@ class SbertPuncCaseOnnx:
             label = decode_label(label_id)
             splitted_text.append(token_to_label(word, label))
         capitalized_text = " ".join(splitted_text)
+
+        # self.session.end_profiling()
+
         return capitalized_text
+
+def gpu_stat(gpu_index):
+
+    try:
+        pynvml.nvmlInit()
+        handle = pynvml.nvmlDeviceGetHandleByIndex(gpu_index)  # Первая видеокарта
+        mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+        free_mb = mem_info.free / 1024**2
+        utilization = pynvml.nvmlDeviceGetUtilizationRates(handle)
+        gpu_load = utilization.gpu
+        temperature = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
+    except pynvml.NVMLError as e:
+        return {"error": str(e)}
+    finally:
+        pynvml.nvmlShutdown()
+    return free_mb, gpu_load,temperature
 
 if __name__ == '__main__':
     from datetime import datetime as dt
-    import logging as logger
-    # Instead of using argparse, directly define the input and model path:
-    input_text = "channel_1: два\nchannel_2: татьяна добрый день это компания вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n"
-
+    time_start = dt.now()
     model_path = str(Path("../models/sbert_punc_case_ru_onnx"))
-    print(f"Source text:   {input_text}\n")
-    sbertpunc = SbertPuncCaseOnnx(model_path, use_gpu = True)
+    print(f" ресурсы до выполнения {gpu_stat(1)}")
+    sbertpunc = SbertPuncCaseOnnx(model_path, use_gpu=True)
+    print(f"Время на инициализацию {(dt.now() - time_start).total_seconds()}")
+    print(f" ресурсы после инициализации {gpu_stat(1)}")
+    input_text = ["channel_1: два\nchannel_2: татьяна добрый день это компания вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n",
+                  "время на переинициализацию модели",
+                  "ресурсы до выполнения",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  "",
+                  ""]
+    for _ in range(1000):
+        import logging as logger
+        # Instead of using argparse, directly define the input and model path:
+        input_text = "channel_1: два\nchannel_2: татьяна добрый день это компания вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n"
+        # print(f"Source text:   {input_text}\n")
+        punctuated = asyncio.run(
+                    sbertpunc.punctuate(input_text)
+                        )
+
+        # print(punctuated)
+
+    print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")
+    print(f" ресурсы после выполнения {gpu_stat(1)}")
 
     time_start = dt.now()
-    print(
-        asyncio.run(
-                sbertpunc.punctuate(input_text)
-                    )
-        )
-    print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")
+    sbertpunc.session.end_profiling()
+    print(f"Время на переинициализацию модели {(dt.now() - time_start).total_seconds()}")
+    # asyncio.run(asyncio.sleep(5))
+    print(f" ресурсы после окончания {gpu_stat(1)}")
