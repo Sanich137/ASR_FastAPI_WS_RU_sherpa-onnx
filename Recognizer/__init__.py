@@ -49,7 +49,7 @@ models_arguments = {
 
 model_settings = models_arguments.get(config.MODEL_NAME)
 
-logger.debug(f"{config.MODEL_NAME} chosen model!")
+logger.info(f"{config.MODEL_NAME} chosen model.")
 
 # Todo - тут нужно отработать для разных моделей
 # if not model_settings.get("model").exists():
