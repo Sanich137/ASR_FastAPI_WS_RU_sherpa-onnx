@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import datetime
+import logging as logger
 
 import numpy as np
 from transformers import AutoTokenizer
 import onnxruntime as ort
 from pathlib import Path
 import pynvml
+
+from typing import List
 
 # Прогнозируемые знаки препинания
 PUNK_MAPPING = {".": "PERIOD", ",": "COMMA", "?": "QUESTION"}
@@ -19,9 +22,11 @@ LABELS_PUNC = ["O"] + list(PUNK_MAPPING.values())
 
 # Сформируем метки на основе комбинаций регистра и пунктуации
 LABELS_list = []
+
 for case in LABELS_CASE:
     for punc in LABELS_PUNC:
         LABELS_list.append(f"{case}_{punc}")
+
 LABELS = {label: i + 1 for i, label in enumerate(LABELS_list)}
 LABELS["O"] = -100
 INVERSE_LABELS = {i: label for label, i in LABELS.items()}
@@ -75,7 +80,10 @@ def decode_label(label, classes="all"):
 
 
 class SbertPuncCaseOnnx:
-    def __init__(self, onnx_model_path, use_gpu = False):
+    def __init__(self, onnx_model_path, use_gpu = False, num_sessions: int = 2):
+        self.sessions: List[ort.InferenceSession] = []
+        self.semaphore = asyncio.Semaphore(num_sessions) # Ограничиваем лимит на очередь сессий в семафоре
+
         self.tokenizer = AutoTokenizer.from_pretrained(onnx_model_path,
                                                        strip_accents=False,
                                                        )
@@ -85,34 +93,40 @@ class SbertPuncCaseOnnx:
         session_options.enable_mem_pattern = False
         session_options.enable_mem_reuse = False
         session_options.enable_cpu_mem_arena = False
-        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        # session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.inter_op_num_threads = 0
         session_options.intra_op_num_threads = 0
-
+        # session_options.add_session_config_entry("session.disable_prepacking", "1")  # Отключаем дублирование весов
+        session_options.add_session_config_entry("session.use_device_allocator_for_initializers", "1")
 
         if not use_gpu:
             providers = ['CPUExecutionProvider']
         else:
             providers = [('CUDAExecutionProvider', {
-                            'device_id': 1,
-                            # 'arena_extend_strategy': 'kNextPowerOfTwo', # DВыделяет память с запасом
-                            'arena_extend_strategy': 'kSameAsRequested' ,# 20.657809 на 1000 итераций и 26 Мб съел
-                            'gpu_mem_limit': int(1.7 * 1024 * 1024 * 1024), #  Потребляет где-то 1.9 Гб памяти ГПУ
-                            'cudnn_conv_algo_search': 'EXHAUSTIVE',
-                            'do_copy_in_default_stream': True,
-                                }),
+                'device_id': 0,
+                'arena_extend_strategy': 'kSameAsRequested', # 20.657809 на 1000 итераций и 26 Мб съел
+                'gpu_mem_limit': int(1.8 * 1024 * 1024 * 1024),  # Потребляет где-то 1.9 Гб памяти ГПУ
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                'do_copy_in_default_stream': True,
+            }),
                          'CPUExecutionProvider']
-            # providers = ort.get_available_providers() можно завести на тензор провайдер, на 2хххRTX работает медленно.
-            # https://developer.nvidia.com/nvidia-tensorrt-8x-download#
-            # https://docs.nvidia.com/deeplearning/tensorrt/latest/installing-tensorrt/installing.html#download
 
-        self.session = ort.InferenceSession(path_or_bytes=f"{onnx_model_path}/model.onnx",
-                                            sess_options=session_options,
-                                            providers=providers)   # CPUExecutionProvider
+        model_pth = Path(onnx_model_path) / "model.onnx"
+        with open(model_pth, "rb") as f:
+            model_bytes = f.read()  # Единый буфер для всех сессий
 
-    async def punctuate(self, text):
+        self.sessions_queue = asyncio.Queue()
+        for _ in range(num_sessions):
+            # providers[0][1]['device_id'] = _   # Если хотим использовать несколько GPU!
+            sess = ort.InferenceSession(path_or_bytes=model_bytes,
+                                        sess_options=session_options,
+                                        providers=providers)
+
+            self.sessions_queue.put_nowait(sess)
+
+
+    async def punctuate(self, session, text):
         text = text.strip().lower()
-
         # Разобъем предложение на слова
         words = text.split()
 
@@ -132,14 +146,15 @@ class SbertPuncCaseOnnx:
         token_type_ids = np.zeros_like(input_ids, dtype=np.int64)  # Добавляем token_type_ids
 
         # Выполнение модели
-        outputs = self.session.run(
-            None,
-            {
+        loop = asyncio.get_event_loop()
+        outputs = await loop.run_in_executor(
+            None,  # Используем default ThreadPoolExecutor
+            lambda: session.run(None, {
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
                 "token_type_ids": token_type_ids,  # Передаём token_type_ids
-            },
-        )
+                        } ))
+
         predictions = np.argmax(outputs[0], axis=2)
 
         # decode punctuation and casing
@@ -151,8 +166,17 @@ class SbertPuncCaseOnnx:
             label = decode_label(label_id)
             splitted_text.append(token_to_label(word, label))
         capitalized_text = " ".join(splitted_text)
+        return capitalized_text
 
-        # self.session.end_profiling()
+    async def process(self, text):
+        async with self.semaphore:
+            session = await self.sessions_queue.get()
+            try:
+                capitalized_text = await self.punctuate(session, text)
+            except Exception as e:
+                logger.error(f"Ошибка пунктуатора - {e}")
+            finally:
+                await self.sessions_queue.put(session)
 
         return capitalized_text
 
@@ -172,40 +196,48 @@ def gpu_stat(gpu_index):
         pynvml.nvmlShutdown()
     return free_mb, gpu_load,temperature
 
+
+input_text = ["Живут грызуны по лесам и полям что они едят эти зверьки грызут зерна и кору деревьев зайцы обгладывают яблони в саду грызуны портят посевы",
+                  "Солнце только что встало небо ясное все вокруг блестит как хорошо на свежем воздухе слышишь пение жаворонка звонкий голосок слышен в ясной вышине",
+                  "В сырых местах живут неядовитые змейки у них два желтых пятна на затылке ужи любят воду и хорошо плавают кормятся ужи лягушками и рыбами вы видели ужа не бойтесь его",
+                  "Белка бойко лазит по деревьям какая она ловкая на ушах у белки кисточки хвост длинный и пушистый зачем он ей белка прикрывается хвостом от холода он служит ей рулём при прыжках",
+                  "Когда ты был в цирке вспомни яркие афиши и флажки вот жонглёр ловит на лету тарелки фокусник превратил шляпу в букет цветов а вот клоун он смешит людей у него в куртке петух как интересно в цирке",
+                  "Вот ночная хищная птица голова у нее круглая клюв крючком когти острые Узнали ее это сова она живет в лесах или на чердаках домов ночью птица ловит мышей",
+                  "Черепахи живут на земле и в воде они откладывают яйца прямо на камни черепахи не высиживают их яйца лопаются сами появляются маленькие черепашата а какого размера эти пресмыкающиеся черепахи бывают маленькие и очень большие",
+                  ]
+
 if __name__ == '__main__':
     from datetime import datetime as dt
-    time_start = dt.now()
+
     model_path = str(Path("../models/sbert_punc_case_ru_onnx"))
-    print(f" ресурсы до выполнения {gpu_stat(1)}")
-    sbertpunc = SbertPuncCaseOnnx(model_path, use_gpu=True)
+    print(f" ресурсы до старта приложения  {gpu_stat(0)}")
+    time_start = dt.now()
+    sbertpunc = SbertPuncCaseOnnx(model_path, use_gpu=True, num_sessions=1)
     print(f"Время на инициализацию {(dt.now() - time_start).total_seconds()}")
-    print(f" ресурсы после инициализации {gpu_stat(1)}")
-    input_text = ["channel_1: два\nchannel_2: татьяна добрый день это компания вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n",
-                  "время на переинициализацию модели",
-                  "ресурсы до выполнения",
-                  "",
-                  "",
-                  "",
-                  "",
-                  "",
-                  "",
-                  ""]
-    for _ in range(1000):
-        import logging as logger
-        # Instead of using argparse, directly define the input and model path:
-        input_text = "channel_1: два\nchannel_2: татьяна добрый день это компания вас беспокоит меня зовут ульяна\nchannel_2: звоню уточнить по поводу документов мы у вас в чате запрашивали список документов\nchannel_2: скажите пожалуйста когда сможете прислать чтобы юристы ознакомились с ними\nchannel_1: два сегодня а да ну хорошо а доброго\nchannel_2: сегодня пришлете хорошо тогда ждем от вас всего доброго\nchannel_2: до свидания\n"
-        # print(f"Source text:   {input_text}\n")
-        punctuated = asyncio.run(
-                    sbertpunc.punctuate(input_text)
-                        )
+    print(f"Ресурсы после старта приложения  {gpu_stat(0)}")
+    import logging as logger
 
-        # print(punctuated)
+    # for _ , text_ in enumerate(input_text*100):
+    #     punctuated = asyncio.run(sbertpunc.process(text_)
+    #                     )
+    #     # print(punctuated)
 
-    print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")
-    print(f" ресурсы после выполнения {gpu_stat(1)}")
+    async def process_texts(texts):
+        tasks = [sbertpunc.process(text) for text in texts]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return results
+
 
     time_start = dt.now()
-    sbertpunc.session.end_profiling()
-    print(f"Время на переинициализацию модели {(dt.now() - time_start).total_seconds()}")
-    # asyncio.run(asyncio.sleep(5))
-    print(f" ресурсы после окончания {gpu_stat(1)}")
+    texts = input_text * 100
+    punctuated_texts = asyncio.run(process_texts(texts))
+    # for text, punctuated in zip(texts, punctuated_texts):
+    #     print(f"Punctuated: {punctuated}\n")
+
+
+
+    print(f" ресурсы после окончания работы приложения  {gpu_stat(0)}")
+    print(f"Время выполнения {(dt.now() - time_start).total_seconds()}")
+
+### Увеличение количества сессий в адаптере приводит к пропорциональному увеличению расхода памяти (1,9 * Х для пунктуации) и где-то на 30% быстрее 7,676 против 5,579.
+### Если использовать 2 ГПУ, то выполняется где-то на быстрее 60% 4.63946 против 7,676

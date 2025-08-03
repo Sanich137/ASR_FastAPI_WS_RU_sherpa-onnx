@@ -1,3 +1,4 @@
+import datetime
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import asyncio
 import os
@@ -17,178 +18,6 @@ from utils.do_logging import logger
 from utils.pre_start_init import paths
 from utils.resamppling import resample_audiosegment
 
-# import logging as logger
-
-# Здесь SileroVAD остаётся только для тестов Диаризации на бою используется класс из do_vad
-class SileroVAD:
-    def __init__(self, onnx_path: Path, use_gpu=False):
-        if use_gpu:
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-        else:
-            providers = ['CPUExecutionProvider']
-        self.sample_rate = 16000
-        self.state = np.zeros((2, 1, 128), dtype=np.float32)
-        self.frame_size = 512
-        self.prob_level = 0.5
-        self.set_mode(3)
-        # Параметры сегментации (VAD)
-        self.min_duration = 0.15  # Минимальная длительность речевого сегмента (сек)
-        self.max_vad_gap = 1  # Максимальный промежуток между сегментами для их объединения (сек)
-
-        session_options = ort.SessionOptions()
-        session_options.log_severity_level = 4
-        session_options.inter_op_num_threads = 0
-        session_options.intra_op_num_threads = 0
-
-        self.session = ort.InferenceSession(path_or_bytes=onnx_path,
-                                            sess_options=session_options,
-                                            providers=providers)
-
-    def reset_state(self):
-        self.state = np.zeros((2, 1, 128), dtype=np.float32)
-
-    def set_mode(self, mode: int):
-        if mode not in [1, 2, 3, 4, 5]:
-            self.prob_level = 0.5
-        elif mode == 1:
-            self.prob_level = 0.7
-        elif mode == 2:
-            self.prob_level = 0.6
-        elif mode == 3:
-            self.prob_level = 0.5
-        elif mode == 4:
-            self.prob_level = 0.3
-        elif mode == 5:
-            self.prob_level = 0.15
-
-    def is_speech(self, audio_frame: np.ndarray) -> tuple[bool, np.ndarray]:
-        """Обработка аудио-фрейма (миничанка)
-                Args:
-                    :param audio_frame: 1D numpy array размером 512 сэмплов
-                    :param sample_rate:
-                Returns:
-                    float: вероятность, что чанк это речь
-                    state: ntreott состояние модели.
-                """
-        if len(audio_frame) != self.frame_size:
-            audio_frame = np.pad(audio_frame, (0, self.frame_size - len(audio_frame)), mode='constant')[
-                          :self.frame_size]
-
-        inputs = {
-            'input': audio_frame.reshape(1, -1).astype(np.float32),
-            'state': self.state,
-            'sr': np.array(16000, dtype=np.int64)
-        }
-
-        outputs = self.session.run(['output', 'stateN'], inputs)
-        self.state = outputs[1]
-        prob = float(outputs[0][0, 0])
-
-        return prob, self.state
-
-    def get_speech_segments(self, audio_frames: np.ndarray) -> list[tuple]:
-        if len(audio_frames.shape) == 2:
-            audio_frames = audio_frames.flatten()
-
-        audio_length_samples = len(audio_frames)
-        window_size_samples = self.frame_size
-        sample_rate = self.sample_rate
-
-        # Параметры из get_speech_timestamps
-        threshold = self.prob_level
-        neg_threshold = threshold - 0.15
-        min_speech_duration_ms = int(self.min_duration * 1000)
-        min_silence_duration_ms = int(self.max_vad_gap * 1000)
-        speech_pad_ms = 30
-        min_speech_samples = sample_rate * min_speech_duration_ms // 1000
-        min_silence_samples = sample_rate * min_silence_duration_ms // 1000
-        speech_pad_samples = sample_rate * speech_pad_ms // 1000
-
-        # Получение вероятностей речи
-        self.reset_state()
-        speech_probs = []
-        for current_start in range(0, audio_length_samples, window_size_samples):
-            chunk = audio_frames[current_start:current_start + window_size_samples]
-            if len(chunk) < window_size_samples:
-                chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
-            prob, new_state = self.is_speech(chunk)
-            self.state = new_state
-            speech_probs.append(prob)
-
-        # Обработка вероятностей для выделения сегментов
-        triggered = False
-        speeches = []
-        current_speech = {}
-        temp_end = 0
-        prev_end = 0
-        next_start = 0
-
-        for i, speech_prob in enumerate(speech_probs):
-            current_sample = window_size_samples * i
-            if speech_prob >= threshold and temp_end:
-                temp_end = 0
-                if next_start < prev_end:
-                    next_start = current_sample
-
-            if speech_prob >= threshold and not triggered:
-                triggered = True
-                current_speech['start'] = current_sample
-                continue
-
-            if speech_prob < neg_threshold and triggered:
-                if not temp_end:
-                    temp_end = current_sample
-                if (current_sample - temp_end) > (sample_rate * 98 // 1000):
-                    prev_end = temp_end
-                if (current_sample - temp_end) < min_silence_samples:
-                    continue
-                else:
-                    current_speech['end'] = temp_end
-                    if (current_speech['end'] - current_speech['start']) > min_speech_samples:
-                        speeches.append(current_speech)
-                    current_speech = {}
-                    prev_end = next_start = temp_end = 0
-                    triggered = False
-                    continue
-
-        if current_speech and (audio_length_samples - current_speech.get('start', 0)) > min_speech_samples:
-            current_speech['end'] = audio_length_samples
-            speeches.append(current_speech)
-
-        # Применение speech_pad и корректировка границ
-        for i, speech in enumerate(speeches):
-            if i == 0:
-                speech['start'] = max(0, speech['start'] - speech_pad_samples)
-            if i != len(speeches) - 1:
-                silence_duration = speeches[i + 1]['start'] - speech['end']
-                if silence_duration < 2 * speech_pad_samples:
-                    speech['end'] += silence_duration // 2
-                    speeches[i + 1]['start'] = max(0, speeches[i + 1]['start'] - silence_duration // 2)
-                else:
-                    speech['end'] = min(audio_length_samples, speech['end'] + speech_pad_samples)
-                    speeches[i + 1]['start'] = max(0, speeches[i + 1]['start'] - speech_pad_samples)
-            else:
-                speech['end'] = min(audio_length_samples, speech['end'] + speech_pad_samples)
-
-        # Формирование результата
-        segments = []
-        for speech in speeches:
-            start = speech['start'] / sample_rate
-            end = speech['end'] / sample_rate
-            audio_segment = audio_frames[int(start * sample_rate):int(end * sample_rate)]
-            segments.append((start, end, audio_segment))
-
-        return segments
-
-
-def process_batch_sync(batch):
-    """Синхронная функция для обработки батча в отдельном процессе."""
-    session = ort.InferenceSession(
-        path_or_bytes=paths.get("diar_speaker_model_path"),  # Укажи актуальный путь к модели
-        providers=['CPUExecutionProvider'],
-        sess_options=ort.SessionOptions()
-    )
-    return session.run(output_names=['embs'], input_feed={'feats': batch})[0].squeeze()
 
 class Diarizer:
     def __init__(self, embedding_model_path: str,
@@ -217,12 +46,14 @@ class Diarizer:
             self.max_cpu_workers = os.cpu_count() - 1 if cpu_workers < 1 else cpu_workers
 
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
+
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 4
         session_options.enable_profiling = False
+        session_options.enable_mem_pattern = False
         session_options.inter_op_num_threads = 0
         session_options.intra_op_num_threads = 0
-        session_options.enable_mem_pattern = False
+
         self.embedding_session = ort.InferenceSession(
             embedding_model_path,
             sess_options=session_options,
@@ -267,18 +98,25 @@ class Diarizer:
             fbanks_array = fbanks_array - np.mean(fbanks_array, axis=1, keepdims=True)
 
         async def process_batch(batch):
-            return await asyncio.to_thread(
-                self.embedding_session.run,
+            # return await asyncio.to_thread(
+            #     self.embedding_session.run,
+            #     output_names=['embs'],
+            #     input_feed={'feats': batch}
+            # )
+
+            return self.embedding_session.run(
                 output_names=['embs'],
                 input_feed={'feats': batch}
-            )
+                )
+
 
         embeddings = []
         with ThreadPoolExecutor(max_workers=self.max_cpu_workers) as executor:
+
             tasks = [
                 process_batch(fbanks_array[i:i + self.batch_size])
                 for i in range(0, fbanks_array.shape[0], self.batch_size)
-            ]
+                ]
             for task in await asyncio.gather(*tasks):
                 embeddings.append(task[0].squeeze())
 
@@ -473,56 +311,52 @@ async def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int 
     return frames
 
 
-# if __name__ == "__main__":
-#     # Todo - перевести тест в async
-#
-#     # Параметры диаризации и кластеризации
-#     num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
-#
-#     # Параметры извлечения ембеддингов
-#     max_phrase_gap = 1  # расстояние между фразами для объединения в один кластер.
-#     use_gpu_diar = False  # По возможности использовать графический процессор для вычислений
-#     batch_size = 32  # Размер батча для извлечения эмбеддингов при работе GPU
-#     max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
-#
-#     # # Параметры сегментации (VAD)
-#     vad_mode = 4  # Режим чувствительности VAD (1, 2, 3, 4, 5)
-#     use_gpu_vad = False  # По возможности использовать графический процессор для вычислений
-#
-#     vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
-#     speaker_model_path =  Path("../models/Diar_model/voxblink2_samresnet100_ft.onnx")
-#
-#     audio_path = "../trash/Роман.mp3"
-#
-#     vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
-#     vad.set_mode(vad_mode)
-#
-#
-#     audio = AudioSegment.from_file(audio_path)
-#     audio_frames = await load_and_preprocess_audio(audio)
-#     #Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
-#
-#     diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
-#                         vad=vad,
-#                         max_phrase_gap=max_phrase_gap,
-#                         batch_size=batch_size,
-#                         cpu_workers=max_cpu_workers,
-#                         use_gpu=use_gpu_diar,
-#                         )
-#
-#     result = await diarizer.diarize_and_merge(
-#         audio_frames,
-#         num_speakers=num_speakers,
-#         filter_cutoff=50,
-#         filter_order=10,
-#         vad_sensity=vad_mode
-#     )
-#
-#     for r in result:
-#         print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
+if __name__ == "__main__":
+    from VoiceActivityDetector import vad
 
+    # Параметры диаризации и кластеризации
+    num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
+
+    # Параметры извлечения ембеддингов
+    max_phrase_gap = 1  # расстояние между фразами для объединения в один кластер.
+    use_gpu_diar = True  # По возможности использовать графический процессор для вычислений
+    batch_size = 1  # Размер батча для извлечения эмбеддингов при работе GPU
+    max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
+
+    # # Параметры сегментации (VAD)
+    vad_mode = 2  # Режим чувствительности VAD (1, 2, 3, 4, 5)
+    # use_gpu_vad = True  # По возможности использовать графический процессор для VAD
+
+    # vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
+    speaker_model_path =  Path("../models/DIARISATION_model/voxblink2_samresnet100_ft.onnx")
+
+    audio_path = "../trash/audio.wav"
+
+    #vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
+    vad.set_mode(vad_mode)
+
+
+    audio = AudioSegment.from_file(audio_path)
+    audio_frames = asyncio.run(load_and_preprocess_audio(audio))
+    #Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
+    start_time = datetime.datetime.now()
+    logger.info(f"Инициируем модель диаризатора")
+    diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
+                        vad=vad,
+                        max_phrase_gap=max_phrase_gap,
+                        batch_size=batch_size,
+                        cpu_workers=max_cpu_workers,
+                        use_gpu=use_gpu_diar,
+                        )
+    logger.info(f"Запускаем диаризацию {(datetime.datetime.now()-start_time).total_seconds()} сек.")
+    result = asyncio.run(diarizer.diarize_and_merge(
+                            audio_frames,
+                            num_speakers=num_speakers,
+                            filter_cutoff=50,
+                            filter_order=10,
+                            vad_sensity=vad_mode
+                            )
+                        )
     for r in result:
         print(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    logger.info(f"Всего на работу затрачено {(datetime.datetime.now() - start_time).total_seconds()} сек.")
