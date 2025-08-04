@@ -64,7 +64,7 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
                     # Обработка случая с одним словом
                     text = words[0].get('word')
                     if do_punctuation:
-                        text = await sbertpunc.punctuate(text)
+                        text = await sbertpunc.process_punctuation_sessions(text)
 
                     sentence_element.append({
                       "start": start_time,
@@ -108,7 +108,7 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
 
                         else:
                             if do_punctuation:
-                                text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
+                                text = await sbertpunc.process_punctuation_sessions(' '.join(str(word) for word in sentences))
                             else:
                                 text = ' '.join(str(word) for word in sentences)
 
@@ -127,7 +127,14 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
                             continue
 
                     if do_punctuation:
-                        text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
+
+                        # text_no_punct = [(' '.join(str(word)) for word in sentences)]
+                        # # Тут можно отдавать много, но много нету, надо передумывать заново логику и вынести пунктуацию за общий цикл разбора слов.
+                        # tasks = [sbertpunc.process_punctuation_sessions(text_no_punct)]
+                        # text = await asyncio.gather(*tasks, return_exceptions=True)
+                        # print(text)
+
+                        text = await sbertpunc.process_punctuation_sessions(' '.join(str(word) for word in sentences))
                     else:
                         text = ' '.join(str(word) for word in sentences)
 
@@ -141,7 +148,8 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
             sentenced_recognition.append(sentence_element)
 
             if do_punctuation:
-                one_text_only = str(await sbertpunc.punctuate(one_text_only))
+                # Тут он текст разделит сам.
+                one_text_only = str(await sbertpunc.process_punctuation_sessions(one_text_only))
 
             text_only.append(one_text_only)
 

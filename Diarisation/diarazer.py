@@ -1,3 +1,5 @@
+import datetime
+
 import config
 from Diarisation.do_diarize import load_and_preprocess_audio
 from utils.pre_start_init import posted_and_downloaded_audio
@@ -21,6 +23,8 @@ async def do_diarizing(
     # ВАЖНЫЙ момент. Мы диаризируем только последний канал.
     audio_frames = await load_and_preprocess_audio(posted_and_downloaded_audio[file_id].split_to_mono()[-1])
 
+    print("начало диаризации")
+    st=datetime.datetime.now()
     # Непосредственно получение временных меток речи
     diar_result = await diarizer.diarize_and_merge(
         audio_frames,
@@ -32,7 +36,7 @@ async def do_diarizing(
 
     for r in diar_result:
         logger.debug(f"Спикер {r['speaker']}: {r['start']:.2f} - {r['end']:.2f} сек")
-
+    print(f"Диаризация за {(datetime.datetime.now()-st).total_seconds()} секунд")
 
     # Построение структуры аналогично raw_data для дальнейшего построения диалога и вывод результата
 #     return merge_asr_diarisation(asr_raw_data, diar_result)

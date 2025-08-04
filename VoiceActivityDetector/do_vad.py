@@ -1,3 +1,6 @@
+import datetime
+import asyncio
+
 import numpy as np
 import onnxruntime as ort
 from pydub import AudioSegment
@@ -48,7 +51,7 @@ class SileroVAD:
         elif mode == 5:
             self.prob_level = 0.15
 
-    async def is_speech(self, audio_frame: np.ndarray, sample_rate) -> tuple[bool, np.ndarray]:
+    async def is_speech(self, audio_frame: np.ndarray, sample_rate) -> tuple[float, np.ndarray]:
         """Обработка аудио-фрейма (миничанка)
                 Args:
                     :param audio_frame: 1D numpy array размером 512 сэмплов
@@ -93,14 +96,42 @@ class SileroVAD:
 
         # Получение вероятностей речи
         await self.reset_state()
-        speech_probs = []
+
+        print("Начало процедуры извлечения речевых сегментов VAD")
+        st_t = datetime.datetime.now()
+
+        chunks = list()
         for current_start in range(0, audio_length_samples, window_size_samples):
             chunk = audio_frames[current_start:current_start + window_size_samples]
             if len(chunk) < window_size_samples:
                 chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
-            prob, new_state = await self.is_speech(chunk, self.sample_rate)
-            self.state = new_state
-            speech_probs.append(prob)
+            chunks.append(chunk)
+
+        async def async_vad_process(async_chunks):
+            tasks = [self.is_speech(c, self.sample_rate) for c in async_chunks]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            list_of_probs = [r[0] if not isinstance(r, Exception) else r for r in results]
+            ist_of_states = [r[1] if not isinstance(r, Exception) else r for r in results]
+            return list_of_probs, ist_of_states
+
+        speech_probs, states = await async_vad_process(chunks)
+
+        # Старый вариант
+        # speech_probs = list()
+        # for current_start in range(0, audio_length_samples, window_size_samples):
+        #     chunk = audio_frames[current_start:current_start + window_size_samples]
+        #     if len(chunk) < window_size_samples:
+        #         chunk = np.pad(chunk, (0, window_size_samples - len(chunk)), mode='constant')
+        #     prob, new_state = await self.is_speech(chunk, self.sample_rate)
+        #     self.state = new_state
+        #     speech_probs.append(prob)
+
+        # VAD завершён за 0.177019 сек.новый способ.
+        # VAD завершён за 0.175812 сек.старый способ.
+
+        print(f"VAD завершён за {(datetime.datetime.now() - st_t).total_seconds()} сек.")
+
+
 
         # Обработка вероятностей для выделения сегментов
         triggered = False
