@@ -64,7 +64,7 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
                     # Обработка случая с одним словом
                     text = words[0].get('word')
                     if do_punctuation:
-                        text = await sbertpunc.process_punctuation_sessions(text)
+                        text = await sbertpunc.punctuate(text)
 
                     sentence_element.append({
                       "start": start_time,
@@ -108,7 +108,7 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
 
                         else:
                             if do_punctuation:
-                                text = await sbertpunc.process_punctuation_sessions(' '.join(str(word) for word in sentences))
+                                text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
                             else:
                                 text = ' '.join(str(word) for word in sentences)
 
@@ -128,7 +128,7 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
 
                     if do_punctuation:
 
-                        text = await sbertpunc.process_punctuation_sessions(' '.join(str(word) for word in sentences))
+                        text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
                     else:
                         text = ' '.join(str(word) for word in sentences)
 
@@ -143,7 +143,7 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
 
             if do_punctuation:
                 # Тут он текст разделит сам.
-                one_text_only = str(await sbertpunc.process_punctuation_sessions(one_text_only))
+                one_text_only = str(await sbertpunc.punctuate(one_text_only))
 
             text_only.append(one_text_only)
 

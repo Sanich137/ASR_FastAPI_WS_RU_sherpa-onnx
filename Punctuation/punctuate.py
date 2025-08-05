@@ -80,9 +80,8 @@ def decode_label(label, classes="all"):
 
 
 class SbertPuncCaseOnnx:
-    def __init__(self, onnx_model_path, use_gpu = False, num_sessions: int = 2):
+    def __init__(self, onnx_model_path, use_gpu = False):
         self.sessions: List[ort.InferenceSession] = []
-        self.semaphore = asyncio.Semaphore(num_sessions) # Ограничиваем лимит на очередь сессий в семафоре
 
         self.tokenizer = AutoTokenizer.from_pretrained(onnx_model_path,
                                                        strip_accents=False,
@@ -116,17 +115,12 @@ class SbertPuncCaseOnnx:
             model_bytes = f.read()  # Единый буфер для всех сессий
 
         # Собираем очередь сессий Todo - очень интеерсный механизм для оптимизации производительности
-        self.sessions_queue = asyncio.Queue()
-        for _ in range(num_sessions):
-            # providers[0][1]['device_id'] = _   # Если хотим использовать несколько GPU!
-            sess = ort.InferenceSession(path_or_bytes=model_bytes,
-                                        sess_options=session_options,
-                                        providers=providers)
-
-            self.sessions_queue.put_nowait(sess)
+        self.session = ort.InferenceSession(path_or_bytes=model_bytes,
+                                    sess_options=session_options,
+                                    providers=providers)
 
 
-    async def punctuate(self, session, text):
+    async def punctuate(self, text):
         text = text.strip().lower()
         # Разобъем предложение на слова
         words = text.split()
@@ -136,7 +130,7 @@ class SbertPuncCaseOnnx:
         if len(tokenizer_output.input_ids) > 512:
             return " ".join(
                 [
-                    await self.punctuate(session, " ".join(text_part))
+                    await self.punctuate(" ".join(text_part))
                     for text_part in np.array_split(words, 2)
                 ]
             )
@@ -149,8 +143,8 @@ class SbertPuncCaseOnnx:
         # Выполнение модели
         loop = asyncio.get_event_loop()
         outputs = await loop.run_in_executor(
-            None,  # Используем default ThreadPoolExecutor
-            lambda: session.run(None, {
+            None,
+            lambda: self.session.run(None, {
                 "input_ids": input_ids,
                 "attention_mask": attention_mask,
                 "token_type_ids": token_type_ids,  # Передаём token_type_ids
@@ -170,14 +164,10 @@ class SbertPuncCaseOnnx:
         return capitalized_text
 
     async def process_punctuation_sessions(self, text):
-        async with self.semaphore:
-            session = await self.sessions_queue.get()
-            try:
-                capitalized_text = await self.punctuate(session, text)
-            except Exception as e:
-                logger.error(f"Ошибка пунктуатора - {e}")
-            finally:
-                await self.sessions_queue.put(session)
+        try:
+            capitalized_text = await self.punctuate(text)
+        except Exception as e:
+            logger.error(f"Ошибка пунктуатора - {e}")
 
         return capitalized_text
 
@@ -214,7 +204,7 @@ if __name__ == '__main__':
     model_path = str(Path("../models/sbert_punc_case_ru_onnx"))
     print(f" ресурсы до старта приложения  {gpu_stat(0)}")
     time_start = dt.now()
-    sbertpunc = SbertPuncCaseOnnx(model_path, use_gpu=True, num_sessions=1)
+    sbertpunc = SbertPuncCaseOnnx(model_path, use_gpu=True)
     print(f"Время на инициализацию {(dt.now() - time_start).total_seconds()}")
     print(f"Ресурсы после старта приложения  {gpu_stat(0)}")
     import logging as logger
