@@ -34,6 +34,7 @@ scikit-learn~=1.5.2
 python_speech_features
 umap-learn~=0.5.7
 hdbscan~=0.8.40
+cupy-cuda12x
 
 
 # for VAD
