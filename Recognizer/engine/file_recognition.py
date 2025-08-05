@@ -155,6 +155,8 @@ def process_file(tmp_path, params):
                     logger.error(error_description)
                     result["success"] = False
                     result['error_description'] = str(error_description)
+        del mono_data
+        del overlaps
 
         if params.do_echo_clearing:
             try:

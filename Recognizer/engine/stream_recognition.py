@@ -56,23 +56,22 @@ async def recognise_w_calculate_confidence(audio_data,
 
     # Многократное распознавание
     for _ in range(num_trials):
-        stream = None
         stream = recognizer.create_stream()
-
         # перевод в семплы для распознавания.
         samples = await get_np_array_samples_float32(audio_data.raw_data, 2)
-
         # передали аудиофрагмент на распознавание
 
         stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
         recognizer.decode_stream(stream)
 
         result = ujson.loads(str(stream.result))
+
         timestamps = result['timestamps']
         tokens = result['tokens']
 
         all_tokens.append(list(zip(tokens, timestamps)))
 
+    del stream
     # Словарь для хранения статистики по токенам
     token_stats = defaultdict(lambda: {"count": 0, "variants": defaultdict(int)})
 
@@ -153,11 +152,14 @@ async def simple_recognise(audio_data, ) -> dict:
 
     # Распознавание в отдельном потоке
     def decode_in_thread():
+
         stream = recognizer.create_stream()
         # передали аудиофрагмент на распознавание
         stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
         recognizer.decode_stream(stream)
-        return str(stream.result)
+        r = str(stream.result)
+        del stream
+        return r
 
     result_json = await asyncio.to_thread(decode_in_thread)
 
@@ -198,7 +200,9 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
         # передали аудиофрагмент на распознавание
         stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
         recognizer.decode_stream(stream)
-        return str(stream.result)
+        r = str(stream.result)
+        del stream
+        return r
 
     result_json = await asyncio.to_thread(decode_in_thread)
 
@@ -215,6 +219,8 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
                                                can_slow_down=True,
                                                multiplier=max((config.SPEECH_PER_SEC_NORM_RATE-1)/speed, 0.8)
                                                                            )
+    samples = None
+    audio_data = None
     return result, speed, multiplier
 
 

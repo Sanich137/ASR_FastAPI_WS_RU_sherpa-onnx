@@ -1,22 +1,9 @@
-from pydub import AudioSegment
-import config
 import asyncio
-import uuid
-from utils.tokens_to_Result import process_asr_json, process_gigaam_asr
 from utils.pre_start_init import (
     app,
-    posted_and_downloaded_audio,
-    audio_buffer,
-    audio_overlap,
-    audio_to_asr,
-    audio_duration,
 )
 from utils.do_logging import logger
-from utils.chunk_doing import find_last_speech_position
-from utils.resamppling import resample_audiosegment
 from models.fast_api_models import PostFileRequest
-from Recognizer.engine.sentensizer import do_sensitizing
-from Recognizer.engine.echoe_clearing import remove_echo
 from Recognizer.engine.file_recognition import process_file
 from fastapi import Depends, File, Form, UploadFile
 import aiofiles
@@ -89,8 +76,8 @@ async def async_receive_file(
             result["success"] = False
             result['error_description'] = str(error_description)
         else:
-            # структура ответа строится в process_file
-            pass
+            await file.close()
+            del file
         finally:
             # Удаляем временный файл
             os.unlink(tmp_path)

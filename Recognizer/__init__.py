@@ -81,7 +81,7 @@ elif config.MODEL_NAME=="Gigaam_rnnt":
         dither=0.00003,
         sample_rate=config.BASE_SAMPLE_RATE,
         decoding_method="greedy_search",
-        modeling_unit="cjkchar+bpe",  # по умолчанию "cjkchar" пишут что надо только для горячих слов
+        modeling_unit="cjkchar",  # по умолчанию "cjkchar" пишут что надо только для горячих слов
         # bpe_vocab=str(model_settings.get("bpe_vocab")), # Указан, но кажется не работает без hotwords
         lm_scale=0.2,  # по умолчанию 0.1
         provider=config.PROVIDER,
