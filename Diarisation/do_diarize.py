@@ -1,5 +1,4 @@
 import datetime
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import asyncio
 import os
 import numpy as np
@@ -37,30 +36,89 @@ class Diarizer:
         self.nfft = 512
         self.max_phrase_gap = max_phrase_gap
         self.min_duration = min_duration
+        self.use_gpu = use_gpu
 
-        if use_gpu:
+        if self.use_gpu:
+            try:
+                import cupy as cp  # Импортируем CuPy для numpy вычислений на GPU
+            except Exception as e:
+                logger.error(f"Не удалось импортировать cupy '{e}' использование GPU в диаризации невозможно."
+                             f"Установите cupy pip install cupy-cuda12x.")
+                self.use_gpu = False
+            else:
+                self.cp = cp
+
+        if self.use_gpu:
             self.batch_size = batch_size
-            self.max_cpu_workers = 1
+            self.max_cpu_workers = 0
+            providers = [('CUDAExecutionProvider', {
+                'device_id': 0,
+                'arena_extend_strategy': 'kSameAsRequested',  # 20.657809 на 1000 итераций и 26 Мб съел
+                'gpu_mem_limit': int(2 * 1024 * 1024 * 1024),  # Потребляет где-то 1.9 Гб памяти ГПУ
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                'do_copy_in_default_stream': False,
+            }),
+                         'CPUExecutionProvider']
+            self.io_binding_provider = 'cuda'
+            self.io_binding_element_type = self.cp.float32
+
+
         else:
             self.batch_size = 1
-            self.max_cpu_workers = os.cpu_count() - 1 if cpu_workers < 1 else cpu_workers
+            self.max_cpu_workers = 0 if cpu_workers < 1 else cpu_workers
+            providers = ['CPUExecutionProvider']
+            self.io_binding_provider = 'cpu'
+            self.io_binding_element_type = np.float32
 
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider'] if use_gpu else ['CPUExecutionProvider']
 
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 4
         session_options.enable_profiling = False
-        session_options.enable_mem_pattern = False
-        session_options.inter_op_num_threads = 0
-        session_options.intra_op_num_threads = 0
+        session_options.enable_mem_pattern = True
+        session_options.enable_mem_reuse = True
+        session_options.enable_cpu_mem_arena = True
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        session_options.inter_op_num_threads = self.max_cpu_workers
+        session_options.intra_op_num_threads = self.max_cpu_workers
+        session_options.add_session_config_entry("session.disable_prepacking", "1")  # Отключаем дублирование весов
+        session_options.add_session_config_entry("session.use_device_allocator_for_initializers", "1")
+
 
         self.embedding_session = ort.InferenceSession(
             embedding_model_path,
             sess_options=session_options,
             providers=providers
         )
-        self.table = {}
         logger.debug(f"Используемые для диаризации провайдеры {self.embedding_session.get_providers()}")
+
+        if self.use_gpu:
+            # Прогрев модели
+            logger.info("Прогреваем модель Диаризации")
+            warm_up_batch = self.cp.ones((self.batch_size, 150, 80), dtype=self.cp.float32)
+            warm_up_io_binding = self.embedding_session.io_binding()
+            warm_up_io_binding.bind_input(
+                name='feats',
+                device_type=self.io_binding_provider,
+                device_id=0,  # Todo - поменять при реализации функции ротации сессий между несколькими адаптерами
+                element_type=self.io_binding_element_type,
+                shape=tuple(warm_up_batch.shape),
+                buffer_ptr=warm_up_batch.data.ptr
+            )
+            warm_up_io_binding.bind_output('embs')
+
+            for i in range(3):  # Выполняем 3 прогревочных вызова
+                logger.debug(f"Прогрев проход {i + 1}")
+                start = self.cp.cuda.Event()
+                start.record()
+                self.embedding_session.run_with_iobinding(warm_up_io_binding)
+                result = warm_up_io_binding.get_outputs()
+                end = self.cp.cuda.Event()
+                end.record()
+                end.synchronize()
+                logger.debug(
+                    f"Прогрев проход  {i + 1} завершен за {self.cp.cuda.get_elapsed_time(start, end) / 1000:.3f} сек.")
+            self.cp.get_default_memory_pool().free_all_blocks()
+            logger.info(f"Прогрев модели Диаризации завершён для размерности {warm_up_batch.shape}.")
 
     async def highpass_filter(self, signal: np.ndarray, cutoff: float, filter_order: int) -> np.ndarray:
         sos = butter(filter_order, cutoff, btype='high', fs=self.sample_rate, output='sos')
@@ -93,34 +151,98 @@ class Diarizer:
         return subsegs, subseg_fbanks
 
     async def extract_embeddings(self, fbanks, subseg_cmn):
-        fbanks_array = np.stack(fbanks)
-        if subseg_cmn:
-            fbanks_array = fbanks_array - np.mean(fbanks_array, axis=1, keepdims=True)
+        logger.debug("Старт извлечения эмбеддингов")
+        padding_count = 0
+        s_t = datetime.datetime.now()
+        try:
+            if self.use_gpu:
+                # Переносим fbanks на GPU с явным указанием float32
+                logger.debug("Перенос fbanks на GPU")
+                start = self.cp.cuda.Event()
+                start.record()
+                fbanks_array = self.cp.stack([self.cp.asarray(fbank, dtype=self.cp.float32) for fbank in fbanks])
+                logger.debug(f"fbanks_array shape: {fbanks_array.shape}, dtype: {fbanks_array.dtype}")
 
-        async def process_batch(batch):
-            # return await asyncio.to_thread(
-            #     self.embedding_session.run,
-            #     output_names=['embs'],
-            #     input_feed={'feats': batch}
-            # )
+                # Дополнение fbanks_array до размера, кратного batch_size
+                num_fbanks = fbanks_array.shape[0]
+                padding_count = (self.batch_size - (num_fbanks % self.batch_size)) % self.batch_size
+                if padding_count > 0:
+                    padding = self.cp.zeros((padding_count, 150, 80), dtype=self.cp.float32)
+                    fbanks_array = self.cp.concatenate([fbanks_array, padding], axis=0)
+                    logger.debug(f"Added {padding_count} padding fbanks, new shape: {fbanks_array.shape}")
 
-            return self.embedding_session.run(
-                output_names=['embs'],
-                input_feed={'feats': batch}
-                )
+                if subseg_cmn:
+                    fbanks_array = fbanks_array - self.cp.mean(fbanks_array, axis=1, keepdims=True)
 
+                end = self.cp.cuda.Event()
+                end.record()
+                end.synchronize()
+                logger.debug(f"Time to prepare fbanks_array on GPU: {self.cp.cuda.get_elapsed_time(start, end) / 1000:.3f} sec")
+            else:
+                logger.debug("Конвертация Fbank в numpy")
+                fbanks_array = np.stack(fbanks)
+                if subseg_cmn:
+                    fbanks_array = fbanks_array - np.mean(fbanks_array, axis=1, keepdims=True)
 
-        embeddings = []
-        with ThreadPoolExecutor(max_workers=self.max_cpu_workers) as executor:
+            # process_batch с IOBinding
+            async def process_batch(batch):
+                try:
+                    logger.debug(f"Batch shape: {batch.shape}, dtype: {batch.dtype}, device: {self.io_binding_provider}")
+                    # Создание IOBinding для батча
+                    io_binding = self.embedding_session.io_binding()
+                    io_binding.bind_input(
+                        name='feats',
+                        device_type=self.io_binding_provider,
+                        device_id=0,
+                        element_type=self.io_binding_element_type,
+                        shape=tuple(batch.shape),
+                        buffer_ptr=batch.ctypes.data if not self.use_gpu else batch.data.ptr
+                    )
+                    io_binding.bind_output('embs')
+                    # Выполнение инференса
+                    self.embedding_session.run_with_iobinding(io_binding)
+
+                    return [io_binding.get_outputs()]  # Возвращаем список, чтобы соответствовать session.run
+                except Exception as e:
+                    logger.error(f"Error in process_batch: {e}")
+                    return e
 
             tasks = [
                 process_batch(fbanks_array[i:i + self.batch_size])
                 for i in range(0, fbanks_array.shape[0], self.batch_size)
-                ]
-            for task in await asyncio.gather(*tasks):
-                embeddings.append(task[0].squeeze())
+            ]
 
-        return np.vstack(embeddings)
+            logger.debug(f"Created {len(tasks)} tasks for processing")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            embeddings = []
+            for i, result in enumerate(results):
+                if not isinstance(result, Exception):
+                    embeddings.append(result[0][0].numpy().squeeze())  # Извлекаем первый элемент и убираем единичные размерности
+                else:
+                    logger.error(f"Error in batch {i}: {result}")
+
+            if self.use_gpu:
+                embeddings = self.cp.asnumpy(self.cp.vstack(embeddings))
+                # Освобождаем память GPU перед возвратом
+                self.cp.get_default_memory_pool().free_all_blocks()
+            else:
+                embeddings = np.vstack(embeddings)
+
+            # Удаление лишних эмбеддингов
+            if padding_count > 0:
+                embeddings = embeddings[:-padding_count]
+                logger.debug(f"Удалили {padding_count} лишних embeddings, Всего embeddings {embeddings.shape} шт.")
+            else:
+                logger.debug(f"Всего embeddings {embeddings.shape} шт.")
+            return embeddings
+
+        except Exception as e:
+            logger.error(f"Error in extract_embeddings: {e}")
+            raise
+        finally:
+            logger.debug(f"Извлекли эмбеддинги за {(datetime.datetime.now() - s_t).total_seconds()} сек.")
+
 
     async def merge_subsegments(self, subsegs, labels):
         merged = []
@@ -298,7 +420,7 @@ async def load_and_preprocess_audio(audio: AudioSegment, target_frame_size: int 
     if audio.frame_rate != sample_rate:
         audio = await resample_audiosegment(audio,sample_rate)
     if audio.channels > 1:
-        audio = audio.split_to_mono()[1][0:60000]
+        audio = audio.split_to_mono()[1]  # [0:60000]
     samples = np.array(audio.get_array_of_samples(), dtype=np.int16)
     samples_float32 = samples.astype(np.float32) / 32768.0
     num_frames = len(samples_float32) // target_frame_size
@@ -318,9 +440,21 @@ if __name__ == "__main__":
     num_speakers = -1  # Количество спикеров (-1 для автоматического определения)
 
     # Параметры извлечения ембеддингов
-    max_phrase_gap = 1  # расстояние между фразами для объединения в один кластер.
-    use_gpu_diar = True  # По возможности использовать графический процессор для вычислений
-    batch_size = 1  # Размер батча для извлечения эмбеддингов при работе GPU
+    max_phrase_gap = 2  # расстояние между фразами для объединения в один кластер.
+    use_gpu_diar = False  # По возможности использовать графический процессор для вычислений
+    batch_size = 8  # Размер батча для извлечения эмбеддингов при работе GPU
+
+    """
+    voxblink2_samresnet100_ft.onnx - 196 Мб. 
+    В простое 1,2 Гб
+    1 - память до 3.8 Извлекли эмбеддинги за 11.071814 сек.
+    2 - 10.769899 сек.
+    3 - память до 3.9 за 7.670195 сек.
+    4 - память до 3.9 за 6.694537 сек.
+    5 - память до 4  за 7.6 сек.
+    8 - память до 4  за 6.143149 сек.
+    16 - память до 4.2 (был пик до 9?)  за 5.514259 сек.
+    """
     max_cpu_workers = 0  # Количество потоков для извлечения эмбедингов при использовании CPU
 
     # # Параметры сегментации (VAD)
@@ -330,7 +464,7 @@ if __name__ == "__main__":
     # vad_model_path = Path("../models/VAD_silero_v5/silero_vad.onnx")
     speaker_model_path =  Path("../models/DIARISATION_model/voxblink2_samresnet100_ft.onnx")
 
-    audio_path = "../trash/audio.wav"
+    audio_path = "../trash/long.mp3"
 
     #vad = SileroVAD(vad_model_path, use_gpu=use_gpu_vad)
     vad.set_mode(vad_mode)
@@ -340,7 +474,7 @@ if __name__ == "__main__":
     audio_frames = asyncio.run(load_and_preprocess_audio(audio))
     #Todo - в load_and_preprocess_audio должен передаваться аудиосегмент.
     start_time = datetime.datetime.now()
-    logger.info(f"Инициируем модель диаризатора")
+    logger.info(f"Инициируем модель Диаризации")
     diarizer = Diarizer(embedding_model_path=str(speaker_model_path),
                         vad=vad,
                         max_phrase_gap=max_phrase_gap,
@@ -349,6 +483,8 @@ if __name__ == "__main__":
                         use_gpu=use_gpu_diar,
                         )
     logger.info(f"Запускаем диаризацию {(datetime.datetime.now()-start_time).total_seconds()} сек.")
+
+    start_time = datetime.datetime.now()
     result = asyncio.run(diarizer.diarize_and_merge(
                             audio_frames,
                             num_speakers=num_speakers,

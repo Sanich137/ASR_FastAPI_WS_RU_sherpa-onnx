@@ -42,8 +42,10 @@ PUNCTUATE_WITH_GPU = True if int(os.getenv('PUNCTUATE_WITH_GPU', 0)) == 1 else F
 CAN_DIAR = True if int(os.getenv('CAN_DIAR', 0)) == 1 else False
 DIAR_MODEL_NAME = str(os.getenv('DIAR_MODEL_NAME', "voxceleb_resnet34_LM")+".onnx")
 DIAR_WITH_GPU = True if int(os.getenv('DIAR_WITH_GPU', 0)) == 1 else False
-CPU_WORKERS = int(os.getenv('CPU_WORKERS', 0)) # Для значений меньше 1 будут использованы все доступные ядра -1.
-# При больше 1 - указанное число ядер CPU. Работает только при GPU True
+CPU_WORKERS = int(os.getenv('CPU_WORKERS', 0)) # Для значений меньше 1 будут использованы все доступные ядра.
+# При значении от 1 - указанное число ядер CPU. Работает только при DIAR_WITH_GPU False
+DIAR_GPU_BATCH_SIZE = int(os.getenv('DIAR_GPU_BATCH_SIZE', 2))  # Ширина Батча для процесса извлечения эмбеддингов с GPU.
+# Оптимально от 4 до 16. Дальнейшее увеличение приводит к неоправданному расходу памяти.
 
 # Разных моделей для диаризации много.
 # Если voxblink2_samresnet100_ft работает на вашей мощности не достаточно быстро, выберите модель меньшего размера:

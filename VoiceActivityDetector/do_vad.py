@@ -97,7 +97,7 @@ class SileroVAD:
         # Получение вероятностей речи
         await self.reset_state()
 
-        print("Начало процедуры извлечения речевых сегментов VAD")
+        logger.debug("Начало процедуры извлечения речевых сегментов VAD")
         st_t = datetime.datetime.now()
 
         chunks = list()
@@ -129,7 +129,7 @@ class SileroVAD:
         # VAD завершён за 0.177019 сек.новый способ.
         # VAD завершён за 0.175812 сек.старый способ.
 
-        print(f"VAD завершён за {(datetime.datetime.now() - st_t).total_seconds()} сек.")
+        logger.debug(f"Поиск речевых сегментов завершён за {(datetime.datetime.now() - st_t).total_seconds()} сек.")
 
 
 
