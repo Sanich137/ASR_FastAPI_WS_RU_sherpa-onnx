@@ -15,8 +15,7 @@ def are_words_similar(word1: str, word2: str, similarity_threshold: float = 0.8)
     similarity = SequenceMatcher(None, word1, word2).ratio()
     if similarity >= similarity_threshold:
         if similarity != 1:
-            print(f"==== слово '{word1}' похоже на слово '{word2}'")
-
+            logger.debug(f"==== слово '{word1}' похоже на слово '{word2}'")
         return True
 
 

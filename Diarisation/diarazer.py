@@ -1,8 +1,7 @@
 import datetime
 
 import config
-# from Diarisation.do_diarize import load_and_preprocess_audio
-from Diarisation.new_do_diarize import load_and_preprocess_audio
+from Diarisation.do_diarize import load_and_preprocess_audio
 from utils.pre_start_init import posted_and_downloaded_audio
 from utils.do_logging import logger
 
