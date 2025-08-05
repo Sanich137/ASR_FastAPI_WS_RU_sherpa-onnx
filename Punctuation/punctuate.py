@@ -93,10 +93,10 @@ class SbertPuncCaseOnnx:
         session_options.enable_mem_pattern = False
         session_options.enable_mem_reuse = False
         session_options.enable_cpu_mem_arena = False
-        # session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.inter_op_num_threads = 0
         session_options.intra_op_num_threads = 0
-        # session_options.add_session_config_entry("session.disable_prepacking", "1")  # Отключаем дублирование весов
+        session_options.add_session_config_entry("session.disable_prepacking", "1")  # Отключаем дублирование весов
         session_options.add_session_config_entry("session.use_device_allocator_for_initializers", "1")
 
         if not use_gpu:
@@ -115,6 +115,7 @@ class SbertPuncCaseOnnx:
         with open(model_pth, "rb") as f:
             model_bytes = f.read()  # Единый буфер для всех сессий
 
+        # Собираем очередь сессий Todo - очень интеерсный механизм для оптимизации производительности
         self.sessions_queue = asyncio.Queue()
         for _ in range(num_sessions):
             # providers[0][1]['device_id'] = _   # Если хотим использовать несколько GPU!
@@ -135,7 +136,7 @@ class SbertPuncCaseOnnx:
         if len(tokenizer_output.input_ids) > 512:
             return " ".join(
                 [
-                    await self.punctuate(" ".join(text_part))
+                    await self.punctuate(session, " ".join(text_part))
                     for text_part in np.array_split(words, 2)
                 ]
             )

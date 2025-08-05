@@ -128,12 +128,6 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
 
                     if do_punctuation:
 
-                        # text_no_punct = [(' '.join(str(word)) for word in sentences)]
-                        # # Тут можно отдавать много, но много нету, надо передумывать заново логику и вынести пунктуацию за общий цикл разбора слов.
-                        # tasks = [sbertpunc.process_punctuation_sessions(text_no_punct)]
-                        # text = await asyncio.gather(*tasks, return_exceptions=True)
-                        # print(text)
-
                         text = await sbertpunc.process_punctuation_sessions(' '.join(str(word) for word in sentences))
                     else:
                         text = ' '.join(str(word) for word in sentences)
