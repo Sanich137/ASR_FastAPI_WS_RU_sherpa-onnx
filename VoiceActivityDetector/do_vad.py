@@ -12,7 +12,14 @@ from utils.do_logging import logger
 class SileroVAD:
     def __init__(self, onnx_path: Path, use_gpu=False):
         if use_gpu:
-            providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+            providers = [('CUDAExecutionProvider', {
+                'device_id': 0,
+                'arena_extend_strategy': 'kSameAsRequested',  # 20.657809 на 1000 итераций и 26 Мб съел
+                'gpu_mem_limit': int(2 * 1024 * 1024 * 1024),  # Потребляет где-то 1.9 Гб памяти ГПУ
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+                'do_copy_in_default_stream': False,
+            }),
+                'CPUExecutionProvider']
         else:
             providers = ['CPUExecutionProvider']
         self.sample_rate = 16000
@@ -26,9 +33,15 @@ class SileroVAD:
 
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 4
+        session_options.enable_profiling = False
+        session_options.enable_mem_pattern = True   # False в пунктуации
+        session_options.enable_mem_reuse = True     # False в пунктуации
+        session_options.enable_cpu_mem_arena = True # False в пунктуации
+        session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.inter_op_num_threads = 0
         session_options.intra_op_num_threads = 0
-        session_options.enable_mem_pattern = False
+        session_options.add_session_config_entry("session.disable_prepacking", "1")  # Отключаем дублирование весов
+        session_options.add_session_config_entry("session.use_device_allocator_for_initializers", "1")
 
         self.session = ort.InferenceSession(path_or_bytes=onnx_path,
                                             sess_options=session_options,
@@ -101,6 +114,7 @@ class SileroVAD:
         st_t = datetime.datetime.now()
 
         chunks = list()
+
         for current_start in range(0, audio_length_samples, window_size_samples):
             chunk = audio_frames[current_start:current_start + window_size_samples]
             if len(chunk) < window_size_samples:

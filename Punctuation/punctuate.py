@@ -90,9 +90,9 @@ class SbertPuncCaseOnnx:
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 4  # Выключаем подробный лог
         session_options.enable_profiling = False
-        session_options.enable_mem_pattern = False
-        session_options.enable_mem_reuse = False
-        session_options.enable_cpu_mem_arena = False
+        session_options.enable_mem_pattern = False      # True в диаризации
+        session_options.enable_mem_reuse = False        # True в диаризации
+        session_options.enable_cpu_mem_arena = False    # True в диаризации
         session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.inter_op_num_threads = 0
         session_options.intra_op_num_threads = 0

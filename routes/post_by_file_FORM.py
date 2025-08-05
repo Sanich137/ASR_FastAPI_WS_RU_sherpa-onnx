@@ -52,26 +52,6 @@ def get_file_request(
     )
 
 
-def sync_resample_audiosegment(audio_data, target_sample_rate):
-    return asyncio.run(resample_audiosegment(audio_data, target_sample_rate))
-
-def sync_find_last_speech_position(post_id):
-    return asyncio.run(find_last_speech_position(post_id))
-
-def sync_process_gigaam_asr(asr_result, duration, multiplier = 1):
-    return asyncio.run(process_gigaam_asr(asr_result, duration, multiplier))
-
-def sync_process_asr_json(asr_result, duration):
-    return asyncio.run(process_asr_json(asr_result, duration))
-
-def sync_remove_echo(raw_data):
-    return asyncio.run(remove_echo(raw_data))
-
-def sync_do_sensitizing(data, do_punctuation):
-    return asyncio.run(do_sensitizing(data, do_punctuation=do_punctuation))
-
-
-
 @app.post("/post_file")
 async def async_receive_file(
     file: UploadFile = File(description="Аудиофайл для обработки"),
