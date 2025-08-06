@@ -110,7 +110,11 @@ class Diarizer:
                 logger.debug(f"Прогрев проход {i + 1}")
                 start = self.cp.cuda.Event()
                 start.record()
-                self.embedding_session.run_with_iobinding(warm_up_io_binding)
+                try:
+                    self.embedding_session.run_with_iobinding(warm_up_io_binding)
+                except Exception as e:
+                    logger.error(f"Тестовый батч не выполнен по причине {e}.")
+                    break
                 result = warm_up_io_binding.get_outputs()
                 end = self.cp.cuda.Event()
                 end.record()
