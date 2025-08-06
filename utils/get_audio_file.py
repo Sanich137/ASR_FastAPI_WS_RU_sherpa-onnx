@@ -32,7 +32,9 @@ async def getting_audiofile(file_url, post_id) -> [bool, str]:
                     logging.error(f'Ошибка получения файла из ЕРП - {e}')
                     error = f"Getting file error - {e}"
                 else:
-                    posted_and_downloaded_audio[post_id] = io.BytesIO(file_data)
+                    buffer = io.BytesIO(file_data)
+                    buffer.seek(0)
+                    posted_and_downloaded_audio[post_id] = buffer
                     res = True
     else:
         error = "No audio file in request link"
