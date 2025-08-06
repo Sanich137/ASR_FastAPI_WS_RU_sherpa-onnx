@@ -1,7 +1,6 @@
+from io import BytesIO
 import asyncio
-from utils.pre_start_init import (
-    app,
-)
+from utils.pre_start_init import app
 from utils.do_logging import logger
 from models.fast_api_models import PostFileRequest
 from Recognizer.engine.file_recognition import process_file
@@ -56,9 +55,9 @@ async def async_receive_file(
 
     # Сохраняем файл на диск асинхронно
     try:
-        async with aiofiles.tempfile.NamedTemporaryFile("wb", delete=False) as tmp:
-            await tmp.write(await file.read())
-            tmp_path = tmp.name
+        buffer = BytesIO()
+        buffer.write(await file.read())
+        buffer.seek(0)
     except Exception as e:
         error_description = f"Не удалось сохранить файл для распознавания: {file.filename}, размер файла: {file.size}, по причине: {e}"
         logger.error(error_description)
@@ -69,18 +68,16 @@ async def async_receive_file(
         logger.debug(f"Получен и сохранён файл {file.filename}")
         try:
             # Запускаем обработку в потоке
-            result = await asyncio.to_thread(process_file, tmp_path, params)
+            result = await asyncio.to_thread(process_file, buffer, params)
         except Exception as e:
             error_description = f"Ошибка обработки в process_file - {e}"
             logger.error(error_description)
             result["success"] = False
             result['error_description'] = str(error_description)
-        else:
-            await file.close()
-            del file
         finally:
             # Удаляем временный файл
-            os.unlink(tmp_path)
+            await file.close()
+            del file
     finally:
         logger.info(result)
         return result

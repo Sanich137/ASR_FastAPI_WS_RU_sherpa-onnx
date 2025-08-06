@@ -111,11 +111,9 @@ class SbertPuncCaseOnnx:
                          'CPUExecutionProvider']
 
         model_pth = Path(onnx_model_path) / "model.onnx"
-        with open(model_pth, "rb") as f:
-            model_bytes = f.read()  # Единый буфер для всех сессий
 
-        # Собираем очередь сессий Todo - очень интеерсный механизм для оптимизации производительности
-        self.session = ort.InferenceSession(path_or_bytes=model_bytes,
+        # Todo - можно собрать  очередь сессий. Очень интересный механизм для оптимизации производительности
+        self.session = ort.InferenceSession(path_or_bytes=model_pth,
                                     sess_options=session_options,
                                     providers=providers)
 
