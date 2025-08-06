@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 from utils.do_logging import logger
 from utils.files_whatcher import start_file_watcher
 from contextlib import asynccontextmanager
@@ -7,6 +6,8 @@ from pathlib import Path
 from fastapi import FastAPI
 import config
 import threading
+import gc
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 paths = {
@@ -57,6 +58,12 @@ audio_to_asr = defaultdict()
 audio_duration = defaultdict(float)
 ws_collected_asr_res = defaultdict()
 posted_and_downloaded_audio = defaultdict()
+
+# Устанавливаем новые пороги сборщика мусора
+gc.set_threshold(500,  # быстрые файлы было 700
+                 5,    # средне выживающие файлы было 10
+                 5)    # долгожители было 10.
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

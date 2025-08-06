@@ -5,8 +5,6 @@ from utils.do_logging import logger
 from models.fast_api_models import PostFileRequest
 from Recognizer.engine.file_recognition import process_file
 from fastapi import Depends, File, Form, UploadFile
-import aiofiles
-import os
 from threading import Lock
 
 
@@ -78,5 +76,5 @@ async def async_receive_file(
             await file.close()
             del file
     finally:
-        logger.info(result)
+        logger.info((f"{result}"))
         return result
