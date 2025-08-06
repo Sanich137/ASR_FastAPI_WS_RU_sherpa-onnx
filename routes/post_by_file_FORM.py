@@ -55,7 +55,8 @@ async def async_receive_file(
 
     # Сохраняем файл на диск асинхронно
     try:
-        buffer = BytesIO(await file.read()).seek(0)
+        buffer = BytesIO(await file.read())
+        buffer.seek(0)
     except Exception as e:
         error_description = f"Не удалось сохранить файл для распознавания: {file.filename}, размер файла: {file.size}, по причине: {e}"
         logger.error(error_description)
