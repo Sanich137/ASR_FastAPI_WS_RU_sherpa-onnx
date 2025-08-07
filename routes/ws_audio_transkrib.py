@@ -188,17 +188,18 @@ async def websocket(ws: WebSocket):
 
     # Передаём на распознавание собранный не полный буфер
     # перевод в семплы для распознавания.
-    audio_to_asr[client_id] = audio_overlap[client_id][-1] + audio_buffer[client_id]
-    logger.debug(f'итоговое сообщение - {audio_to_asr[client_id].duration_seconds} секунд')
+    audio_to_asr[client_id][-1] = audio_overlap[client_id] + audio_buffer[client_id]
+    logger.debug(f'итоговое сообщение - {audio_to_asr[client_id][-1].duration_seconds} секунд')
 
     try:
         try:
-            if audio_to_asr[client_id].duration_seconds < 2:
-                audio_to_asr[client_id] = audio_to_asr[client_id] + AudioSegment.silent(1000, frame_rate=sample_rate)
+            if audio_to_asr[client_id][-1].duration_seconds < 2:
+
+                audio_to_asr[client_id][-1] = audio_to_asr[client_id][-1] + AudioSegment.silent(1000, frame_rate=sample_rate)
         except Exception as e:
-            logger.error(f"Error getting len of last chunk - {e}")
+            logger.error(f"Ошибка дополнения тишиной последнего чанка - {e}")
             last_result = None
-            error_description = f"Error getting len of last chunk - {e}"
+            error_description = f"Ошибка дополнения тишиной последнего чанка - {e}"
         else:
             if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
                 last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id][-1])
@@ -229,7 +230,7 @@ async def websocket(ws: WebSocket):
             logger.debug(last_result)
             is_silence = False
 
-
+        # Todo - Вот тут как будто ошибка, не отрабатывается пунктуация.
         if do_dialogue:
             try:
                 sentenced_data = await do_sensitizing(ws_collected_asr_res[client_id], do_punctuation)
@@ -237,6 +238,7 @@ async def websocket(ws: WebSocket):
                 logger.error(f"await do_sensitizing - {e}")
                 error_description = f"do_sensitizing - {e}"
 
+        #
         if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=error_description, _last_message=True,
                                    _sentenced_data=sentenced_data):
             logger.error(f"send_message not ok work canceled")
