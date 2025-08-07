@@ -113,7 +113,7 @@ async def find_last_speech_position(socket_id, is_last_chunk):
             speech_end = len(audio) - i * frame_length
 
         separation_time = int(speech_end * 1000 / silero_bitrate)
-
+        # Todo - в качестве оптимизации расхода памяти в audio_to_asr и audio_overlap можно хранить не аудио а время начала и окончания чанка.
         audio_to_asr[socket_id] = audio_overlap[socket_id] + audio_buffer[socket_id][:separation_time]
         audio_overlap[socket_id] = audio_buffer[socket_id][separation_time:]
 

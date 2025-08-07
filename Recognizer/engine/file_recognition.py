@@ -63,7 +63,6 @@ def process_file(tmp_path, params):
                                                                         audio_data=posted_and_downloaded_audio[post_id],
                                                                         target_sample_rate=config.BASE_SAMPLE_RATE)
                                                                     )
-
     except KeyError as e_key:
         error_description = f"Ошибка обращения по ключу {post_id} при изменения фреймрейта - {e_key}"
         logger.error(error_description)
@@ -96,7 +95,7 @@ def process_file(tmp_path, params):
             result["raw_data"].update({f"channel_{n_channel + 1}": list()})
 
             # Основной процесс перебора чанков для распознавания
-            overlaps = list(mono_data[::config.MAX_OVERLAP_DURATION * 1000])  # Чанки аудио для рапсознавания
+            overlaps = list(mono_data[::config.MAX_OVERLAP_DURATION * 1000])  # Чанки аудио для распознавания
             total_chunks = len(overlaps)  # Количество чанков, для поиска последнего
 
             for idx, overlap in enumerate(overlaps):

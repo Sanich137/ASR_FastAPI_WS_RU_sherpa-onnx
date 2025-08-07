@@ -40,7 +40,7 @@ PUNCTUATE_WITH_GPU = True if int(os.getenv('PUNCTUATE_WITH_GPU', 0)) == 1 else F
 
 # Diarisation_settings
 CAN_DIAR = True if int(os.getenv('CAN_DIAR', 0)) == 1 else False
-DIAR_MODEL_NAME = str(os.getenv('DIAR_MODEL_NAME', "voxceleb_resnet34_LM")+".onnx")
+DIAR_MODEL_NAME = str(os.getenv('DIAR_MODEL_NAME', "voxblink2_samresnet100_ft")+".onnx")
 DIAR_WITH_GPU = True if int(os.getenv('DIAR_WITH_GPU', 0)) == 1 else False
 CPU_WORKERS = int(os.getenv('CPU_WORKERS', 0)) # Для значений меньше 1 будут использованы все доступные ядра.
 # При значении от 1 - указанное число ядер CPU. Работает только при DIAR_WITH_GPU False
@@ -48,8 +48,6 @@ DIAR_GPU_BATCH_SIZE = int(os.getenv('DIAR_GPU_BATCH_SIZE', 2))  # Ширина �
 # Оптимально от 4 до 16. Дальнейшее увеличение приводит к неоправданному расходу памяти.
 
 # Разных моделей для диаризации много.
-# Если voxblink2_samresnet100_ft работает на вашей мощности не достаточно быстро, выберите модель меньшего размера:
-# voxblink2_samresnet34_ft тоже вполне норм и должна помещаться в 8Gb GPU.
 # [('cnceleb_resnet34', 25), ('cnceleb_resnet34_LM', 25), ('voxblink2_samresnet100', 191), ('voxblink2_samresnet100_ft', 191),
 # ('voxblink2_samresnet34', 96), ('voxblink2_samresnet34_ft', 96), ('voxceleb_CAM++', 27), ('voxceleb_CAM++_LM', 27),
 # ('voxceleb_ECAPA1024', 56), ('voxceleb_ECAPA1024_LM', 56), ('voxceleb_ECAPA512', 23), ('voxceleb_ECAPA512_LM', 23),
