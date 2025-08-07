@@ -1,3 +1,4 @@
+from datetime import datetime as dt
 import ujson
 import asyncio
 from collections import defaultdict
@@ -38,6 +39,7 @@ def calc_speed(data):
     return speech_speed
 
 
+# Ещё используется
 async def recognise_w_calculate_confidence(audio_data,
                                      num_trials = 1,
                                      time_tolerance: float = 0.5) -> dict:
@@ -105,8 +107,6 @@ async def recognise_w_calculate_confidence(audio_data,
 
     # Возвращаем результат в формате JSON
     return result
-
-
 
 async def simple_recognise(audio_data, ) -> dict:
     """
@@ -223,6 +223,63 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
     audio_data = None
     return result, speed, multiplier
 
+# Наработки по распознавания батчем. Не хватает памяти. Прироста скорости найти не удаётся
+async def simple_recognise_batch(list_audio_data: list, batch_size: int = 4) -> list:
+    time_start = dt.now()
+
+    # Преобразуем аудио в numpy-массивы
+    list_of_samples = [
+        await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
+        for audio_data in list_audio_data
+    ]
+
+    # Формируем батчи
+    list_of_batches = [list_of_samples[i:i + batch_size] for i in range(0, len(list_of_samples), batch_size)]
+
+    async def process_batch(a_batch):
+        loop = asyncio.get_running_loop()
+        streams = []
+
+        def sync_process_batch():
+            try:
+                # Создаём потоки для батча
+                for samples_data in a_batch:
+                    stream = recognizer.create_stream()
+                    stream.accept_waveform(sample_rate=16000, waveform=samples_data)
+                    streams.append(stream)
+
+                # Декодируем батч
+                recognizer.decode_streams(streams)
+
+                # Собираем результаты
+                return [ujson.loads(str(stream.result)) for stream in streams]
+            finally:
+                # Освобождаем потоки
+                for stream in streams:
+                    del stream
+
+        # Выполняем в пуле потоков
+        return await loop.run_in_executor(None, sync_process_batch)
+
+    # Обрабатываем батчи последовательно
+    results = []
+    logger.info(f"Создано {len(list_of_batches)} батчей для распознавания.")
+
+    for i, batch in enumerate(list_of_batches):
+        try:
+            batch_result = await process_batch(batch)
+            results.append(batch_result)
+            logger.info(f"Обработан батч {i + 1}/{len(list_of_batches)}")
+        except Exception as e:
+            logger.error(f"Ошибка обработки батча {i + 1}: {e}")
+            results.append([])  # Пустой результат для батча при ошибке
+
+    # Объединяем результаты
+    flat_results = [item for sublist in results for item in sublist if not isinstance(item, Exception)]
+
+    logger.info(f"Время выполнения: {(dt.now() - time_start).total_seconds()} сек.")
+
+    return flat_results
 
 
 

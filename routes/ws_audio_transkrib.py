@@ -28,6 +28,7 @@ async def websocket(ws: WebSocket):
     audio_buffer[client_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
     audio_overlap[client_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
     audio_duration[client_id] = 0
+    audio_to_asr[client_id] = list()
     ws_collected_asr_res[client_id] = {f"channel_{1}": list()}
     do_dialogue = False
     do_punctuation = False
@@ -95,7 +96,7 @@ async def websocket(ws: WebSocket):
                         logger.error(f"Ошибка принятия аудио - {e}")
                     else:
                         logger.debug("Чанк принят и распознан")
-
+                # Todo-вынести за конструкцию if-else приёма данных. и сократить обрабоку последнего чанка по примеру process_file
                 # Приводим фреймрейт к фреймрейту модели
                 if audiosegment_chunk.frame_rate != config.BASE_SAMPLE_RATE:
                     audiosegment_chunk = await resample_audiosegment(audiosegment_chunk, config.BASE_SAMPLE_RATE)
@@ -118,20 +119,20 @@ async def websocket(ws: WebSocket):
             else:
                 try:
                     if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
-                        asr_first_result_wo_conf =await simple_recognise(audio_to_asr[client_id])
+                        asr_first_result_wo_conf = await simple_recognise(audio_to_asr[client_id][-1])
                         asr_result_words = await process_gigaam_asr(asr_first_result_wo_conf, audio_duration[client_id])
 
-                        audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
+                        audio_duration[client_id] += audio_to_asr[client_id][-1].duration_seconds
                         logger.debug(asr_result_words)
 
                         # Копим ответы для пунктуации
                         ws_collected_asr_res[client_id][f"channel_{1}"].append(asr_result_words)
                     else:
-                        asr_result_w_conf = await recognise_w_calculate_confidence(audio_to_asr[client_id],
+                        asr_result_w_conf = await recognise_w_calculate_confidence(audio_to_asr[client_id][-1],
                                                                              num_trials=config.RECOGNITION_ATTEMPTS)
 
                         asr_result_words = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
-                        audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
+                        audio_duration[client_id] += audio_to_asr[client_id][-1].duration_seconds
                         logger.debug(asr_result_words)
 
                         # Копим ответы для пунктуации
@@ -187,7 +188,7 @@ async def websocket(ws: WebSocket):
 
     # Передаём на распознавание собранный не полный буфер
     # перевод в семплы для распознавания.
-    audio_to_asr[client_id] = audio_overlap[client_id] + audio_buffer[client_id]
+    audio_to_asr[client_id] = audio_overlap[client_id][-1] + audio_buffer[client_id]
     logger.debug(f'итоговое сообщение - {audio_to_asr[client_id].duration_seconds} секунд')
 
     try:
@@ -199,8 +200,8 @@ async def websocket(ws: WebSocket):
             last_result = None
             error_description = f"Error getting len of last chunk - {e}"
         else:
-            if config.MODEL_NAME == "Gigaam":
-                last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id])
+            if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
+                last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id][-1])
                 last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
                 logger.debug(f'Последний результат {last_result.get("data").get("text")}')
 
