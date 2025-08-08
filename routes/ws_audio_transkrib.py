@@ -54,6 +54,7 @@ async def websocket(ws: WebSocket):
                     audio_format = json_cfg.get("audio_format", 'pcm16')
 
                     sample_rate = json_cfg.get('sample_rate')
+
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
 
                     do_dialogue = json_cfg.get("do_dialogue", False)
@@ -85,11 +86,9 @@ async def websocket(ws: WebSocket):
                     )
                 else:
                     try:
-                        buffer = BytesIO()
-                        # Запускаем FFmpeg для конвертации
-                        subprocess.run([
-                            "ffmpeg", "-i", "input.webm", "-f", "wav", buffer
-                        ])
+                        buffer = BytesIO(chunk)
+                        buffer.seek(0)
+                        # buffer.write()
                         audiosegment_chunk = AudioSegment.from_file(buffer)
 
                     except Exception as e:
@@ -108,10 +107,8 @@ async def websocket(ws: WebSocket):
 
                 # Накопили больше нормы
                 if (audio_overlap[client_id]+audio_buffer[client_id]).duration_seconds >= config.MAX_OVERLAP_DURATION:
-
                     # Проверяем новый чанк перед объединением (там же режем хвост и добавляем его при необходимости)
                     await find_last_speech_position(client_id, is_last_chunk=False)
-
                 else:
                     continue
             except Exception as e:
@@ -188,7 +185,7 @@ async def websocket(ws: WebSocket):
 
     # Передаём на распознавание собранный не полный буфер
     # перевод в семплы для распознавания.
-    audio_to_asr[client_id][-1] = audio_overlap[client_id] + audio_buffer[client_id]
+    audio_to_asr[client_id].append(audio_overlap[client_id] + audio_buffer[client_id])
     logger.debug(f'итоговое сообщение - {audio_to_asr[client_id][-1].duration_seconds} секунд')
 
     try:
