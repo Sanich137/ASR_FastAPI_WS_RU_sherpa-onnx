@@ -25,6 +25,7 @@ RECOGNITION_ATTEMPTS = 1  # Пока не менять
 SPEECH_PER_SEC_NORM_RATE = 18  # Нормальное количество токенов в секунду. При превышении этого значения становится
 # возможным автоматически замедлять скорость речи для улучшения распознавания. В реальной речи, как правило, находится
 # в интервале от 13 до 25.
+MAKE_MONO = True if int(os.getenv('MAKE_MONO', 0)) == 1 else False
 
 # Vad_settings
 VAD_SENSITIVITY = int(os.getenv('VAD_SENSE', 3))  # 1 to 5 Higher - more words.
@@ -36,6 +37,7 @@ BETWEEN_WORDS_PERCENTILE = int(os.getenv('BETWEEN_WORDS_PERCENTILE', 80)) # Па
 # То есть, по длительности каждая десятая пауза означает конец предложения или мысли. Влияет на пунктуацию выражений.
 
 # Punctuate_settings
+CAN_PUNCTUATE = True if int(os.getenv('CAN_PUNCTUATE', 1)) == 1 else False
 PUNCTUATE_WITH_GPU = True if int(os.getenv('PUNCTUATE_WITH_GPU', 0)) == 1 else False
 
 # Diarisation_settings
@@ -63,6 +65,8 @@ SPEED_SPEECH_CORRECTION_MULTIPLIER = float(os.getenv('SPEED_SPEECH_CORRECTION_MU
 # Настройки сервиса локального распознавания.
 DO_LOCAL_FILE_RECOGNITIONS = True if int(os.getenv('DO_LOCAL_FILE_RECOGNITIONS', 0)) == 1 else False
 DELETE_LOCAL_FILE_AFTR_ASR = True if int(os.getenv('DELETE_LOCAL_FILE_AFTR_ASR', 0)) == 1 else False
+HUMAN_FORMAT_MD_FILE = True if int(os.getenv('HUMAN_FORMAT_MD_FILE', 0)) == 1 else False
+
 
 AUDIOEXTENTIONS =  [
     # Основные форматы

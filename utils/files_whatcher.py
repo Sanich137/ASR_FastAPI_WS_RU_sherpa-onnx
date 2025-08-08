@@ -8,7 +8,7 @@ from pathlib import Path
 
 import config
 from models.fast_api_models import PostFileRequest
-from utils.save_asr_to_md import save_to_md
+from utils.save_asr_to_md import save_to_file
 
 
 def send_file_to_asr(event, file_path):
@@ -16,11 +16,11 @@ def send_file_to_asr(event, file_path):
     if not event.is_directory:
         file_params = PostFileRequest()
         file_params.speech_speed_correction_multiplier = 1
-        file_params.do_diarization = True
-        file_params.do_punctuation = True
+        file_params.do_diarization = config.CAN_DIAR
+        file_params.do_punctuation = config.CAN_PUNCTUATE
         file_params.do_dialogue = True
-        file_params.do_echo_clearing = False
-        file_params.make_mono = True
+        file_params.do_echo_clearing = True
+        file_params.make_mono = config.MAKE_MONO
         file_params.diar_vad_sensity = 2
         file_params.do_auto_speech_speed_correction = True
         file_params.keep_raw = False
@@ -29,11 +29,11 @@ def send_file_to_asr(event, file_path):
             tmp_path=file_path,
             params=file_params
         )
-        # Имя файла без расширения
-        file_name = file_path.stem
+        # # Имя файла без расширения
+        # file_name = file_path.stem
 
         if asr_data["success"]:
-            asyncio.run(save_to_md(asr_data, file_name))
+            asyncio.run(save_to_file(asr_data, file_path))
 
             if config.DELETE_LOCAL_FILE_AFTR_ASR:
                 try:

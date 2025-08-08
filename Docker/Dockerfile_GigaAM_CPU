@@ -65,8 +65,9 @@ ENV BASE_SAMPLE_RATE=16000 \
     DO_LOCAL_FILE_RECOGNITIONS=0 \
     DELETE_LOCAL_FILE_AFTR_ASR=0 \
     PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx
+    MAKE_MONO=1
 
-# Скачивание модели - ВСЕ В ОДНОМ RUN-слое!
+# Скачивание модели.
 RUN mkdir -p $(dirname "$DIAR_MODEL_OUTPUT_PATH") && \
     echo "Пытаемся скачать модель $DIAR_MODEL_NAME..." && \
     # 1. Получаем JSON с данными файлов
