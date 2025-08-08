@@ -38,13 +38,7 @@ class ASRStreamingClient:
         sound = AudioSegment.from_file(str(file_path))
         if sound.frame_rate != self.frame_rate:
             logging.warning(f"Конвертация FR {sound.frame_rate} → {self.frame_rate}")
-            sound = (sound.
-
-
-
-
-
-                     set_frame_rate(self.frame_rate))
+            sound = (sound.set_frame_rate(self.frame_rate))
         return sound.set_channels(1)
 
     async def _send_config(self, websocket, sample_rate, wait_null_answers):
@@ -128,8 +122,8 @@ if __name__ == "__main__":
     # parser = argparse.ArgumentParser()
     # args = parser.parse_args()
     # args.uri ="ws://192.168.100.29:49153/ws"
-    # args.file = "test.wav"
-    # args.frame_rate = 8000
+    # args.file = "Можно через час совещание.mp3"
+    # args.frame_rate = 16000
     # args.buffer_size = 4
 
 
