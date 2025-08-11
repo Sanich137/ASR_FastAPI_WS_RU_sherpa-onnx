@@ -1,3 +1,4 @@
+from numba.experimental.function_type import typeof_function_type
 from pydub import AudioSegment
 import config
 import asyncio
@@ -49,11 +50,20 @@ def process_file(tmp_path, params):
         result["success"] = False
         result["error_description"] = error_description
         return result
-    else:
-        # Проверка длины переданного на распознавание аудио
-        if posted_and_downloaded_audio[post_id].duration_seconds < 5:
-            logger.debug(f"На вход передано аудио короче 5 секунд. Будет дополнено тишиной ещё 5 сек.")
-            posted_and_downloaded_audio[post_id]+=AudioSegment.silent(duration=5,frame_rate=config.BASE_SAMPLE_RATE)
+
+    # Проверка длины переданного на распознавание аудио
+    try:
+        with audio_lock:
+            if posted_and_downloaded_audio[post_id].duration_seconds < 5:
+                logger.debug(f"На вход передано аудио короче 5 секунд. Будет дополнено тишиной ещё 5 сек.")
+                posted_and_downloaded_audio[post_id] += AudioSegment.silent(duration=5, frame_rate=config.BASE_SAMPLE_RATE)
+    except Exception as e:
+        error_description += f"Error len_fixing_file: {e}"
+        logger.error(error_description)
+        result["success"] = False
+        result["error_description"] = error_description
+        return result
+
 
     # Приводим фреймрейт к фреймрейту модели
     try:
@@ -76,138 +86,143 @@ def process_file(tmp_path, params):
         result["success"] = False
         result['error_description'] = str(error_description)
         return result
-    else:
-        # Обрабатываем чанки с аудио по N секунд
-        for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
-            # Подготовительные действия
-            try:
-                with audio_lock:
-                    audio_buffer[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
-                    audio_overlap[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
-                    audio_duration[post_id] = 0
-            except Exception as e:
-                    error_description = f"Ошибка изменения фреймрейта - {e}"
-                    logger.error(error_description)
-                    result["success"] = False
-                    result['error_description'] = str(error_description)
-                    return result
 
-            result["raw_data"].update({f"channel_{n_channel + 1}": list()})
-
-            # Основной процесс перебора чанков для распознавания
-            overlaps = list(mono_data[::config.MAX_OVERLAP_DURATION * 1000])  # Чанки аудио для распознавания
-            total_chunks = len(overlaps)  # Количество чанков, для поиска последнего
-            audio_to_asr[post_id] = list()
-            for idx, overlap in enumerate(overlaps):
-                is_last_chunk = (idx == total_chunks - 1) # Если чанк последний
-                with audio_lock:
-                    if (audio_overlap[post_id].duration_seconds + overlap.duration_seconds) < config.MAX_OVERLAP_DURATION:
-                        silent_secs = config.MAX_OVERLAP_DURATION - (audio_overlap[post_id].duration_seconds + overlap.duration_seconds)
-                        overlap += AudioSegment.silent(silent_secs, frame_rate=config.BASE_SAMPLE_RATE)
-                    audio_buffer[post_id] = overlap
-                    asyncio.run(find_last_speech_position(post_id, is_last_chunk)) # Последний чанк обрабатывается иначе.
-
-            use_batching = False
-            if use_batching:
-                list_asr_result_wo_conf = asyncio.run(simple_recognise_batch(audio_to_asr[post_id]))  # --> list
-                continue
-            else:
-                pass
-
-            for audio_asr in audio_to_asr[post_id]:
-                try:
-                    # Снижаем скорость аудио по необходимости
-                    if params.do_auto_speech_speed_correction or params.speech_speed_correction_multiplier != 1:
-                        logger.debug("Будут использованы механизмы анализа скорости речи и замедления аудио")
-
-                        asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_asr,
-                                                                            can_slow_down=True,
-                                                                            multiplier=params.speech_speed_correction_multiplier))
-                        params.speech_speed_correction_multiplier = multiplier
-                    else:
-                        # Производим распознавание
-                        asr_result_wo_conf = asyncio.run(simple_recognise(audio_asr))
-
-                except Exception as e:
-                    logger.error(f"Error ASR audio - {e}")
-                    error_description = f"Error ASR audio - {e}"
-                else:
-                    if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":  # Whisper
-                        asr_result = asyncio.run(process_gigaam_asr(asr_result_wo_conf,
-                                                             audio_duration[post_id],
-                                                             params.speech_speed_correction_multiplier))
-                    else:
-                        asr_result = asyncio.run(process_asr_json(asr_result_wo_conf, audio_duration[post_id]))
-
-                    result["raw_data"][f"channel_{n_channel + 1}"].append(asr_result)
-
-                    with audio_lock:
-                        audio_duration[post_id] += audio_asr.duration_seconds
-                    res = True
-                    logger.debug(asr_result)
-
+    # Обрабатываем чанки с аудио по N секунд
+    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[post_id].split_to_mono()):
+        # Подготовительные действия
+        try:
             with audio_lock:
-                try:
-                    del audio_overlap[post_id]
-                    del audio_buffer[post_id]
-                    del audio_to_asr[post_id]
-                    del audio_duration[post_id]
-                except Exception as e:
-                    error_description = f"Ошибка при очистке данных - {e}"
-                    logger.error(error_description)
-                    result["success"] = False
-                    result['error_description'] = str(error_description)
-        del mono_data
-        del overlaps
+                audio_buffer[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
+                audio_overlap[post_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
+                audio_duration[post_id] = 0
+        except Exception as e:
+                error_description = f"Ошибка изменения фреймрейта - {e}"
+                logger.error(error_description)
+                result["success"] = False
+                result['error_description'] = str(error_description)
+                return result
 
-        if params.do_echo_clearing:
-            try:
-                result["raw_data"] = asyncio.run(remove_echo(result["raw_data"]))
+        result["raw_data"].update({f"channel_{n_channel + 1}": list()})
 
-            except Exception as e:
-                logger.error(f"Error echo clearing - {e}")
-                error_description = f"Error echo clearing - {e}"
-                res = False
+        # Основной процесс перебора чанков для распознавания
+        overlaps = list(mono_data[::config.MAX_OVERLAP_DURATION * 1000])  # Чанки аудио для распознавания
+        total_chunks = len(overlaps)  # Количество чанков, для поиска последнего
+        audio_to_asr[post_id] = list()
+        for idx, overlap in enumerate(overlaps):
+            is_last_chunk = (idx == total_chunks - 1) # Если чанк последний
+            with audio_lock:
+                if (audio_overlap[post_id].duration_seconds + overlap.duration_seconds) < config.MAX_OVERLAP_DURATION:
+                    silent_secs = config.MAX_OVERLAP_DURATION - (audio_overlap[post_id].duration_seconds + overlap.duration_seconds)
+                    overlap += AudioSegment.silent(silent_secs, frame_rate=config.BASE_SAMPLE_RATE)
+                audio_buffer[post_id] = overlap
+                asyncio.run(find_last_speech_position(post_id, is_last_chunk)) # Последний чанк обрабатывается иначе.
 
-        if params.do_diarization and not config.CAN_DIAR:
-            params.do_diarization = False
-            error_description += "Diarization is not available\n"
-            logger.error("Запрошена диаризация, но она не доступна.")
-
-        if params.do_diarization:
-            try:
-                result["diarized_data"] = asyncio.run(do_diarizing(
-                    file_id=str(post_id), asr_raw_data=result["raw_data"], diar_vad_sensity=params.diar_vad_sensity
-                ))
-            except Exception as e:
-                logger.error(f"do_diarizing - {e}")
-                error_description = f"do_diarizing - {e}"
-                res = False
-            else:
-                diarized = True
-
-        if params.do_dialogue:
-            data_to_do_sensitizing = result["diarized_data"] if diarized else result["raw_data"]
-            try:
-                result["sentenced_data"] = asyncio.run(do_sensitizing(
-                    input_asr_json=data_to_do_sensitizing, do_punctuation=params.do_punctuation
-                                                                        )
-                                                        )
-            except Exception as e:
-                logger.error(f"do_sensitizing - {e}")
-                error_description = f"do_sensitizing - {e}"
-                res = False
-            else:
-                if not params.keep_raw:
-                    result["raw_data"].clear()
+        use_batching = False
+        if use_batching:
+            list_asr_result_wo_conf = asyncio.run(simple_recognise_batch(audio_to_asr[post_id]))  # --> list
+            continue
         else:
-            result["sentenced_data"].clear()
+            pass
 
-        result["error_description"] = error_description
-        result["success"] = res
+        for audio_asr in audio_to_asr[post_id]:
+            try:
+                # Снижаем скорость аудио по необходимости
+                if params.do_auto_speech_speed_correction or params.speech_speed_correction_multiplier != 1:
+                    logger.debug("Будут использованы механизмы анализа скорости речи и замедления аудио")
+
+                    asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_asr,
+                                                                        can_slow_down=True,
+                                                                        multiplier=params.speech_speed_correction_multiplier))
+                    params.speech_speed_correction_multiplier = multiplier
+                else:
+                    # Производим распознавание
+                    asr_result_wo_conf = asyncio.run(simple_recognise(audio_asr))
+
+            except Exception as e:
+                logger.error(f"Error ASR audio - {e}")
+                error_description = f"Error ASR audio - {e}"
+            else:
+                if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":  # Whisper
+                    asr_result = asyncio.run(process_gigaam_asr(asr_result_wo_conf,
+                                                         audio_duration[post_id],
+                                                         params.speech_speed_correction_multiplier))
+                else:
+                    asr_result = asyncio.run(process_asr_json(asr_result_wo_conf, audio_duration[post_id]))
+
+                result["raw_data"][f"channel_{n_channel + 1}"].append(asr_result)
+
+                with audio_lock:
+                    audio_duration[post_id] += audio_asr.duration_seconds
+                res = True
+                logger.debug(asr_result)
 
         with audio_lock:
-            del posted_and_downloaded_audio[post_id]
+            try:
+                del audio_overlap[post_id]
+                del audio_buffer[post_id]
+                del audio_to_asr[post_id]
+                del audio_duration[post_id]
+            except Exception as e:
+                error_description = f"Ошибка при очистке данных - {e}"
+                logger.error(error_description)
+                result["success"] = False
+                result['error_description'] = str(error_description)
+    del mono_data
+    del overlaps
 
-        logger.debug(result)
-        return result
+    if params.do_echo_clearing:
+        try:
+            result["raw_data"] = asyncio.run(remove_echo(result["raw_data"]))
+
+        except Exception as e:
+            logger.error(f"Error echo clearing - {e}")
+            error_description = f"Error echo clearing - {e}"
+            res = False
+
+    if params.do_diarization and not config.CAN_DIAR:
+        error_description += "Diarization is not available.\n"
+        logger.error("Запрошена диаризация, но она не доступна.")
+        params.do_diarization = False
+    # Проверяем возможность диаризации. Если здесь стерео-канал, то диаризацию выключаем.
+    elif params.do_diarization and len(posted_and_downloaded_audio[post_id].split_to_mono()) != 1:
+        error_description += f"Only mono diarization available.\n"
+        logger.error("При запрошенной диаризации аудио имеет более одного аудио-канала. Диаризация будет выключена.")
+        params.do_diarization = False
+
+    if params.do_diarization:
+        try:
+            result["diarized_data"] = asyncio.run(do_diarizing(
+                file_id=str(post_id), asr_raw_data=result["raw_data"], diar_vad_sensity=params.diar_vad_sensity
+            ))
+        except Exception as e:
+            logger.error(f"do_diarizing - {e}")
+            error_description = f"do_diarizing - {e}"
+            res = False
+        else:
+            diarized = True
+
+    if params.do_dialogue:
+        data_to_do_sensitizing = result["diarized_data"] if diarized else result["raw_data"]
+        try:
+            result["sentenced_data"] = asyncio.run(do_sensitizing(
+                input_asr_json=data_to_do_sensitizing, do_punctuation=params.do_punctuation
+                                                                    )
+                                                    )
+        except Exception as e:
+            logger.error(f"do_sensitizing - {e}")
+            error_description = f"do_sensitizing - {e}"
+            res = False
+        else:
+            if not params.keep_raw:
+                result["raw_data"].clear()
+    else:
+        result["sentenced_data"].clear()
+
+    result["error_description"] = error_description
+    result["success"] = res
+
+    with audio_lock:
+        del posted_and_downloaded_audio[post_id]
+
+    logger.debug(result)
+    return result
