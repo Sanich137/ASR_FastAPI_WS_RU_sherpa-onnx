@@ -14,8 +14,8 @@ class SileroVAD:
         if use_gpu:
             providers = [('CUDAExecutionProvider', {
                 'device_id': 0,
-                'arena_extend_strategy': 'kSameAsRequested',  # 20.657809 на 1000 итераций и 26 Мб съел
-                'gpu_mem_limit': int(0.3 * 1024 * 1024 * 1024),  # Потребляет где-то 1.9 Гб памяти ГПУ
+                'arena_extend_strategy': 'kSameAsRequested',
+                'gpu_mem_limit': int(0.3 * 1024 * 1024 * 1024),
                 'cudnn_conv_algo_search': 'EXHAUSTIVE',
                 'do_copy_in_default_stream': False,
             }),
@@ -34,8 +34,8 @@ class SileroVAD:
         session_options = ort.SessionOptions()
         session_options.log_severity_level = 4
         session_options.enable_profiling = False
-        session_options.enable_mem_pattern = True   # False в пунктуации
-        session_options.enable_mem_reuse = True     # False в пунктуации
+        session_options.enable_mem_pattern = False   # False в пунктуации
+        session_options.enable_mem_reuse = False     # False в пунктуации
         session_options.enable_cpu_mem_arena = False # False в пунктуации
         session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         session_options.inter_op_num_threads = 0
