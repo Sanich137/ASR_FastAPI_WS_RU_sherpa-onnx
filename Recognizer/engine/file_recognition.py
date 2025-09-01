@@ -186,7 +186,7 @@ def process_file(tmp_path, params):
     # Проверяем возможность диаризации. Если здесь стерео-канал, то диаризацию выключаем.
     elif params.do_diarization and len(posted_and_downloaded_audio[post_id].split_to_mono()) != 1:
         error_description += f"Only mono diarization available.\n"
-        logger.error("При запрошенной диаризации аудио имеет более одного аудио-канала. Диаризация будет выключена.")
+        logger.warn("При запрошенной диаризации аудио имеет более одного аудио-канала. Диаризация будет выключена.")
         params.do_diarization = False
 
     if params.do_diarization:
