@@ -7,7 +7,6 @@ from Recognizer.engine.file_recognition import process_file
 from fastapi import Depends, File, Form, UploadFile
 from threading import Lock
 
-
 # Глобальный лок для потокобезопасности
 audio_lock = Lock()
 

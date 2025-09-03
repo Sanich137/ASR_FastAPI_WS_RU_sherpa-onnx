@@ -47,20 +47,7 @@ class PostFileRequest(BaseModel):
     speech_speed_correction_multiplier: float = config.SPEED_SPEECH_CORRECTION_MULTIPLIER
 
 
-class PostFileRequestDiarize(BaseModel):
-    """
-    Модель для проверки запроса пользователя.
-    :param keep_raw: Если False, то запрос вернёт только пост-обработанные данные do_punctuation и do_dialogue.
-    :param do_echo_clearing: Проверяет наличие повторений между каналами.
-    :param num_speakers: Предполагаемое количество спикеров в разговоре. -1 - значит мы не знаем сколько спикеров и определяем их параметром cluster_threshold.
-    :param cluster_threshold: Значение от 0 до 1. Чем меньше, тем более чувствительное выделение спикеров (тем их больше)
-    :param do_punctuation: Расставляет пунктуацию.
-    """
-    keep_raw: bool = True
-    do_echo_clearing: bool = False
-    do_punctuation: bool = False
-    num_speakers: int = -1,
-    cluster_threshold: float = 0.2
+
 
 class WebSocketModel(BaseModel):
     """OpenAPI не хочет описывать WS, а я не хочу изучать OPEN API. По этому описание тут.
@@ -119,3 +106,18 @@ class WebSocketModel(BaseModel):
   }
     """
     pass
+
+class PostFileResponse(BaseModel):
+    """
+
+    Модель для проверки ответа на PostForm запрос пользователя.
+
+    :param success: Общие сведения об успешности обработки запроса
+    :param error_description: Если success не True, то будет описание ошибки. Или если True могут быть варнинги
+    :param raw_data: тут чистый ответ с разбивкой по словам/предложениям/общий текст.
+    :param sentenced_data: Ответ разбитый на диалоги, или только фразы, если спикер один
+    """
+    success: bool
+    error_description: str
+    raw_data: dict
+    sentenced_data: dict

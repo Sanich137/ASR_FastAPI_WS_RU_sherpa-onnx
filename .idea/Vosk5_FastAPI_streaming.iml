@@ -10,6 +10,8 @@
       <excludeFolder url="file://$MODULE_DIR$/models/sbert_punc_case_ru_onnx" />
       <excludeFolder url="file://$MODULE_DIR$/models/Diar_model" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/models/GigaAMv2_RNNT_RU_ASR_for_sherpa_onnx" />
+      <excludeFolder url="file://$MODULE_DIR$/models/T-one" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.12 (Vosk5_FastAPI_streaming)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

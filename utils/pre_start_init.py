@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 from utils.do_logging import logger
 from utils.files_whatcher import start_file_watcher
+from asr_pipeline.state_manager import StateManager
+from asr_pipeline.pipeline_config import PIPELINE_CONFIG
+from asr_pipeline.routing import PipelineRouter
+from asr_pipeline.worker import monitor_queues,start_workers,stop_monitor,start_monitor
+
 from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI
@@ -52,8 +57,9 @@ paths = {
 from collections import defaultdict
 
 # Глобальные переменные
-audio_overlap = defaultdict()
+bytes_buffer = defaultdict()
 audio_buffer = defaultdict()
+audio_overlap = defaultdict()
 audio_to_asr = defaultdict()
 audio_duration = defaultdict(float)
 ws_collected_asr_res = defaultdict()
@@ -69,7 +75,18 @@ gc.set_threshold(500,  # быстрые файлы было 700
 async def lifespan(app: FastAPI):
     # on_start
     logger.debug("Приложение FastAPI запущено")
+
+    # Запуск мониторинга очередей
+    start_monitor()
+
+    # Запуск воркеров
+    router = PipelineRouter(PIPELINE_CONFIG)
+    manager = StateManager(router)
+    start_workers(manager)
+    app.state.manager = manager
+
     global observer
+
     if config.DO_LOCAL_FILE_RECOGNITIONS:
         observer_thread = threading.Thread(
             target=lambda: start_file_watcher(file_path=str(paths.get("local_recognition_folder"))),
@@ -79,6 +96,8 @@ async def lifespan(app: FastAPI):
         logger.info("File watcher started")
 
     yield  # Здесь приложение работает
+    stop_monitor.set()
+    logger.debug("Приложение FastAPI остановлено")
 
 app = FastAPI(lifespan=lifespan,
               version="1.0",

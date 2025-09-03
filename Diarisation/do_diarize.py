@@ -41,6 +41,7 @@ class Diarizer:
         if self.use_gpu:
             try:
                 import cupy as cp  # Импортируем CuPy для numpy вычислений на GPU
+
             except Exception as e:
                 logger.error(f"Не удалось импортировать cupy '{e}' использование GPU в диаризации невозможно."
                              f"Установите cupy pip install cupy-cuda12x.")

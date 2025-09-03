@@ -6,29 +6,38 @@ from fastapi.logger import logger as fastapi_logger
 
 logger = logging.getLogger(__name__)
 
+# Формат лога — теперь начинается с времени
+formatter = logging.Formatter(
+    fmt=config.LOGGING_FORMAT,
+    datefmt='%Y-%m-%d %H:%M:%S'  # Явно задаём формат даты
+)
+
 if config.IS_PROD:
-    # Создаем обработчик, который ротирует логи каждый день в полночь
+    # Создаём обработчик с ротацией
     file_handler = TimedRotatingFileHandler(
-        filename=config.FILENAME,  # Базовое имя файла
-        when='midnight',  # Ротация каждый день в полночь
-        interval=1,  # Интервал - каждый день
-        backupCount=config.LOG_BACKUP_COUNT if hasattr(config, 'LOG_BACKUP_COUNT') else 7,
-        # Хранить 7 дней логов по умолчанию
-        encoding='UTF-8'
+        filename=config.FILENAME,
+        when='midnight',
+        interval=1,
+        backupCount=config.LOG_BACKUP_COUNT,
+        encoding='utf-8'
     )
-
     file_handler.setLevel(config.LOGGING_LEVEL)
-    file_handler.setFormatter(logging.Formatter(config.LOGGING_FORMAT))
+    file_handler.setFormatter(formatter)
 
-    # Настраиваем логгер
+    # Добавляем обработчик к основному логгеру и fastapi_logger
     logger.addHandler(file_handler)
     fastapi_logger.addHandler(file_handler)
 
-    # Убираем basicConfig, так как мы используем кастомный обработчик
-    logging.basicConfig(level=config.LOGGING_LEVEL)
+    # Устанавливаем уровень основного логгера
+    logging.getLogger().setLevel(config.LOGGING_LEVEL)
 else:
+    # Для dev-среды — консольный вывод с тем же форматом
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(config.LOGGING_LEVEL)
+    console_handler.setFormatter(formatter)
     logging.basicConfig(
         level=config.LOGGING_LEVEL,
         format=config.LOGGING_FORMAT,
-        encoding="UTF-8"
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[console_handler]
     )

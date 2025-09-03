@@ -13,10 +13,10 @@ NUM_THREADS = int(os.getenv('NUM_THREADS', 0))
 
 # Logger settings
 LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
-LOGGING_FORMAT = os.getenv('LOGGING_FORMAT', u'#%(levelname)-8s %(filename)s [LINE:%(lineno)d] [%(asctime)s]  %(message)s')
-FILENAME = os.getenv('FILENAME', f'logs/ASR-{datetime.datetime.now().date()}.log')
+LOGGING_FORMAT = '%(asctime)s %(levelname)s %(filename)s [LINE:%(lineno)d] %(message)s'
+FILENAME = os.getenv('FILENAME', f'logs/ASR.log')
 FILEMODE = os.getenv('FILEMODE', 'a')
-LOG_BACKUP_COUNT = os.getenv('LOG_BACKUP_COUNT', 180)   # Срок хранения логов в днях
+LOG_BACKUP_COUNT = int(os.getenv('LOG_BACKUP_COUNT', 180))   # Срок хранения логов в днях
 IS_PROD = True if int(os.getenv('IS_PROD', 1))==1 else False
 
 # Recognition_settings
