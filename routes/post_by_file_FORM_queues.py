@@ -49,6 +49,7 @@ async def async_receive_file(
         error_description = str(),
         raw_data = dict(),
         sentenced_data = dict(),
+        diarized_data = dict()
     )
 
     # Создаём состояние и получаем request_id
@@ -73,10 +74,18 @@ async def async_receive_file(
     except Exception as e:
         error_description = str(e)
         logger.error(f"Не удалось отправить задачу в очередь: {error_description}")
-        # Возвращаем клиенту идентификатор для отслеживания
+
         # Тут запустим цикл ожидания в states готового ответа PostFileResponse для отдачи в response
     else:
         result.success = True
 
-    return result
+
+    while True:
+        if app.state.manager.states[request_id].current_stage is None:
+            print("ВЫХОД БЛИЗКО!")
+            break
+        else:
+            await asyncio.sleep(1)
+
+    return app.state.manager.states[request_id].results
 

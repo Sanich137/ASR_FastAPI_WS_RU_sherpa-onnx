@@ -22,7 +22,8 @@ async def worker(stage: str, handler: Callable, manager: StateManager):
 
             next_stage = await manager.update_state(handler_response, stage)
 
-            await queues[next_stage].put(request_id)
+            if next_stage:
+                await queues[next_stage].put(request_id)
 
         except Exception as e:
             logger.error(f"Error in {stage}: {str(e)}")
@@ -82,13 +83,13 @@ def start_workers(manager: StateManager) -> None:
                 manager.worker_tasks = []
             manager.worker_tasks.append(task)
 
-            logger.info(f"Started {worker_name} for stage '{stage_name}'")
+            logger.debug(f"Started {worker_name} for stage '{stage_name}'")
 
     logger.info(f"Pipeline started with {len(PIPELINE_CONFIG)} stages")
 
     # Логируем детали по каждому этапу
     for stage_config in PIPELINE_CONFIG:
-        logger.info(
+        logger.debug(
             f"Stage '{stage_config.name}': "
             f"{stage_config.num_workers} worker(s), "
             f"handler={stage_config.handler.__name__}"

@@ -115,9 +115,11 @@ class PostFileResponse(BaseModel):
     :param success: Общие сведения об успешности обработки запроса
     :param error_description: Если success не True, то будет описание ошибки. Или если True могут быть варнинги
     :param raw_data: тут чистый ответ с разбивкой по словам/предложениям/общий текст.
-    :param sentenced_data: Ответ разбитый на диалоги, или только фразы, если спикер один
+    :param sentenced_data: Ответ разбитый на диалоги, или только фразы, если спикер один.
+    :param diarized_data: Результаты обработки после диаризации.
     """
     success: bool
     error_description: str
     raw_data: dict
     sentenced_data: dict
+    diarized_data: dict

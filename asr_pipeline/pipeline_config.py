@@ -1,8 +1,14 @@
-from typing import Callable, List
+from typing import Callable, Union
 import random
 import asyncio
 from asr_handlers.receive_handler import receive_handler
 from asr_handlers.convert_handler import convert_handler
+from asr_handlers.split_audio_handler import split_audio_handler
+from asr_handlers.asr_recognize_handler import asr_recognize_handler
+from asr_handlers.echo_clearing_handler import echo_clearing_handler
+from asr_handlers.diarize_handler import diarize_handler
+from asr_handlers.dialogue_handler import dialogue_handler
+from asr_handlers.return_response_handler import return_response_handler
 
 
 class PipelineStage:
@@ -10,67 +16,24 @@ class PipelineStage:
             self,
             name: str,
             handler: Callable,
-            next_stage: List[str] = None,
+            next_stage: list[str|None] = None,
             num_workers: int = 1
             ):
         self.name = name
         self.handler = handler
-        self.next_stage = next_stage or List
-        # self.definition = str
+        self.next_stage = next_stage
+        # self.definition = str # todo попробовать тут хранить условия для получения задачи в очередь в связи с params.
         self.num_workers = num_workers
 
 
 # Заглушки функций (оставлены без изменений)
-
-async def split_audio(data):
-    print(f"{"\n"}Starting split_audio: {data['raw']}")
-    await asyncio.sleep(random.uniform(0.1, 1))
-    print(f"{"\n"}Finished split_audio: {data['raw']}")
-    return {"parts": []}
-
-
-async def asr_recognize_handler(data):
-    print(f"{"\n"}Starting asr_recognize_handler: {data['raw']}")
-    await asyncio.sleep(random.uniform(2, 5))
-    print(f"{"\n"}Finished asr_recognize_handler: {data['raw']}")
-    return {"transcripts": []}
-
-async def echo_clearing_handler(data):
-    print(f"{"\n"}Starting echo_clearing_handler: {data['raw']}")
-    await asyncio.sleep(random.uniform(2, 5))
-    print(f"{"\n"}Finished echo_clearing_handler: {data['raw']}")
-    return {"transcripts": []}
-
-
-async def diarize_handler(data):
-    print(f"{"\n"}Starting diarize: {data['raw']}")
-    await asyncio.sleep(random.uniform(1, 1))
-    print(f"{"\n"}Finished diarize: {data['raw']}")
-    return {"speakers": [], "mapped": []}
-
-
-async def dialogue_handler(data):
-    print(f"{"\n"}Starting diarize: {data['raw']}")
-    await asyncio.sleep(random.uniform(1, 1))
-    print(f"{"\n"}Finished diarize: {data['raw']}")
-    return {"speakers": [], "mapped": []}
-
-
-async def punctuate_handler(data):
-    print(f"{"\n"}Starting punctuate: {data['raw']}")
-    await asyncio.sleep(random.uniform(0.1, 1))
-    print(f"{"\n"}Finished punctuate: {data['raw']}")
-    print(f"{"\n"}Finished punctuate: {data['raw']}")
-    return {"punctuated": ""}
-
-
-async def return_response(data):
-    print(f"{"\n"}Starting return_response: {data['raw']}")
-    await asyncio.sleep(random.uniform(0.1, 1))
-    print(f"{"\n"}Finished return_response: {data['raw']}")
-    return data
-
-
+# Пунктуация совмещена с посторением диалога. Посотмрим, может быть разделить
+# async def punctuate_handler(data):
+#     print(f"{"\n"}Starting punctuate: {data['raw']}")
+#     await asyncio.sleep(random.uniform(0.1, 1))
+#     print(f"{"\n"}Finished punctuate: {data['raw']}")
+#     print(f"{"\n"}Finished punctuate: {data['raw']}")
+#     return {"punctuated": ""}
 
 
 # Все этапы в одном месте
@@ -92,7 +55,7 @@ PIPELINE_CONFIG = [
         ),
     PipelineStage(
         name="split",
-        handler=split_audio,
+        handler=split_audio_handler,
         next_stage=["asr"],
         num_workers=1
         ),
@@ -117,19 +80,21 @@ PIPELINE_CONFIG = [
     PipelineStage(
         name="dialogue",
         handler=dialogue_handler,
-        next_stage=["punctuate"],
-        num_workers=1
-        ),
-    PipelineStage(
-        name="punctuate",
-        handler=punctuate_handler,
         next_stage=["response"],
         num_workers=1
         ),
+    # Пунктуация совмещена с построением диалога. Посмотрим, может быть разделить
+    # PipelineStage(
+    #     name="punctuate",
+    #     handler=punctuate_handler,
+    #     next_stage=["response"],
+    #     num_workers=1
+    #     ),
     PipelineStage(
         name="response",
-        handler=return_response,
-        num_workers=1
+        handler=return_response_handler,
+        next_stage=[None],
+        num_workers=1,
         )
     ]
 

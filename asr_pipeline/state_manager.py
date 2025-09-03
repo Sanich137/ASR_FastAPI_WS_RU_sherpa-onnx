@@ -46,8 +46,11 @@ class StateManager:
             current_stage="receive",
             results=result,
             next_stage="convert",
-            stage_results=init_data
+            stage_results=init_data,
+            created_at=time.time(),
+            processing_time=time.time(), # Todo Обновлять на каждой смене очереди
         )
+
         self.states[request_id] = state
 
         logger.info(f"Created state for request {request_id}")
@@ -69,7 +72,8 @@ class StateManager:
         else:
             self.states[handler_response.request_id] = handler_response
 
-        # Определяем следующие этапы через роутер. Если предыдущий результат завершился не удачно, возвращаем ответ.
+        # Определяем следующие этапы через роутер.
+        # Если предыдущий результат завершился не удачно, возвращаем ответ.
         if state.results.success:
             state.next_stage = self.router.get_next_stage(stage, params=handler_response.params)
         else:
@@ -77,10 +81,11 @@ class StateManager:
 
         # Если это финальный этап, фиксируем время обработки
         if not state.next_stage:
-            state.results["processing_time"] = time.time() - state.created_at
+            state.current_stage = None
+            state.processing_time = time.time() - state.created_at
             logger.info(
                 f"Request {handler_response.request_id} completed. "
-                f"Total processing time: {state.results['processing_time']:.2f}s"
+                f"Total processing time: {state.processing_time:.2f} s"
             )
 
         logger.info(f"Updated state for {handler_response.request_id}: {stage} → {state.next_stage}")

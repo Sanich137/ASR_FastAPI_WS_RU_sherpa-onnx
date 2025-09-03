@@ -127,7 +127,6 @@ async def do_sensitizing(input_asr_json: str, do_punctuation: bool = False):
                             continue
 
                     if do_punctuation:
-
                         text = await sbertpunc.punctuate(' '.join(str(word) for word in sentences))
                     else:
                         text = ' '.join(str(word) for word in sentences)

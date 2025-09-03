@@ -10,7 +10,6 @@ class PipelineRouter:
         stage = self.config_map[current_stage]
         logger.info(f"для определения следующего этапа получено stage.name: {stage.name}")
 
-
         # Todo можно попробовать внести в PIPELINE_CONFIG отсылку на params и if/else сократится до одного условия
         next_stage = self.config_map[stage.name].next_stage[0]
 

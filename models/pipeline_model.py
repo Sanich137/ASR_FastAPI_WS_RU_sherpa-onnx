@@ -10,8 +10,9 @@ import time
 class ProcessingState(BaseModel):
     request_id: UUID
     params: PostFileRequest
-    current_stage: str
-    stage_results: dict
-    next_stage: str
+    current_stage: str | None
+    stage_results: dict | list
+    next_stage: str | None
     results: PostFileResponse
-    created_at: float = time.time()
+    processing_time: float
+    created_at: float

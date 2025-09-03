@@ -1,6 +1,5 @@
 import datetime
 import asyncio
-import os
 import numpy as np
 from pydub import AudioSegment
 from pathlib import Path
@@ -14,7 +13,6 @@ import time
 from umap import UMAP
 from hdbscan import HDBSCAN
 from utils.do_logging import logger
-from utils.pre_start_init import paths
 from utils.resamppling import resample_audiosegment
 
 

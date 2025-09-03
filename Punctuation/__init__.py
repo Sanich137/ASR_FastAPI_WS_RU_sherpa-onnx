@@ -1,4 +1,4 @@
-from utils.pre_start_init import paths
+from utils.globals import paths
 from utils.do_logging import logger
 from .punctuate import SbertPuncCaseOnnx
 import config

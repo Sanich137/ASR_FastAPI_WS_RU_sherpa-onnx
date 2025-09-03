@@ -1,4 +1,3 @@
-from numba.experimental.function_type import typeof_function_type
 from pydub import AudioSegment
 import config
 import asyncio
