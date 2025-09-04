@@ -1,17 +1,13 @@
 from utils.do_logging import logger
 from utils.bytes_to_samples_audio import get_np_array_samples_float32
 
-from utils.globals import (audio_overlap,
-                          audio_buffer,
-                          audio_to_asr,
-                                  )
 from VoiceActivityDetector import vad
 from utils.resamppling import resample_audiosegment
 
 import numpy as np
 from pydub import AudioSegment
 
-async def find_last_speech_position(socket_id, is_last_chunk):
+async def find_last_speech_position(audio_buffer,audio_overlap, is_last_chunk):
     """
     1. Берём собранное аудио, добавляем в начало overlap
     2. Конвертируем его в np.float32
@@ -22,23 +18,23 @@ async def find_last_speech_position(socket_id, is_last_chunk):
     """
 
     if is_last_chunk:
-        audio_to_asr[socket_id].append(audio_overlap[socket_id] + audio_buffer[socket_id])
+        audio_to_asr = (audio_overlap + audio_buffer)
     else:
-        frame_rate = audio_buffer[socket_id].frame_rate
+        frame_rate = audio_buffer.frame_rate
         # 16000 - битрейт, требуемый Silero VAD
         silero_bitrate = 16000
 
         # Проверка входного аудио
-        if not audio_buffer[socket_id]:
+        if not audio_buffer:
             logger.error("Ошибка: audio_buffer пустой")
             raise ValueError("audio_buffer не может быть пустым")
 
-        if audio_buffer[socket_id].frame_rate != silero_bitrate:
-            audio_for_vad = await resample_audiosegment(audio_buffer[socket_id], silero_bitrate)
+        if audio_buffer.frame_rate != silero_bitrate:
+            audio_for_vad = await resample_audiosegment(audio_buffer, silero_bitrate)
         else:
-            audio_for_vad = audio_buffer[socket_id]
+            audio_for_vad = audio_buffer
 
-        logger.debug(f"Получено из буфера на обработку аудио продолжительностью {audio_buffer[socket_id].duration_seconds}")
+        logger.debug(f"Получено из буфера на обработку аудио продолжительностью {audio_buffer.duration_seconds}")
 
         # Переводим в float32 для VAD
         try:
@@ -71,7 +67,7 @@ async def find_last_speech_position(socket_id, is_last_chunk):
         speech_end = len(audio)
         partial_frame_length = 0
 
-        # Разделение на фрагменты
+        # для анализа берём не больше 1/3 аудио с конца. Если всё это речь, то отдаём весь чанк в распознавание
         frames = [audio[i:i + frame_length] for i in range(int(len(audio)//3), len(audio), frame_length)]
         logger.debug(f"Создано фреймов: {len(frames)}, frame_length={frame_length}")
 
@@ -113,12 +109,12 @@ async def find_last_speech_position(socket_id, is_last_chunk):
 
         separation_time = int(speech_end * 1000 / silero_bitrate)
         # Todo - в качестве оптимизации расхода памяти в audio_to_asr и audio_overlap можно хранить не аудио а время начала и окончания чанка.
-        audio_to_asr[socket_id].append(audio_overlap[socket_id] + audio_buffer[socket_id][:separation_time])
-        audio_overlap[socket_id] = audio_buffer[socket_id][separation_time:]
+        audio_to_asr = audio_overlap + audio_buffer[:separation_time]
+        audio_overlap = audio_buffer[separation_time:]
 
-        logger.debug(f"Передано на ASR аудио продолжительностью {audio_to_asr[socket_id][-1].duration_seconds}")
-        logger.debug(f"Передано в перекрытие аудио продолжительностью {audio_overlap[socket_id].duration_seconds}")
+        logger.debug(f"Передано на ASR аудио продолжительностью {audio_to_asr.duration_seconds}")
+        logger.debug(f"Передано в перекрытие аудио продолжительностью {audio_overlap.duration_seconds}")
 
-        audio_buffer[socket_id] = AudioSegment.silent(1, frame_rate)
+        audio_buffer = AudioSegment.silent(1, frame_rate)
 
-    return audio_to_asr[socket_id][-1]
+    return audio_to_asr, audio_overlap

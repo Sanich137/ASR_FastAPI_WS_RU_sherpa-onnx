@@ -17,13 +17,16 @@ class PipelineStage:
             name: str,
             handler: Callable,
             next_stage: list[str|None] = None,
-            num_workers: int = 1
+            num_workers: int = 1,
+            extra_args = None
             ):
         self.name = name
         self.handler = handler
         self.next_stage = next_stage
         # self.definition = str # todo попробовать тут хранить условия для получения задачи в очередь в связи с params.
         self.num_workers = num_workers
+        self.extra_args = extra_args or {}  # Словарь с дополнительными аргументами
+
 
 
 # Заглушки функций (оставлены без изменений)
@@ -45,43 +48,44 @@ PIPELINE_CONFIG = [
         name="receive",
         handler=receive_handler,
         next_stage=["convert"],
-        num_workers=1
+        num_workers=5
         ),
     PipelineStage(
         name="convert",
         handler=convert_handler,
         next_stage=["split"],
-        num_workers=1
+        num_workers=5
         ),
     PipelineStage(
         name="split",
         handler=split_audio_handler,
         next_stage=["asr"],
-        num_workers=1
+        num_workers=5
         ),
     PipelineStage(
         name="asr",
         handler=asr_recognize_handler,
         next_stage=["echo_clearing"],
-        num_workers=1
+        num_workers=2,
+        extra_args={"recognizer": None}
         ),
     PipelineStage(
         name="echo_clearing",
         handler=echo_clearing_handler,
         next_stage=["diarize"],
-        num_workers=1
+        num_workers=5
         ),
     PipelineStage(
         name="diarize",
         handler=diarize_handler,
         next_stage=["dialogue"],
-        num_workers=1
+        num_workers=5
         ),
     PipelineStage(
         name="dialogue",
         handler=dialogue_handler,
         next_stage=["response"],
-        num_workers=1
+        num_workers=5
         ),
     # Пунктуация совмещена с построением диалога. Посмотрим, может быть разделить
     # PipelineStage(

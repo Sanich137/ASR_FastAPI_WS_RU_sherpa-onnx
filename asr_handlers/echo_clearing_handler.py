@@ -9,7 +9,7 @@ from models.pipeline_model import ProcessingState
 
 async def echo_clearing_handler(data: ProcessingState) -> ProcessingState:
     data.results.success = False
-    logger.info(f'Получено задание в echo_clearing_handler')  # post_asr_production
+    logger.debug(f'Получено задание в echo_clearing_handler')  # post_asr_production
 
     try:
         data.results.raw_data = await remove_echo(data.results.raw_data)
@@ -21,6 +21,6 @@ async def echo_clearing_handler(data: ProcessingState) -> ProcessingState:
     else:
         data.results.success = True
 
-    logger.info(f'Возвращено задание из echo_clearing_handler')
+    logger.debug(f'Возвращено задание из echo_clearing_handler')
 
     return data

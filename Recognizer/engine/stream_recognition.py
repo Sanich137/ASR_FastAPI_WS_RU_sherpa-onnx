@@ -1,13 +1,20 @@
 from datetime import datetime as dt
+import sherpa_onnx
+import numpy as np
 import ujson
 import asyncio
 from collections import defaultdict
 import config
-from Recognizer import recognizer
-from utils.bytes_to_samples_audio import get_np_array_samples_float32
+from Recognizer import get_recognizer
+from utils.bytes_to_samples_audio import get_np_array_samples_float32, get_cupy_array_samples_float32
 from utils.resamppling import resample_audiosegment
 from utils.slow_down_audio import do_slow_down_audio
 from utils.do_logging import logger
+
+import cupy as cp
+cp_stream = cp.cuda.Stream()
+
+
 
 def calc_speed(data):
     time_to_speak_tokens = 0
@@ -108,10 +115,11 @@ async def recognise_w_calculate_confidence(audio_data,
     # Возвращаем результат в формате JSON
     return result
 
-async def simple_recognise(audio_data, ) -> dict:
+async def simple_recognise(audio_data, recognizer: sherpa_onnx.OfflineRecognizer = None) -> dict:
     """
     Собираем токены в слова дополнительных вычислений не производит.
 
+    :param recognizer:
     :param audio_data: Аудиоданные в формате Audiosegment (puDub).
     :return: json =
         {
@@ -169,18 +177,32 @@ async def simple_recognise(audio_data, ) -> dict:
     return result
 
 
-async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_slow_down = False,
-                                       ) -> tuple:
+async def recognise_w_speed_correction(
+    audio_data,
+    multiplier: float = 1.0,
+    can_slow_down: bool = False,
+    recognizer: sherpa_onnx.OfflineRecognizer = None,
+    attempt: int = 0  # Добавляем счетчик попыток
+) -> tuple:
     """
     Распознавание чанка с возможностью контроля быстрой речи.
 
+    :param recognizer: sherpa_onnx
     :param multiplier: Float
     :param can_slow_down: Boolean
     :param audio_data: Аудиоданные в формате Audiosegment (puDub).
     :return: Dict
     """
+    MAX_ATTEMPTS = 2  # Максимальное количество попыток
+
+
+    if attempt >= MAX_ATTEMPTS:
+        logger.warning("Превышено максимальное количество попыток распознавания")
+
+        return {}, 0, multiplier
 
     speed = 0
+
     if can_slow_down and multiplier < 1:
         logger.debug(f"Обработка быстрой речи с коэффициентом: {multiplier:.2f}")
         audio_data = await do_slow_down_audio(audio_segment=audio_data,slowdown_rate=multiplier)
@@ -191,20 +213,23 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
         audio_data = await resample_audiosegment(audio_data, config.BASE_SAMPLE_RATE)
 
     # перевод в семплы для распознавания.
+    # samples = await get_cupy_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
+    # # перевод в семплы для распознавания.
     samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
 
-    # Распознавание в отдельном потоке
-    def decode_in_thread():
-        stream = recognizer.create_stream()
+    # Дополняем нулями, чтобы в модель отдавать одной длины чанки.
+    current_length = len(samples)
+    target_length = audio_data.frame_rate * (config.MAX_OVERLAP_DURATION + 2)
+    padding = target_length - current_length
+    logger.debug(f"Дополняем аудио нулями (+{padding} сэмплов)")
+    samples = np.pad(samples, (0, padding), mode='constant')
 
-        # передали аудиофрагмент на распознавание
-        stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
-        recognizer.decode_stream(stream)
-        r = str(stream.result)
-        del stream
-        return r
-
-    result_json = await asyncio.to_thread(decode_in_thread)
+    # Создаем стрим и распознаем
+    stream = recognizer.create_stream()
+    stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
+    recognizer.decode_stream(stream)
+    result_json = str(stream.result)
+    del stream
 
     # Парсим результат
     result = ujson.loads(result_json)
@@ -214,13 +239,12 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
         logger.debug(f"Скорость аудио {speed} единиц в секунду")
         if speed > config.SPEECH_PER_SEC_NORM_RATE:
             # print(max((config.SPEECH_PER_SEC_NORM_RATE - 1) / speed, 0.8))
-
             result, speed, multiplier = await recognise_w_speed_correction(audio_data=audio_data,
                                                can_slow_down=True,
-                                               multiplier=max((config.SPEECH_PER_SEC_NORM_RATE-1)/speed, 0.8)
-                                                                           )
-    samples = None
-    audio_data = None
+                                               multiplier=max((config.SPEECH_PER_SEC_NORM_RATE-1)/speed, 0.8),
+                                               recognizer=recognizer,
+                                               attempt=attempt + 1 # Увеличиваем счетчик попыток
+                                                   )
     return result, speed, multiplier
 
 # Наработки по распознавания батчем. Не хватает памяти. Прироста скорости найти не удаётся

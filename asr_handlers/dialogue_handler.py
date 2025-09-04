@@ -4,7 +4,7 @@ from Recognizer.engine.sentensizer import do_sensitizing
 
 
 async def dialogue_handler(data: ProcessingState) -> ProcessingState:
-    logger.info(f'Получено задание в dialogue_handler')  # post_asr_production
+    logger.debug(f'Получено задание в dialogue_handler')  # post_asr_production
     params = data.params
     data.results.success = False
 
@@ -30,6 +30,6 @@ async def dialogue_handler(data: ProcessingState) -> ProcessingState:
     else:
         data.results.sentenced_data.clear()
 
-    logger.info(f'Возвращено задание из dialogue_handler')
+    logger.debug(f'Возвращено задание из dialogue_handler')
 
     return data

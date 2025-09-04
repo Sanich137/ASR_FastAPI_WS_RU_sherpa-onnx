@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 from uuid import UUID, uuid4
-from models.pipeline_model import ProcessingState
+from models.pipeline_model import ProcessingState, StageResults
 from models.fast_api_models import PostFileRequest, SyncASRRequest
 from asr_pipeline.routing import PipelineRouter
 
@@ -30,7 +30,7 @@ class StateManager:
 
         logger.info("StateManager initialized with PipelineRouter")
 
-    async def create_state(self, result, init_data: dict, params: PostFileRequest) -> UUID:
+    async def create_state(self, result, init_data: StageResults, params: PostFileRequest) -> UUID:
         """
         Создаёт новое состояние для запроса.
 
@@ -39,6 +39,7 @@ class StateManager:
         :param params: Параметры обработки от пользователя.
         :return: Уникальный идентификатор запроса.
         """
+
         request_id = uuid4()
         state = ProcessingState(
             request_id=request_id,
@@ -53,7 +54,7 @@ class StateManager:
 
         self.states[request_id] = state
 
-        logger.info(f"Created state for request {request_id}")
+        logger.debug(f"Created state for request {request_id}")
         return request_id
 
     async def update_state(self, handler_response: ProcessingState, stage: str) -> str:
@@ -88,7 +89,7 @@ class StateManager:
                 f"Total processing time: {state.processing_time:.2f} s"
             )
 
-        logger.info(f"Updated state for {handler_response.request_id}: {stage} → {state.next_stage}")
+        logger.debug(f"Updated state for {handler_response.request_id}: {stage} → {state.next_stage}")
         return state.next_stage
 
     async def get_state(self, request_id: UUID) -> Optional[ProcessingState]:

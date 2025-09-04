@@ -2,7 +2,6 @@ import datetime
 
 import config
 from Diarisation.do_diarize import load_and_preprocess_audio
-from utils.globals import posted_and_downloaded_audio
 from utils.do_logging import logger
 
 from collections import defaultdict
@@ -11,16 +10,16 @@ if config.CAN_DIAR:
     from Diarisation import diarizer
 
 async def do_diarizing(
-        file_id:str,
+        audio,
         asr_raw_data,
         num_speakers:int = -1,
         filter_cutoff:int = 50,
         filter_order:int = 10,
-        diar_vad_sensity: int = 3
+        diar_vad_sensity: int = 3,
         ):
     # Предобработка аудио.
     # ВАЖНЫЙ момент. Мы диаризируем только последний канал.
-    audio_frames = await load_and_preprocess_audio(posted_and_downloaded_audio[file_id].split_to_mono()[-1])
+    audio_frames = await load_and_preprocess_audio(audio.split_to_mono()[-1])
 
     logger.debug("Старт процесса диаризации.")
     st=datetime.datetime.now()

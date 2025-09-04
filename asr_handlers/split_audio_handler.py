@@ -1,6 +1,6 @@
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
-from utils.globals import posted_and_downloaded_audio, audio_buffer, audio_overlap, audio_duration, audio_to_asr
+
 from models.pipeline_model import ProcessingState
 from pydub import AudioSegment
 from config import BASE_SAMPLE_RATE, MAX_OVERLAP_DURATION
@@ -8,19 +8,19 @@ from config import BASE_SAMPLE_RATE, MAX_OVERLAP_DURATION
 
 async def split_audio_handler(data: ProcessingState) -> ProcessingState:
     data.results.success = False
-    request_id = data.request_id
-    splitted_chank = None
-    list_of_audio = list()
-    logger.info(f'Получено задание в split_audio_handler')
-    audio_to_asr[request_id] = list()
+
+    posted_and_downloaded_audio = data.stage_results.posted_and_downloaded_audio
+
+    list_of_audio_to_asr = list()
+    logger.debug(f'Получено задание в split_audio_handler')
+
     # Обрабатываем чанки с аудио по N секунд
-    for n_channel, mono_data in enumerate(posted_and_downloaded_audio[request_id].split_to_mono()):
+    for n_channel, mono_data in enumerate(posted_and_downloaded_audio.split_to_mono()):
         # Подготовительные действия
-        list_of_audio.append(list())
+        list_of_audio_to_asr.append(list())
         try:
-            audio_buffer[request_id] = AudioSegment.silent(1, frame_rate=BASE_SAMPLE_RATE)
-            audio_overlap[request_id] = AudioSegment.silent(1, frame_rate=BASE_SAMPLE_RATE)
-            audio_duration[request_id] = 0
+            audio_overlap = AudioSegment.silent(1, frame_rate=BASE_SAMPLE_RATE) # Это "хвост" аудио после VAD
+            audio_duration = 0
         except Exception as e:
             error_description = f"Ошибка изменения фреймрейта - {e}"
             logger.error(error_description)
@@ -32,18 +32,18 @@ async def split_audio_handler(data: ProcessingState) -> ProcessingState:
 
         try:
             # Основной процесс перебора чанков для распознавания
-            overlaps = list(mono_data[::MAX_OVERLAP_DURATION * 1000])  # Чанки аудио для распознавания
-            total_chunks = len(overlaps)  # Количество чанков, для поиска последнего
-            for idx, overlap in enumerate(overlaps):
+            audio_chunks = list(mono_data[::MAX_OVERLAP_DURATION * 1000])  # Чанки аудио для распознавания
+            total_chunks = len(audio_chunks)  # Количество чанков, для поиска последнего
+            for idx, audio_chunk in enumerate(audio_chunks):
                 is_last_chunk = (idx == total_chunks - 1)  # Если чанк последний
-                if (audio_overlap[request_id].duration_seconds + overlap.duration_seconds) < MAX_OVERLAP_DURATION:
+                if (audio_overlap.duration_seconds + audio_chunk.duration_seconds) < MAX_OVERLAP_DURATION:
                     silent_secs = MAX_OVERLAP_DURATION - (
-                                audio_overlap[request_id].duration_seconds + overlap.duration_seconds)
-                    overlap += AudioSegment.silent(silent_secs, frame_rate=BASE_SAMPLE_RATE)
-                audio_buffer[request_id] = overlap
+                                audio_overlap.duration_seconds + audio_chunk.duration_seconds)
+                    audio_chunk += AudioSegment.silent(silent_secs, frame_rate=BASE_SAMPLE_RATE)
 
                 # Последний чанк обрабатывается иначе.
-                list_of_audio[n_channel].append(await find_last_speech_position(request_id, is_last_chunk))
+                audio_to_asr, audio_overlap = await find_last_speech_position(audio_chunk, audio_overlap, is_last_chunk)
+                list_of_audio_to_asr[n_channel].append(audio_to_asr)
 
         except Exception as e:
             error_description = f"При разделении аудио на чанки: {e}"
@@ -52,15 +52,15 @@ async def split_audio_handler(data: ProcessingState) -> ProcessingState:
             return data
 
         else:
-            audio_to_asr[request_id].clear()
+            del audio_to_asr
             data.results.success = True
 
-    audio_to_asr[request_id] = list_of_audio
+    data.stage_results.audio_to_asr =  list_of_audio_to_asr
 
-    logger.info(f'Возвращено задание из split_audio_handler')
+    logger.debug(f'Возвращено задание из split_audio_handler')
 
     del mono_data
-    del overlaps
-    del list_of_audio
+    del audio_chunks
+    del list_of_audio_to_asr
 
     return data
