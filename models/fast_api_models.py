@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl, Field
-from typing import Union, Annotated
+from typing import Union, Annotated, Optional
 from fastapi import UploadFile
 
 import config
@@ -35,6 +35,7 @@ class PostFileRequest(BaseModel):
     :param do_dialogue: Собирает из распознанного текста фразы, разделённые более длинным молчанием,
     чем некое среднее значение.
     :param do_punctuation: Расставляет пунктуацию.
+    :key save_file: если True, то будет сохранять результат распознавания в папку after_asr. Применять для FileHandler
     """
     keep_raw: Union[bool, None] = True
     do_echo_clearing: Union[bool, None] = False
@@ -45,7 +46,6 @@ class PostFileRequest(BaseModel):
     diar_vad_sensity: int = 3
     do_auto_speech_speed_correction: Union[bool, None] = config.DO_SPEED_SPEECH_CORRECTION
     speech_speed_correction_multiplier: float = config.SPEED_SPEECH_CORRECTION_MULTIPLIER
-
 
 
 

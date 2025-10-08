@@ -1,8 +1,7 @@
 import asyncio
 from fastapi import HTTPException
 from utils.pre_start_init import app
-from utils.do_logging import logger
-from asr_pipeline.worker import queues
+# from asr_pipeline.worker import queues
 
 from utils.do_logging import logger
 from models.fast_api_models import PostFileRequest, PostFileResponse

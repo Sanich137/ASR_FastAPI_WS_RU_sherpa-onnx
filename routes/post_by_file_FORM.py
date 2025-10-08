@@ -8,7 +8,7 @@ from fastapi import Depends, File, Form, UploadFile
 from threading import Lock
 
 # Глобальный лок для потокобезопасности
-audio_lock = Lock()
+# audio_lock = Lock()
 
 # Функция для извлечения параметров из FormData
 def get_file_request(

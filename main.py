@@ -1,10 +1,9 @@
 from utils.do_logging import logger
 import uvicorn
 import config
-from utils.pre_start_init import app
 import routes, models
 from fastapi.openapi.utils import get_openapi
-
+from utils.pre_start_init import app
 
 def custom_openapi():
     openapi_schema = get_openapi(
@@ -39,11 +38,10 @@ def custom_openapi():
     return openapi_schema
 
 
-
-
 try:
     if __name__ == '__main__':
         app.openapi = custom_openapi
+
         uvicorn.run(app, host=config.HOST, port=config.PORT)
 except KeyboardInterrupt:
     logger.info('\nDone')

@@ -217,12 +217,12 @@ async def recognise_w_speed_correction(
     # # перевод в семплы для распознавания.
     samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
 
-    # Дополняем нулями, чтобы в модель отдавать одной длины чанки.
-    current_length = len(samples)
-    target_length = audio_data.frame_rate * (config.MAX_OVERLAP_DURATION + 2)
-    padding = target_length - current_length
-    logger.debug(f"Дополняем аудио нулями (+{padding} сэмплов)")
-    samples = np.pad(samples, (0, padding), mode='constant')
+    # # Дополняем нулями, чтобы в модель отдавать одной длины чанки.
+    # current_length = len(samples)
+    # target_length = int(audio_data.frame_rate * (config.MAX_OVERLAP_DURATION/0.7))
+    # padding = target_length - current_length
+    # logger.debug(f"Дополняем аудио нулями (+{padding} сэмплов)")
+    # samples = np.pad(samples, (0, padding), mode='constant')
 
     # Создаем стрим и распознаем
     stream = recognizer.create_stream()
@@ -235,6 +235,7 @@ async def recognise_w_speed_correction(
     result = ujson.loads(result_json)
 
     if can_slow_down and multiplier == 1:
+        # Todo - проверить функцию расчёта скорости.
         speed = calc_speed(result)
         logger.debug(f"Скорость аудио {speed} единиц в секунду")
         if speed > config.SPEECH_PER_SEC_NORM_RATE:

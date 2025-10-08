@@ -7,7 +7,7 @@ from models.pipeline_model import ProcessingState
 
 async def convert_handler(data: ProcessingState) -> ProcessingState:
 
-    logger.debug(f'Получено задание в convert_handler')
+    logger.info(f'Получено задание в convert_handler')
     data.results.success = False
     request_id = data.request_id
     params =  data.params
@@ -57,6 +57,6 @@ async def convert_handler(data: ProcessingState) -> ProcessingState:
         data.stage_results.posted_and_downloaded_audio = posted_and_downloaded_audio
         data.results.success = True
 
-    logger.debug(f'Получен ответ в convert_handler')
+    logger.info(f'Получен ответ в convert_handler')
 
     return data

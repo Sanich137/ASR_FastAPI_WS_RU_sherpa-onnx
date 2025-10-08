@@ -7,8 +7,8 @@ import io
 
 from pydub import AudioSegment
 
-from utils.pre_start_init import posted_and_downloaded_audio
-from utils.pre_start_init import paths
+from utils.globals import posted_and_downloaded_audio
+from utils.globals import paths
 
 async def getting_audiofile(file_url, post_id) -> [bool, str]:
     res = False

@@ -1,7 +1,8 @@
 import uuid
 import asyncio
 import os
-from utils.pre_start_init import app, posted_and_downloaded_audio
+from utils.pre_start_init import app
+from utils.globals import posted_and_downloaded_audio
 from utils.do_logging import logger
 from utils.get_audio_file import getting_audiofile, open_default_audiofile
 from models.fast_api_models import SyncASRRequest
@@ -11,7 +12,7 @@ from io import BytesIO
 
 
 # Глобальный лок для потокобезопасности
-audio_lock = Lock()
+# audio_lock = Lock()
 
 @app.post("/post_one_step_req")
 async def post(params: SyncASRRequest):

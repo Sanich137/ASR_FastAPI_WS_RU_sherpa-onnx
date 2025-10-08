@@ -1,4 +1,4 @@
-from utils.pre_start_init import app
+from main import app
 import config
 
 @app.get("/")

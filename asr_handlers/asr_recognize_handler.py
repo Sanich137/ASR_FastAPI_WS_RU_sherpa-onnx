@@ -58,6 +58,6 @@ async def asr_recognize_handler(data: ProcessingState, recognizer: sherpa_onnx.O
     else:
         data.results.success = True
 
-    logger.debug(f'Возвращено задание из asr_recognize_handler')
+    logger.info(f'Возвращено задание из asr_recognize_handler')
     return data
 

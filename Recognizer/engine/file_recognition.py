@@ -3,7 +3,7 @@ import config
 import asyncio
 import uuid
 from utils.tokens_to_Result import process_asr_json, process_gigaam_asr
-from utils.pre_start_init import (
+from utils.globals import (
     posted_and_downloaded_audio,
     audio_buffer,
     audio_overlap,
@@ -20,7 +20,7 @@ from Diarisation.diarazer import do_diarizing
 from threading import Lock
 
 # Глобальный лок для потокобезопасности
-audio_lock = Lock()
+# audio_lock = Lock()
 
 def process_file(tmp_path, params):
     res = False

@@ -3,7 +3,6 @@ import logging
 import datetime
 import os
 import pynvml
-from utils.pre_start_init import audio_to_asr
 
 
 def get_gpu_free_memory():
@@ -26,7 +25,7 @@ def get_gpu_free_memory():
 async def check_if_service_is_alive():
 
     logging.info('GET_is_alive')
-    tasks_in_work = len(audio_to_asr)
+    tasks_in_work = "Временно отключено"
 
     free_mb, gpu_load,temperature = get_gpu_free_memory()
 

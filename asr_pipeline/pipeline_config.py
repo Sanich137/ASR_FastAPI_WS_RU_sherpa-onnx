@@ -18,11 +18,13 @@ class PipelineStage:
             handler: Callable,
             next_stage: list[str|None] = None,
             num_workers: int = 1,
+            worker_type: str = "async",
             extra_args = None
             ):
         self.name = name
         self.handler = handler
         self.next_stage = next_stage
+        self.worker_type = worker_type  # или "process"
         # self.definition = str # todo попробовать тут хранить условия для получения задачи в очередь в связи с params.
         self.num_workers = num_workers
         self.extra_args = extra_args or {}  # Словарь с дополнительными аргументами
@@ -48,44 +50,52 @@ PIPELINE_CONFIG = [
         name="receive",
         handler=receive_handler,
         next_stage=["convert"],
-        num_workers=5
-        ),
+        num_workers=1,
+        worker_type="async",  # или "process"
+
+    ),
     PipelineStage(
         name="convert",
         handler=convert_handler,
         next_stage=["split"],
-        num_workers=5
+        num_workers=1,
+        worker_type="async",  # или "process"
         ),
     PipelineStage(
         name="split",
         handler=split_audio_handler,
         next_stage=["asr"],
-        num_workers=5
+        num_workers=1,
+        worker_type="async",  # или "process"
         ),
     PipelineStage(
         name="asr",
         handler=asr_recognize_handler,
         next_stage=["echo_clearing"],
-        num_workers=2,
-        extra_args={"recognizer": None}
+        num_workers=1,
+        extra_args={"recognizer": None},
+        worker_type="process",  # или "process"
         ),
     PipelineStage(
         name="echo_clearing",
         handler=echo_clearing_handler,
         next_stage=["diarize"],
-        num_workers=5
+        num_workers=1,
+        worker_type="async",  # или "process"
         ),
     PipelineStage(
         name="diarize",
         handler=diarize_handler,
         next_stage=["dialogue"],
-        num_workers=5
+        num_workers=1,
+        worker_type="async",  # или "process"
         ),
     PipelineStage(
         name="dialogue",
         handler=dialogue_handler,
         next_stage=["response"],
-        num_workers=5
+        num_workers=1,
+        worker_type="async",  # или "process"
         ),
     # Пунктуация совмещена с построением диалога. Посмотрим, может быть разделить
     # PipelineStage(
