@@ -64,7 +64,7 @@ ENV BASE_SAMPLE_RATE=16000 \
     DIAR_API_URL=https://modelscope.cn/api/v1/datasets/wenet/wespeaker_pretrained_models/oss/tree \
     DO_LOCAL_FILE_RECOGNITIONS=0 \
     DELETE_LOCAL_FILE_AFTR_ASR=0 \
-    PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx
+    PYTHONPATH=/ASR_FastAPI_WS_RU_sherpa-onnx \
     MAKE_MONO=1
 
 # Скачивание модели.
