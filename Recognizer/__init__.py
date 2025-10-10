@@ -77,7 +77,7 @@ elif config.MODEL_NAME=="Gigaam_rnnt":
         joiner=str(paths.get("gigaam_rnnt_joiner_path")),
         tokens=str(paths.get("gigaam_rnnt_tokens_path")),
         feature_dim=64,
-        num_threads=4,    #config.NUM_THREADS,
+        num_threads=config.NUM_THREADS,
         dither=0.00003,
         sample_rate=config.BASE_SAMPLE_RATE,
         decoding_method="greedy_search",
@@ -88,7 +88,24 @@ elif config.MODEL_NAME=="Gigaam_rnnt":
         model_type="nemo_transducer",
         debug=True if config.LOGGING_LEVEL == "DEBUG" else False,
     )
+elif config.MODEL_NAME=="Vosk5":
+    recognizer = sherpa_onnx.OfflineRecognizer.from_transducer(
+        encoder=str(paths.get("vosk_full_encoder_path")),
+        decoder=str(paths.get("vosk_full_decoder_path")),
+        joiner=str(paths.get("vosk_full_joiner_path")),
+        tokens=str(paths.get("vosk_full_tokens_path")),
+        feature_dim=80,
+        num_threads=config.NUM_THREADS,
+        dither=0.00003,
+        sample_rate=config.BASE_SAMPLE_RATE,
+        decoding_method="greedy_search",
+        modeling_unit="cjkchar",  # по умолчанию "cjkchar" пишут что надо только для горячих слов
+        # bpe_vocab=str(model_settings.get("bpe_vocab")), # Указан, но кажется не работает без hotwords
+        lm_scale=0.2,  # по умолчанию 0.1
+        provider=config.PROVIDER,
+        debug=True if config.LOGGING_LEVEL == "DEBUG" else False,
 
+    )
 elif config.MODEL_NAME== "Whisper":
     recognizer = sherpa_onnx.OfflineRecognizer.from_whisper(
         encoder=str(model_settings.get("encoder")),

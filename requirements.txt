@@ -21,8 +21,8 @@ psutil~=7.0.0
 
 # For ASR
 -f https://k2-fsa.github.io/sherpa/onnx/cuda.html
-sherpa-onnx==1.12.7+cuda
-onnxruntime-gpu==1.17.1
+sherpa-onnx==1.12.14+cuda12.cudnn
+onnxruntime-gpu[cuda,cudnn]==1.22
 
 librosa~=0.11.0
 
@@ -34,8 +34,7 @@ scikit-learn~=1.5.2
 python_speech_features
 umap-learn~=0.5.7
 hdbscan~=0.8.40
-cupy-cuda11x  # Учитывайте используемую версию cuda.
-# cupy-cuda12x  # Учитывайте используемую версию cuda.
+cupy-cuda12x  # Учитывайте используемую версию cuda.
 
 
 # for VAD
