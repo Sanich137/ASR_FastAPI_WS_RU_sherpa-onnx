@@ -24,7 +24,7 @@ from Recognizer.engine.stream_recognition import recognise_w_calculate_confidenc
 async def websocket(ws: WebSocket):
     wait_null_answers=True
     client_id = uuid.uuid4()
-    logger.info(f'Принят новый сокет id = {client_id}')
+    logger.debug(f'Принят новый сокет id = {client_id}')
     audio_buffer[client_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
     audio_overlap[client_id] = AudioSegment.silent(1, frame_rate=config.BASE_SAMPLE_RATE)
     audio_duration[client_id] = 0
@@ -38,6 +38,7 @@ async def websocket(ws: WebSocket):
     error_description = None
 
     await ws.accept()
+    channel_name = str()
 
     while True:
         try:
@@ -50,27 +51,27 @@ async def websocket(ws: WebSocket):
             try:
                 if message.get('text') and 'config' in message.get('text'):
                     json_cfg = ujson.loads(message.get('text'))['config']
-
                     audio_format = json_cfg.get("audio_format", 'pcm16')
-
                     sample_rate = json_cfg.get('sample_rate')
-
                     wait_null_answers = json_cfg.get('wait_null_answers', wait_null_answers)
-
                     do_dialogue = json_cfg.get("do_dialogue", False)
                     do_punctuation = json_cfg.get("do_punctuation", False)
-
-                    logger.info(f"\n Task received, config -  {message.get('text')}")
+                    try:
+                        channel_name = message.get('text').get("channelName")
+                    except Exception as e:
+                        channel_name = "Null"
+                        logger.debug("ChannelName not parsed")
+                    logger.info(f"Task received, config -  {message.get('text')}")
                     continue
 
                 elif message.get('text') and 'eof' in message.get('text'):
-                    logger.debug("EOF received\n")
+                    logger.info(f"EOF received in channel {channel_name}")
                     break
                 else:
-                    logger.error(f"Can`t recognise  text part of  message {message.get('text')}")
+                    logger.error(f"Can`t recognise  text part of  message {message.get('text')} in channel {channel_name}")
 
             except Exception as e:
-                logger.error(f'Error text message compiling. Message:{message} - error:{e}')
+                logger.error(f'Error text message compiling. Message:{message} - error:{e} in channel {channel_name}')
         elif isinstance(message, dict) and message.get('bytes'):
             try:
                 # Получаем новый чанк с данными
@@ -92,9 +93,9 @@ async def websocket(ws: WebSocket):
                         audiosegment_chunk = AudioSegment.from_file(buffer)
 
                     except Exception as e:
-                        logger.error(f"Ошибка принятия аудио - {e}")
+                        logger.error(f"Ошибка принятия аудио - {e} in channel {channel_name}")
                     else:
-                        logger.debug("Чанк принят и распознан")
+                        logger.debug(f"Чанк принят и распознан in channel {channel_name}")
                 # Todo-вынести за конструкцию if-else приёма данных. и сократить обрабоку последнего чанка по примеру process_file
                 # Приводим фреймрейт к фреймрейту модели
                 if audiosegment_chunk.frame_rate != config.BASE_SAMPLE_RATE:
@@ -112,7 +113,7 @@ async def websocket(ws: WebSocket):
                 else:
                     continue
             except Exception as e:
-                logger.error(f"AcceptWaveform error - {e}")
+                logger.error(f"AcceptWaveform error - {e} in channel {channel_name}")
             else:
                 try:
                     if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
@@ -168,11 +169,11 @@ async def websocket(ws: WebSocket):
                                 logger.error(f"error clearing globals after abnormal closing socket - {e}")
                             return
         else:
-            error_description = f"Can`t parse message - {message}"
+            error_description = f"Can`t parse message - {message} in channel {channel_name}"
             logger.error(error_description)
 
             if not await send_messages(ws, _silence=False, _data=None, _error=error_description):
-                logger.error(f"send_message not ok work canceled")
+                logger.error(f"send_message not ok work canceled in channel {channel_name}")
                 try:
                     del audio_overlap[client_id]
                     del audio_buffer[client_id]
@@ -180,7 +181,7 @@ async def websocket(ws: WebSocket):
                     del audio_duration[client_id]
                     del ws_collected_asr_res[client_id]
                 except Exception as e:
-                    logger.error(f"error clearing globals after abnormal closing socket - {e}")
+                    logger.error(f"error clearing globals after abnormal closing socket - {e} in channel {channel_name}")
                 return
 
     # Передаём на распознавание собранный не полный буфер
@@ -194,14 +195,14 @@ async def websocket(ws: WebSocket):
 
                 audio_to_asr[client_id][-1] = audio_to_asr[client_id][-1] + AudioSegment.silent(1000, frame_rate=sample_rate)
         except Exception as e:
-            logger.error(f"Ошибка дополнения тишиной последнего чанка - {e}")
+            logger.error(f"Ошибка дополнения тишиной последнего чанка - {e} in channel {channel_name}")
             last_result = None
-            error_description = f"Ошибка дополнения тишиной последнего чанка - {e}"
+            error_description = f"Ошибка дополнения тишиной последнего чанка - {e} in channel {channel_name}"
         else:
             if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
                 last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id][-1])
                 last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
-                logger.debug(f'Последний результат {last_result.get("data").get("text")}')
+                logger.debug(f'Последний результат {last_result.get("data").get("text")} in channel {channel_name}')
 
                 ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
                 logger.debug(last_result)
@@ -238,7 +239,7 @@ async def websocket(ws: WebSocket):
         #
         if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=error_description, _last_message=True,
                                    _sentenced_data=sentenced_data):
-            logger.error(f"send_message not ok work canceled")
+            logger.error(f"send_message not ok work canceled in channel {channel_name}")
             try:
                 del audio_overlap[client_id]
                 del audio_buffer[client_id]
@@ -246,7 +247,7 @@ async def websocket(ws: WebSocket):
                 del audio_duration[client_id]
                 del ws_collected_asr_res[client_id]
             except Exception as e:
-                logger.error(f"error clearing globals after abnormal closing socket - {e}")
+                logger.error(f"error clearing globals after abnormal closing socket - {e} in channel {channel_name}")
             return
 
     await ws.close()
@@ -258,7 +259,7 @@ async def websocket(ws: WebSocket):
         del audio_duration[client_id]
         del ws_collected_asr_res[client_id]
     except Exception as e:
-        logger.error(f"error clearing globals after NORMAL closing socket - {e}")
+        logger.error(f"error clearing globals after NORMAL closing socket - {e} in channel {channel_name}")
     return
 
     # try:
