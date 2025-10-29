@@ -1,7 +1,7 @@
 from utils.do_logging import logger
 
 
-async def send_messages(_socket, _data=None, _silence=True, _error=None, _last_message=False,
+async def send_messages(_socket, _channel_name = None, _data=None, _silence=True, _error=None, _last_message=False,
                         _sentenced_data=None):
     if _sentenced_data is None:
         _sentenced_data = dict()
@@ -14,7 +14,8 @@ async def send_messages(_socket, _data=None, _silence=True, _error=None, _last_m
     else:
         data = _data.get('data')
 
-    snd_mssg = {"silence": _silence,
+    snd_mssg = {"channel_name": _channel_name,
+                "silence": _silence,
                 "data": data,
                 "error": _error,
                 "last_message": _last_message,

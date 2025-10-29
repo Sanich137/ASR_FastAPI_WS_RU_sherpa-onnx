@@ -141,7 +141,7 @@ async def websocket(ws: WebSocket):
                 else:
                     if len(asr_result_words.get("data").get("text")) == 0 or asr_result_words.get("data").get("text") == ' ':
                         if wait_null_answers:
-                            if not await send_messages(ws, _silence = True, _data = None, _error = None):
+                            if not await send_messages(ws, _silence = True, _data = None, _error = None, _channel_name=channel_name):
                                 logger.error(f"send_message not ok work canceled")
                                 try:
                                     del audio_overlap[client_id]
@@ -157,7 +157,7 @@ async def websocket(ws: WebSocket):
                             logger.debug("sending silence partials skipped")
                             continue
                     else:
-                        if not await send_messages(ws, _silence=False, _data=asr_result_words, _error=None):
+                        if not await send_messages(ws, _silence=False, _data=asr_result_words, _error=None, _channel_name = channel_name):
                             logger.error(f"send_message not ok work canceled")
                             try:
                                 del audio_overlap[client_id]
@@ -168,11 +168,15 @@ async def websocket(ws: WebSocket):
                             except Exception as e:
                                 logger.error(f"error clearing globals after abnormal closing socket - {e}")
                             return
+        elif isinstance(message, dict) and message.get('type') == "websocket.disconnect":
+            description = f"Channel {channel_name} closed from outside"
+            logger.error(description)
+            break
         else:
             error_description = f"Can`t parse message - {message} in channel {channel_name}"
             logger.error(error_description)
 
-            if not await send_messages(ws, _silence=False, _data=None, _error=error_description):
+            if not await send_messages(ws, _silence=False, _data=None, _error=error_description, _channel_name=channel_name):
                 logger.error(f"send_message not ok work canceled in channel {channel_name}")
                 try:
                     del audio_overlap[client_id]
@@ -238,7 +242,7 @@ async def websocket(ws: WebSocket):
 
         #
         if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=error_description, _last_message=True,
-                                   _sentenced_data=sentenced_data):
+                                   _sentenced_data=sentenced_data, _channel_name=channel_name):
             logger.error(f"send_message not ok work canceled in channel {channel_name}")
             try:
                 del audio_overlap[client_id]
@@ -250,6 +254,7 @@ async def websocket(ws: WebSocket):
                 logger.error(f"error clearing globals after abnormal closing socket - {e} in channel {channel_name}")
             return
 
+    logger.info(f"Closing connection {channel_name}")
     await ws.close()
 
     try:
