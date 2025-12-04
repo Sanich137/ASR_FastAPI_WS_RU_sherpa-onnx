@@ -109,68 +109,68 @@ async def recognise_w_calculate_confidence(audio_data,
     # Возвращаем результат в формате JSON
     return result
 
+# async def simple_recognise(audio_data, ) -> dict:
+#     """
+#     Собираем токены в слова дополнительных вычислений не производит.
+#
+#     :param audio_data: Аудиоданные в формате Audiosegment (puDub).
+#     :return: json =
+#         {
+#         "data": {
+#           "result": [
+#
+#             {
+#               "conf": 1,
+#               "start": 32.22,
+#               "end": 32.46,
+#               "word": "сейчас"
+#             },
+#             {
+#               "conf": 1,
+#               "start": 33.26,
+#               "end": 33.74,
+#               "word": "попробуем"
+#             },
+#             {
+#               "conf": 1,
+#               "start": 37.46,
+#               "end": 37.82,
+#               "word": "свидания"
+#             }
+#           ],
+#           "text": "угу угу ладно сейчас попробуем все хорошо поняла вас спасибо да до свидания"
+#         }
+#
+#     без дополнительных расчётов
+#     """
+#
+#     # Приводим фреймрейт к фреймрейту модели
+#     if audio_data.frame_rate != config.BASE_SAMPLE_RATE:
+#         audio_data = await resample_audiosegment(audio_data, config.BASE_SAMPLE_RATE)
+#
+#     # Перевод в семплы для распознавания.
+#     samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
+#
+#     # Распознавание в отдельном потоке
+#     def decode_in_thread():
+#
+#         stream = recognizer.create_stream()
+#         # передали аудиофрагмент на распознавание
+#         stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
+#         recognizer.decode_stream(stream)
+#         r = str(stream.result)
+#         del stream
+#         return r
+#
+#     result_json = await asyncio.to_thread(decode_in_thread)
+#
+#     # Парсим результат
+#     result = ujson.loads(result_json)
+#
+#     return result
+
+
 async def simple_recognise(audio_data, ) -> dict:
-    """
-    Собираем токены в слова дополнительных вычислений не производит.
-
-    :param audio_data: Аудиоданные в формате Audiosegment (puDub).
-    :return: json =
-        {
-        "data": {
-          "result": [
-
-            {
-              "conf": 1,
-              "start": 32.22,
-              "end": 32.46,
-              "word": "сейчас"
-            },
-            {
-              "conf": 1,
-              "start": 33.26,
-              "end": 33.74,
-              "word": "попробуем"
-            },
-            {
-              "conf": 1,
-              "start": 37.46,
-              "end": 37.82,
-              "word": "свидания"
-            }
-          ],
-          "text": "угу угу ладно сейчас попробуем все хорошо поняла вас спасибо да до свидания"
-        }
-
-    без дополнительных расчётов
-    """
-
-    # Приводим фреймрейт к фреймрейту модели
-    if audio_data.frame_rate != config.BASE_SAMPLE_RATE:
-        audio_data = await resample_audiosegment(audio_data, config.BASE_SAMPLE_RATE)
-
-    # Перевод в семплы для распознавания.
-    samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
-
-    # Распознавание в отдельном потоке
-    def decode_in_thread():
-
-        stream = recognizer.create_stream()
-        # передали аудиофрагмент на распознавание
-        stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
-        recognizer.decode_stream(stream)
-        r = str(stream.result)
-        del stream
-        return r
-
-    result_json = await asyncio.to_thread(decode_in_thread)
-
-    # Парсим результат
-    result = ujson.loads(result_json)
-
-    return result
-
-
-async def simple_recognise_stupakov(audio_data, ) -> dict:
     # Приводим фреймрейт к фреймрейту модели
     if audio_data.frame_rate != config.BASE_SAMPLE_RATE:
         audio_data = await resample_audiosegment(audio_data, config.BASE_SAMPLE_RATE)
@@ -199,28 +199,8 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
         audio_data = await do_slow_down_audio(audio_segment=audio_data,slowdown_rate=multiplier)
 
 
-    # Приводим фреймрейт к фреймрейту модели
-    if audio_data.frame_rate != config.BASE_SAMPLE_RATE:
-        audio_data = await resample_audiosegment(audio_data, config.BASE_SAMPLE_RATE)
-
-    # перевод в семплы для распознавания.
-    samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
-
-    # Распознавание в отдельном потоке
-    def decode_in_thread():
-        stream = recognizer.create_stream()
-
-        # передали аудиофрагмент на распознавание
-        stream.accept_waveform(sample_rate=audio_data.frame_rate, waveform=samples)
-        recognizer.decode_stream(stream)
-        r = str(stream.result)
-        del stream
-        return r
-
-    result_json = await asyncio.to_thread(decode_in_thread)
-
     # Парсим результат
-    result = ujson.loads(result_json)
+    result = await simple_recognise(audio_data)
 
     if can_slow_down and multiplier == 1:
         speed = calc_speed(result)
@@ -235,6 +215,9 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
     samples = None
     audio_data = None
     return result, speed, multiplier
+
+
+
 
 # Наработки по распознавания батчем. Не хватает памяти. Прироста скорости найти не удаётся
 async def simple_recognise_batch(list_audio_data: list, batch_size: int = 4) -> list:
