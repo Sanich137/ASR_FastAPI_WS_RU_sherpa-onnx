@@ -14,7 +14,7 @@ from utils.pre_start_init import (
 from utils.do_logging import logger
 from utils.chunk_doing import find_last_speech_position
 from utils.resamppling import resample_audiosegment
-from Recognizer.engine.stream_recognition import simple_recognise, recognise_w_speed_correction, simple_recognise_batch
+from Recognizer.engine.stream_recognition import simple_recognise, recognise_w_speed_correction, simple_recognise_batch, simple_recognise_stupakov
 from Recognizer.engine.sentensizer import do_sensitizing
 from Recognizer.engine.echoe_clearing import remove_echo
 from Diarisation.diarazer import do_diarizing
@@ -117,6 +117,7 @@ def process_file(tmp_path, params):
                 audio_buffer[post_id] = overlap
                 asyncio.run(find_last_speech_position(post_id, is_last_chunk)) # Последний чанк обрабатывается иначе.
 
+
         use_batching = False
         if use_batching:
             list_asr_result_wo_conf = asyncio.run(simple_recognise_batch(audio_to_asr[post_id]))  # --> list
@@ -126,17 +127,20 @@ def process_file(tmp_path, params):
 
         for audio_asr in audio_to_asr[post_id]:
             try:
-                # Снижаем скорость аудио по необходимости
-                if params.do_auto_speech_speed_correction or params.speech_speed_correction_multiplier != 1:
-                    logger.debug("Будут использованы механизмы анализа скорости речи и замедления аудио")
 
-                    asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_asr,
-                                                                        can_slow_down=True,
-                                                                        multiplier=params.speech_speed_correction_multiplier))
-                    params.speech_speed_correction_multiplier = multiplier
-                else:
-                    # Производим распознавание
-                    asr_result_wo_conf = asyncio.run(simple_recognise(audio_asr))
+                asr_result_wo_conf = asyncio.run(simple_recognise_stupakov(audio_asr))
+
+                # # Снижаем скорость аудио по необходимости
+                # if params.do_auto_speech_speed_correction or params.speech_speed_correction_multiplier != 1:
+                #     logger.debug("Будут использованы механизмы анализа скорости речи и замедления аудио")
+                #
+                #     asr_result_wo_conf, speed, multiplier = asyncio.run(recognise_w_speed_correction(audio_asr,
+                #                                                         can_slow_down=True,
+                #                                                         multiplier=params.speech_speed_correction_multiplier))
+                #     params.speech_speed_correction_multiplier = multiplier
+                # else:
+                #     # Производим распознавание
+                #     asr_result_wo_conf = asyncio.run(simple_recognise(audio_asr))
 
             except Exception as e:
                 logger.error(f"Error ASR audio - {e}")

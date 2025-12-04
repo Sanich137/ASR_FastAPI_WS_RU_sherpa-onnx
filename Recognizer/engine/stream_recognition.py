@@ -8,6 +8,7 @@ from utils.bytes_to_samples_audio import get_np_array_samples_float32
 from utils.resamppling import resample_audiosegment
 from utils.slow_down_audio import do_slow_down_audio
 from utils.do_logging import logger
+from dataclasses import asdict
 
 def calc_speed(data):
     time_to_speak_tokens = 0
@@ -165,6 +166,18 @@ async def simple_recognise(audio_data, ) -> dict:
 
     # Парсим результат
     result = ujson.loads(result_json)
+
+    return result
+
+
+async def simple_recognise_stupakov(audio_data, ) -> dict:
+    # Приводим фреймрейт к фреймрейту модели
+    if audio_data.frame_rate != config.BASE_SAMPLE_RATE:
+        audio_data = await resample_audiosegment(audio_data, config.BASE_SAMPLE_RATE)
+
+    # Перевод в семплы для распознавания.
+    samples = await get_np_array_samples_float32(audio_data.raw_data, audio_data.sample_width)
+    result = asdict(recognizer.recognize(samples, sample_rate=config.BASE_SAMPLE_RATE))
 
     return result
 
