@@ -212,11 +212,7 @@ async def recognise_w_speed_correction(audio_data, multiplier=float(1.0), can_sl
                                                can_slow_down=True,
                                                multiplier=max((config.SPEECH_PER_SEC_NORM_RATE-1)/speed, 0.8)
                                                                            )
-    samples = None
-    audio_data = None
     return result, speed, multiplier
-
-
 
 
 # Наработки по распознавания батчем. Не хватает памяти. Прироста скорости найти не удаётся

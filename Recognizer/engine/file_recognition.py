@@ -3,7 +3,7 @@ from pydub import AudioSegment
 import config
 import asyncio
 import uuid
-from utils.tokens_to_Result import process_asr_json, process_gigaam_asr
+from utils.tokens_to_Result import process_asr_json
 from utils.pre_start_init import (
     posted_and_downloaded_audio,
     audio_buffer,
@@ -144,12 +144,7 @@ def process_file(tmp_path, params):
                 logger.error(f"Error ASR audio - {e}")
                 error_description = f"Error ASR audio - {e}"
             else:
-                if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":  # Whisper
-                    asr_result = asyncio.run(process_gigaam_asr(asr_result_wo_conf,
-                                                         audio_duration[post_id],
-                                                         params.speech_speed_correction_multiplier))
-                else:
-                    asr_result = asyncio.run(process_asr_json(asr_result_wo_conf, audio_duration[post_id]))
+                asr_result = asyncio.run(process_asr_json(asr_result_wo_conf, audio_duration[post_id]))
 
                 result["raw_data"][f"channel_{n_channel + 1}"].append(asr_result)
 

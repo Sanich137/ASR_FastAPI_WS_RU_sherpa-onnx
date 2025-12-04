@@ -40,7 +40,9 @@ async def websocket(ws: WebSocket):
     await ws.accept()
     channel_name = str()
 
-    while True:
+    EOF_received = False
+
+    while not EOF_received:
         try:
             message = await ws.receive()
         except Exception as wse:
@@ -66,7 +68,7 @@ async def websocket(ws: WebSocket):
 
                 elif message.get('text') and 'eof' in message.get('text'):
                     logger.info(f"EOF received in channel {channel_name}")
-                    break
+                    EOF_received = True
                 else:
                     logger.error(f"Can`t recognise  text part of  message {message.get('text')} in channel {channel_name}")
 
@@ -115,32 +117,26 @@ async def websocket(ws: WebSocket):
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e} in channel {channel_name}")
             else:
+                # Для последнего или неполного чанка дописываем тишиной.
+                if audio_to_asr[client_id][-1].duration_seconds < 2:
+                    audio_to_asr[client_id][-1] = (audio_to_asr[client_id][-1] +
+                                                   AudioSegment.silent(1000, frame_rate=sample_rate))
+
                 try:
-                    if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
-                        asr_first_result_wo_conf = await simple_recognise(audio_to_asr[client_id][-1])
-                        asr_result_words = await process_gigaam_asr(asr_first_result_wo_conf, audio_duration[client_id])
+                    asr_result = await simple_recognise(audio_to_asr[client_id][-1])
+                    asr_result_words = await process_asr_json(asr_result, audio_duration[client_id])
+                    audio_duration[client_id] += audio_to_asr[client_id][-1].duration_seconds
+                    logger.debug(asr_result_words)
 
-                        audio_duration[client_id] += audio_to_asr[client_id][-1].duration_seconds
-                        logger.debug(asr_result_words)
-
-                        # Копим ответы для пунктуации
-                        ws_collected_asr_res[client_id][f"channel_{1}"].append(asr_result_words)
-                    else:
-                        asr_result_w_conf = await recognise_w_calculate_confidence(audio_to_asr[client_id][-1],
-                                                                             num_trials=config.RECOGNITION_ATTEMPTS)
-
-                        asr_result_words = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
-                        audio_duration[client_id] += audio_to_asr[client_id][-1].duration_seconds
-                        logger.debug(asr_result_words)
-
-                        # Копим ответы для пунктуации
-                        ws_collected_asr_res[client_id][f"channel_{1}"].append(asr_result_words)
+                    # Копим ответы для пунктуации
+                    ws_collected_asr_res[client_id][f"channel_{1}"].append(asr_result_words)
 
                 except Exception as e:
                     logger.error(f"recognizer.get_result(stream()) error - {e}")
                 else:
                     if len(asr_result_words.get("data").get("text")) == 0 or asr_result_words.get("data").get("text") == ' ':
                         if wait_null_answers:
+                            #todo - что с передачей последнего сообщения?
                             if not await send_messages(ws, _silence = True, _data = None, _error = None, _channel_name=channel_name):
                                 logger.error(f"send_message not ok work canceled")
                                 try:
@@ -157,7 +153,8 @@ async def websocket(ws: WebSocket):
                             logger.debug("sending silence partials skipped")
                             continue
                     else:
-                        if not await send_messages(ws, _silence=False, _data=asr_result_words, _error=None, _channel_name = channel_name):
+                        if not await send_messages(ws, _silence=False, _data=asr_result_words, _error=error_description,
+                                                   _channel_name = channel_name):
                             logger.error(f"send_message not ok work canceled")
                             try:
                                 del audio_overlap[client_id]
@@ -188,71 +185,27 @@ async def websocket(ws: WebSocket):
                     logger.error(f"error clearing globals after abnormal closing socket - {e} in channel {channel_name}")
                 return
 
-    # Передаём на распознавание собранный не полный буфер
-    # перевод в семплы для распознавания.
-    audio_to_asr[client_id].append(audio_overlap[client_id] + audio_buffer[client_id])
-    logger.debug(f'итоговое сообщение - {audio_to_asr[client_id][-1].duration_seconds} секунд')
-
-    try:
+    # Todo - Вот тут как будто ошибка, не отрабатывается пунктуация.
+    if do_dialogue:
         try:
-            if audio_to_asr[client_id][-1].duration_seconds < 2:
-
-                audio_to_asr[client_id][-1] = audio_to_asr[client_id][-1] + AudioSegment.silent(1000, frame_rate=sample_rate)
+            sentenced_data = await do_sensitizing(ws_collected_asr_res[client_id], do_punctuation)
         except Exception as e:
-            logger.error(f"Ошибка дополнения тишиной последнего чанка - {e} in channel {channel_name}")
-            last_result = None
-            error_description = f"Ошибка дополнения тишиной последнего чанка - {e} in channel {channel_name}"
-        else:
-            if config.MODEL_NAME == "Gigaam" or config.MODEL_NAME == "Gigaam_rnnt":
-                last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id][-1])
-                last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
-                logger.debug(f'Последний результат {last_result.get("data").get("text")} in channel {channel_name}')
+            logger.error(f"await do_sensitizing - {e}")
+            error_description = f"do_sensitizing - {e}"
 
-                ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
-                logger.debug(last_result)
-            else:
-                asr_result_w_conf = await recognise_w_calculate_confidence(audio_to_asr[client_id],
-                                                                     num_trials=config.RECOGNITION_ATTEMPTS)
-                last_result = await process_asr_json(asr_result_w_conf, audio_duration[client_id])
-                audio_duration[client_id] += audio_to_asr[client_id].duration_seconds
-                ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
-                logger.debug(last_result)
-
-    except Exception as e:
-        logger.error(f"last_asr_result_w_conf error - {e}")
-
-    else:
-        if len(last_result.get("data").get("text")) == 0:
-            is_silence = True
-            last_result = None
-        elif last_result.get("data").get("text") == ' ':
-            is_silence = True
-            last_result = None
-        else:
-            logger.debug(last_result)
-            is_silence = False
-
-        # Todo - Вот тут как будто ошибка, не отрабатывается пунктуация.
-        if do_dialogue:
-            try:
-                sentenced_data = await do_sensitizing(ws_collected_asr_res[client_id], do_punctuation)
-            except Exception as e:
-                logger.error(f"await do_sensitizing - {e}")
-                error_description = f"do_sensitizing - {e}"
-
-        #
-        if not await send_messages(ws, _silence=is_silence, _data=last_result, _error=error_description, _last_message=True,
-                                   _sentenced_data=sentenced_data, _channel_name=channel_name):
-            logger.error(f"send_message not ok work canceled in channel {channel_name}")
-            try:
-                del audio_overlap[client_id]
-                del audio_buffer[client_id]
-                del audio_to_asr[client_id]
-                del audio_duration[client_id]
-                del ws_collected_asr_res[client_id]
-            except Exception as e:
-                logger.error(f"error clearing globals after abnormal closing socket - {e} in channel {channel_name}")
-            return
+    #
+    if not await send_messages(ws, _silence=False, _data=None, _error=error_description, _last_message=True,
+                               _sentenced_data=sentenced_data, _channel_name=channel_name):
+        logger.error(f"send_message not ok work canceled in channel {channel_name}")
+        try:
+            del audio_overlap[client_id]
+            del audio_buffer[client_id]
+            del audio_to_asr[client_id]
+            del audio_duration[client_id]
+            del ws_collected_asr_res[client_id]
+        except Exception as e:
+            logger.error(f"error clearing globals after abnormal closing socket - {e} in channel {channel_name}")
+        return
 
     logger.info(f"Closing connection {channel_name}")
     await ws.close()

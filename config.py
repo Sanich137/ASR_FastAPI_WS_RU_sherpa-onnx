@@ -11,6 +11,9 @@ BASE_SAMPLE_RATE = int(os.getenv('BASE_SAMPLE_RATE', 16000))  # Стрим из 
 PROVIDER = os.getenv('PROVIDER',"CUDA")
 NUM_THREADS = int(os.getenv('NUM_THREADS', 0))
 
+# HuggingFaceHubSettings
+os.environ["HF_HOME"] = os.getenv("HF_HOME", "./models")
+
 # Logger settings
 LOGGING_LEVEL = os.getenv('LOGGING_LEVEL', 'DEBUG')
 LOGGING_FORMAT = os.getenv('LOGGING_FORMAT', u'#%(levelname)-8s %(filename)s [LINE:%(lineno)d] [%(asctime)s]  %(message)s')
