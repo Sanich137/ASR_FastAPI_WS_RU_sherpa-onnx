@@ -81,7 +81,7 @@ async def websocket(ws: WebSocket):
                     # Переводим чанк в объект Audiosegment
                     audiosegment_chunk = AudioSegment(
                         chunk,
-                        frame_rate = sample_rate,  # Укажи частоту дискретизации
+                        frame_rate = sample_rate,  # Частота дискретизации
                         sample_width = 2,   # Ширина сэмпла (2 байта для int16)
                         channels = 1        # Количество каналов. По умолчанию - 1, Моно.
                     )
@@ -116,11 +116,6 @@ async def websocket(ws: WebSocket):
             except Exception as e:
                 logger.error(f"AcceptWaveform error - {e} in channel {channel_name}")
             else:
-                # Для последнего или неполного чанка дописываем тишиной.
-                if audio_to_asr[client_id][-1].duration_seconds < 2:
-                    audio_to_asr[client_id][-1] = (audio_to_asr[client_id][-1] +
-                                                   AudioSegment.silent(1000, frame_rate=sample_rate))
-
                 try:
                     asr_result = await simple_recognise(audio_to_asr[client_id][-1])
                     asr_result_words = await process_asr_json(asr_result, audio_duration[client_id])
@@ -197,8 +192,12 @@ async def websocket(ws: WebSocket):
             error_description = f"Ошибка дополнения тишиной последнего чанка - {e} in channel {channel_name}"
         else:
             last_asr_result_w_conf = await simple_recognise(audio_to_asr[client_id][-1])
-            last_result = await process_gigaam_asr(last_asr_result_w_conf, audio_duration[client_id])
+            last_result = await process_asr_json(last_asr_result_w_conf, audio_duration[client_id])
             logger.debug(f'Последний результат {last_result.get("data").get("text")} in channel {channel_name}')
+
+            # Добавляем ответ для пунктуации
+            ws_collected_asr_res[client_id][f"channel_{1}"].append(last_result)
+
 
     except Exception as e:
         logger.error(f"last_asr_result_w_conf error - {e}")
@@ -214,7 +213,6 @@ async def websocket(ws: WebSocket):
             logger.debug(last_result)
             is_silence = False
 
-        # Todo - Вот тут как будто ошибка, не отрабатывается пунктуация.
         if do_dialogue:
             try:
                 sentenced_data = await do_sensitizing(ws_collected_asr_res[client_id], do_punctuation)
