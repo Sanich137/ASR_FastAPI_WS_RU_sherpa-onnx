@@ -15,10 +15,25 @@ Environment=PORT=49153
 
 # Environment=LOGGING_LEVEL="DEBUG"
 
-Environment=MODEL_NAME=Gigaam
-Environment=BASE_SAMPLE_RATE=8000
-Environment=PROVIDER=CUDA
+Environment=MODEL_NAME="gigaam-v3-rnnt"
+Environment=BASE_SAMPLE_RATE=16000
+Environment=PROVIDER="CUDA"
 Environment=IS_PROD=1
+Environment=BETWEEN_WORDS_PERCENTILE=90
+
+Environment=CAN_DIAR=0
+Environment=DIAR_WITH_GPU=1
+Environment=DIAR_MODEL_NAME="voxblink2_samresnet100_ft"
+Environment=DIAR_GPU_BATCH_SIZE=8
+
+Environment=DO_LOCAL_FILE_RECOGNITIONS=0
+Environment=DELETE_LOCAL_FILE_AFTR_ASR=1
+
+Environment=DO_SPEED_SPEECH_CORRECTION=1
+Environment=MAX_OVERLAP_DURATION=30
+Environment=PUNCTUATE_WITH_GPU=1
+Environment=VAD_SENSE=3
+
 
 
 WorkingDirectory=/opt/Vosk5_FastAPI_streaming
