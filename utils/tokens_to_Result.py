@@ -5,15 +5,9 @@ from sympy.physics.units import speed
 
 from utils.do_logging import logger
 
-# # Функция для преобразования логарифмических вероятностей в обычные
-# def logprob_to_prob(logprob):
-#     return math.exp(logprob)  # Используем exp для преобразования ln(prob)
-
-# Асинхронная функция для обработки JSON
+# Парсим JSON
 async def process_asr_json(input_json, time_shift = 0.0):
-    # Парсим JSON
     data = input_json
-
     # Формируем шаблон результата
     result = {"data": {"result": [], "text": ""}}
 
